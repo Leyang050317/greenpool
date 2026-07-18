@@ -17,4 +17,7 @@ Route::middleware('auth')->group(function () {
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
 
+Route::view('/email-verified', 'auth.verification-success')
+    ->name('verification.success');
+
 require __DIR__.'/auth.php';
