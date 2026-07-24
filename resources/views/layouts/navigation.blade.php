@@ -5,22 +5,74 @@
             <div class="flex">
                 <!-- Logo -->
                 <div class="shrink-0 flex items-center">
-                    <a href="{{ route('dashboard') }}">
-                        <x-application-logo class="block h-9 w-auto fill-current text-gray-800" />
+                    <a href="{{ route('dashboard') }}"
+                        class="text-2xl font-bold text-emerald-600">
+                        GreenPool
                     </a>
                 </div>
 
                 <!-- Navigation Links -->
                 <div class="hidden space-x-8 sm:-my-px sm:ms-10 sm:flex">
-                    <x-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
-                        {{ __('Dashboard') }}
+
+                    @if(Auth::user()->role === 'passenger')
+
+                    <x-nav-link
+                        :href="route('passenger.home')"
+                        :active="request()->routeIs('passenger.home')">
+                        Home
                     </x-nav-link>
+
+                    <x-nav-link
+                        :href="route('passenger.booking')"
+                        :active="request()->routeIs('passenger.booking')">
+                        My Booking
+                    </x-nav-link>
+
+                    @elseif(Auth::user()->role === 'driver')
+
+                    <x-nav-link
+                        :href="route('driver.home')"
+                        :active="request()->routeIs('driver.home')">
+                        Home
+                    </x-nav-link>
+
+                    <x-nav-link href="#">
+                        Booking Request
+                    </x-nav-link>
+
+                    <x-nav-link href="#">
+                        Vehicle
+                    </x-nav-link>
+
+                    @endif
+
                 </div>
             </div>
 
-            <!-- Settings Dropdown -->
-            <div class="hidden sm:flex sm:items-center sm:ms-6">
+            <!-- Right Navigation -->
+            <div class="hidden sm:flex sm:items-center sm:space-x-4">
+
+                <!-- Notification -->
+                <button
+                    class="relative p-2 rounded-full text-gray-500 hover:bg-gray-100 hover:text-emerald-600 transition">
+
+                    <svg xmlns="http://www.w3.org/2000/svg"
+                        class="w-6 h-6"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor">
+
+                        <path stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M15 17h5l-1.4-1.4A2 2 0 0118 14.17V11a6 6 0 10-12 0v3.17a2 2 0 01-.59 1.42L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                    </svg>
+
+                </button>
+
+                <!-- User Dropdown -->
                 <x-dropdown align="right" width="48">
+
                     <x-slot name="trigger">
                         <button class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-gray-500 bg-white hover:text-gray-700 focus:outline-none transition ease-in-out duration-150">
                             <div>{{ Auth::user()->name }}</div>
@@ -43,13 +95,15 @@
                             @csrf
 
                             <x-dropdown-link :href="route('logout')"
-                                    onclick="event.preventDefault();
+                                onclick="event.preventDefault();
                                                 this.closest('form').submit();">
                                 {{ __('Log Out') }}
                             </x-dropdown-link>
                         </form>
                     </x-slot>
+
                 </x-dropdown>
+
             </div>
 
             <!-- Hamburger -->
@@ -89,7 +143,7 @@
                     @csrf
 
                     <x-responsive-nav-link :href="route('logout')"
-                            onclick="event.preventDefault();
+                        onclick="event.preventDefault();
                                         this.closest('form').submit();">
                         {{ __('Log Out') }}
                     </x-responsive-nav-link>

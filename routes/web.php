@@ -2,11 +2,12 @@
 
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Passenger\PassengerBookingController;
 use App\Http\Controllers\Passenger\HomeController as PassengerHomeController;
 use App\Http\Controllers\Driver\HomeController as DriverHomeController;
 
 Route::get('/', function () {
-    return view('welcome');
+    return redirect()->route('login');
 });
 
 Route::get('/dashboard', function () {
@@ -26,6 +27,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('/driver/home', [DriverHomeController::class, 'index'])
         ->name('driver.home');
+
+    Route::get('/passenger/booking', [PassengerBookingController::class, 'index'])
+    ->name('passenger.booking');
 
 });
 

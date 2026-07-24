@@ -28,11 +28,17 @@ class AuthenticatedSessionController extends Controller
 
         $request->session()->regenerate();
 
-        if ($request->user()->role === 'driver') {
-            return redirect()->intended(route('driver.home'));
+        $user = $request->user();
+
+        if ($user->role === 'driver') {
+            return redirect()->route('driver.home');
         }
 
-        return redirect()->intended(route('passenger.home'));
+        if ($user->role === 'passenger') {
+            return redirect()->route('passenger.home');
+        }
+
+        abort(403, 'Invalid user role.');
     }
 
     /**
