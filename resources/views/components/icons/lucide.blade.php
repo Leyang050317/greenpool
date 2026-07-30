@@ -55,6 +55,16 @@
             <circle cx="12" cy="12" r="10" />
             <path d="M9.1 9a3 3 0 1 1 5.8 1c0 2-3 2-3 4M12 18h.01" />
             @break
+        @case('circle-check')
+            <circle cx="12" cy="12" r="10" />
+            <path d="m9 12 2 2 4-4" />
+            @break
+        @case('star')
+            <path d="m12 2 3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z" />
+            @break
+        @case('plus')
+            <path d="M5 12h14M12 5v14" />
+            @break
         @case('panel-left-open')
             <rect width="18" height="18" x="3" y="3" rx="2" />
             <path d="M9 3v18M14 9l3 3-3 3" />
