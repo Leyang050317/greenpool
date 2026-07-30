@@ -31,11 +31,11 @@ class AuthenticatedSessionController extends Controller
         $user = $request->user();
 
         if ($user->role === 'driver') {
-            return redirect()->route('driver.home');
+            return redirect()->intended(route('driver.home'));
         }
 
         if ($user->role === 'passenger') {
-            return redirect()->route('passenger.home');
+            return redirect()->intended(route('passenger.home'));
         }
 
         abort(403, 'Invalid user role.');

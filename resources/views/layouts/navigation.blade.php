@@ -5,7 +5,9 @@
             <div class="flex">
                 <!-- Logo -->
                 <div class="shrink-0 flex items-center">
-                    <a href="{{ route('dashboard') }}"
+                    <a href="{{ Auth::user()->role === 'driver'
+                        ? route('driver.home')
+                        : route('passenger.home') }}"
                         class="text-2xl font-bold text-emerald-600">
                         GreenPool
                     </a>
@@ -121,9 +123,39 @@
     <!-- Responsive Navigation Menu -->
     <div :class="{'block': open, 'hidden': ! open}" class="hidden sm:hidden">
         <div class="pt-2 pb-3 space-y-1">
-            <x-responsive-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
-                {{ __('Dashboard') }}
+
+            @if(Auth::user()->role === 'passenger')
+
+            <x-responsive-nav-link
+                :href="route('passenger.home')"
+                :active="request()->routeIs('passenger.home')">
+                Home
             </x-responsive-nav-link>
+
+            <x-responsive-nav-link
+                :href="route('passenger.booking')"
+                :active="request()->routeIs('passenger.booking')">
+                My Booking
+            </x-responsive-nav-link>
+
+            @elseif(Auth::user()->role === 'driver')
+
+            <x-responsive-nav-link
+                :href="route('driver.home')"
+                :active="request()->routeIs('driver.home')">
+                Home
+            </x-responsive-nav-link>
+
+            <x-responsive-nav-link href="#">
+                Booking Request
+            </x-responsive-nav-link>
+
+            <x-responsive-nav-link href="#">
+                Vehicle
+            </x-responsive-nav-link>
+
+            @endif
+
         </div>
 
         <!-- Responsive Settings Options -->
