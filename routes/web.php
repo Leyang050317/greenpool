@@ -1,10 +1,11 @@
 <?php
 
+use App\Http\Controllers\Driver\HomeController as DriverHomeController;
+use App\Http\Controllers\Driver\VehicleController;
+use App\Http\Controllers\Passenger\HomeController as PassengerHomeController;
+use App\Http\Controllers\Passenger\PassengerBookingController;
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\Passenger\PassengerBookingController;
-use App\Http\Controllers\Passenger\HomeController as PassengerHomeController;
-use App\Http\Controllers\Driver\HomeController as DriverHomeController;
 
 Route::get('/', function () {
     return redirect()->route('login');
@@ -25,7 +26,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('driver.home');
 
     Route::get('/passenger/booking', [PassengerBookingController::class, 'index'])
-    ->name('passenger.booking');
+        ->name('passenger.booking');
+
+    Route::middleware('driver')->prefix('driver')->name('driver.')->group(function () {
+        Route::patch('vehicles/{vehicle}/activate', [VehicleController::class, 'activate'])
+            ->name('vehicles.activate');
+        Route::patch('vehicles/{vehicle}/deactivate', [VehicleController::class, 'deactivate'])
+            ->name('vehicles.deactivate');
+        Route::resource('vehicles', VehicleController::class);
+    });
 
 });
 

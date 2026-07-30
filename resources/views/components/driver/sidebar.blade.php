@@ -3,7 +3,7 @@
         ['label' => 'Dashboard', 'icon' => 'layout-dashboard', 'href' => route('driver.home'), 'active' => request()->routeIs('driver.home')],
         ['label' => 'My Trips', 'icon' => 'route', 'href' => '#', 'active' => request()->routeIs('driver.trips.*')],
         ['label' => 'Booking Requests', 'icon' => 'clipboard-list', 'href' => '#', 'active' => request()->routeIs('driver.booking-requests.*')],
-        ['label' => 'My Vehicles', 'icon' => 'car-front', 'href' => '#', 'active' => request()->routeIs('driver.vehicles.*')],
+        ['label' => 'My Vehicles', 'icon' => 'car-front', 'href' => route('driver.vehicles.index'), 'active' => request()->routeIs('driver.vehicles.*')],
         ['label' => 'Tourist Attractions', 'icon' => 'map-pinned', 'href' => '#', 'active' => request()->routeIs('driver.attractions.*')],
         ['label' => 'Notifications', 'icon' => 'bell', 'href' => '#', 'active' => request()->routeIs('driver.notifications.*'), 'unread' => true],
         ['label' => 'Profile', 'icon' => 'user-circle', 'href' => route('profile.edit'), 'active' => request()->routeIs('profile.edit')],
