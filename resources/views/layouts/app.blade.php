@@ -9,28 +9,72 @@
 
         <!-- Fonts -->
         <link rel="preconnect" href="https://fonts.bunny.net">
-        <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet" />
+        <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&family=inter:700&display=swap" rel="stylesheet" />
 
         <!-- Scripts -->
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     </head>
     <body class="font-sans antialiased">
-        <div class="min-h-screen bg-gray-100">
-            @include('layouts.navigation')
+        @if(Auth::user()?->role === 'driver')
+            <div
+                x-data="driverNavigation"
+                @keydown.escape.window="closeMobileDrawer()"
+                @open-navigation-drawer.window="openMobileDrawer()"
+                class="min-h-screen overflow-x-hidden bg-gray-100"
+            >
+                <div
+                    class="fixed inset-y-0 left-0 z-40 hidden transition-[width] duration-200 ease-out md:block"
+                    :class="sidebarExpanded ? 'w-72' : 'w-20'"
+                >
+                    <x-driver.sidebar />
+                </div>
 
-            <!-- Page Heading -->
-            @isset($header)
-                <header class="bg-white shadow">
-                    <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-                        {{ $header }}
-                    </div>
-                </header>
-            @endisset
+                <div
+                    x-cloak
+                    x-show="mobileDrawerOpen"
+                    x-transition.opacity.duration.150ms
+                    class="fixed inset-0 z-40 bg-slate-950/45 md:hidden"
+                    @click="closeMobileDrawer()"
+                    aria-hidden="true"
+                ></div>
 
-            <!-- Page Content -->
-            <main>
-                {{ $slot }}
-            </main>
-        </div>
+                <div
+                    id="driver-mobile-navigation"
+                    x-cloak
+                    x-show="mobileDrawerOpen"
+                    x-transition:enter="transition ease-out duration-200"
+                    x-transition:enter-start="-translate-x-full"
+                    x-transition:enter-end="translate-x-0"
+                    x-transition:leave="transition ease-in duration-150"
+                    x-transition:leave-start="translate-x-0"
+                    x-transition:leave-end="-translate-x-full"
+                    class="fixed inset-y-0 left-0 z-50 w-72 md:hidden"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-label="Driver navigation menu"
+                >
+                    <x-driver.sidebar />
+                </div>
+
+                <div
+                    class="min-h-screen transition-[padding] duration-200 ease-out"
+                    :class="sidebarExpanded ? 'md:pl-72' : 'md:pl-20'"
+                >
+                    <x-application-header />
+
+                    <main>
+                        {{ $slot }}
+                    </main>
+                </div>
+            </div>
+        @else
+            <div class="min-h-screen bg-gray-100">
+                <x-application-header />
+
+                <main>
+                    {{ $slot }}
+                </main>
+            </div>
+        @endif
     </body>
 </html>
