@@ -35,4 +35,10 @@ return [
         ],
     ],
 
+    'routing' => [
+        'nominatim_url' => env('NOMINATIM_URL', 'https://nominatim.openstreetmap.org'),
+        'osrm_url' => env('OSRM_URL', 'https://router.project-osrm.org'),
+        'user_agent' => env('NOMINATIM_USER_AGENT', 'GreenPool Trip Management/1.0'),
+    ],
+
 ];

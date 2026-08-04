@@ -25,6 +25,7 @@ class User extends Authenticatable implements MustVerifyEmail
         'email',
         'role',
         'password',
+        'photo',
     ];
 
     /**
@@ -53,5 +54,10 @@ class User extends Authenticatable implements MustVerifyEmail
     public function vehicles(): HasMany
     {
         return $this->hasMany(Vehicle::class);
+    }
+
+    public function trips(): HasMany
+    {
+        return $this->hasMany(Trip::class);
     }
 }
