@@ -7,11 +7,8 @@
                 </div>
             @endif
 
-            <div class="mb-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div class="mb-5">
                 <a href="{{ route('driver.vehicles.index') }}" class="text-sm font-semibold text-[#2E7D32] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2E7D32]">← Back to vehicles</a>
-                <a href="{{ route('driver.vehicles.edit', $vehicle) }}" class="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-gray-300 px-5 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2E7D32]">
-                    Edit vehicle
-                </a>
             </div>
 
             <article class="rounded-2xl border border-gray-200 bg-white">
@@ -48,19 +45,9 @@
                 </dl>
 
                 <div class="flex flex-wrap gap-3 border-t border-gray-100 p-6">
-                    @if ($vehicle->status === 'Active')
-                        <form method="POST" action="{{ route('driver.vehicles.deactivate', $vehicle) }}">
-                            @csrf
-                            @method('PATCH')
-                            <button type="submit" class="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-gray-300 px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2E7D32]">Deactivate</button>
-                        </form>
-                    @else
-                        <form method="POST" action="{{ route('driver.vehicles.activate', $vehicle) }}">
-                            @csrf
-                            @method('PATCH')
-                            <button type="submit" class="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-[#2E7D32] px-4 py-2.5 text-sm font-semibold text-[#2E7D32] hover:bg-green-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2E7D32]">Activate</button>
-                        </form>
-                    @endif
+                    <a href="{{ route('driver.vehicles.edit', $vehicle) }}" class="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-gray-300 px-5 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2E7D32]">
+                        Edit vehicle
+                    </a>
 
                     <button type="button" @click="confirmDelete = true" class="ml-auto inline-flex min-h-[44px] items-center justify-center rounded-xl px-4 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600">
                         Delete vehicle
