@@ -32,22 +32,26 @@ class RegisteredUserController extends Controller
     {
         $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:' . User::class],
-            'role' => ['required', 'in:driver,passenger'],
-            'password' => ['required', 'confirmed', Rules\Password::defaults()],
+            'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:'.User::class],
+            'password' => ['required', 'confirmed', \Illuminate\Validation\Rules\Password::defaults()],
+            'role' => ['required', 'string', 'in:driver,passenger'],
         ]);
 
         $user = User::create([
             'name' => $request->name,
             'email' => $request->email,
+            'password' => \Illuminate\Support\Facades\Hash::make($request->password),
             'role' => $request->role,
-            'password' => Hash::make($request->password),
         ]);
 
-        event(new Registered($user));
+        event(new \Illuminate\Auth\Events\Registered($user));
 
-        Auth::login($user);
+        \Illuminate\Support\Facades\Auth::login($user);
 
-        return redirect()->route('verification.notice');
+        if ($user->role === 'driver') {
+            return redirect(route('driver.home'));
+        }
+
+        return redirect(route('passenger.home'));
     }
 }
