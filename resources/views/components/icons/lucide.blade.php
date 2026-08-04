@@ -65,6 +65,53 @@
         @case('plus')
             <path d="M5 12h14M12 5v14" />
             @break
+        @case('arrow-right')
+            <path d="M5 12h14M13 6l6 6-6 6" />
+            @break
+        @case('arrow-left')
+            <path d="M19 12H5M11 18l-6-6 6-6" />
+            @break
+        @case('calendar')
+            <rect width="18" height="18" x="3" y="4" rx="2" />
+            <path d="M16 2v4M8 2v4M3 10h18" />
+            @break
+        @case('clock')
+            <circle cx="12" cy="12" r="9" />
+            <path d="M12 7v5l3 2" />
+            @break
+        @case('users')
+            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+            <circle cx="9" cy="7" r="4" />
+            <path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
+            @break
+        @case('eye')
+            <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12" />
+            <circle cx="12" cy="12" r="3" />
+            @break
+        @case('pencil')
+            <path d="M12 20h9" />
+            <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+            @break
+        @case('map-pin')
+            <path d="M20 10c0 5-8 12-8 12S4 15 4 10a8 8 0 1 1 16 0Z" />
+            <circle cx="12" cy="10" r="2.5" />
+            @break
+        @case('armchair')
+            <path d="M4 11V6a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v5M12 11V7a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v4M4 11h16v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2ZM6 18v2M18 18v2" />
+            @break
+        @case('dollar-sign')
+            <path d="M12 2v20M17 5.5c-1.2-1-2.8-1.5-5-1.5-3 0-5 1.5-5 4s2 3.5 5 4 5 1.5 5 4-2 4-5 4c-2.2 0-3.8-.5-5-1.5" />
+            @break
+        @case('align-left')
+            <path d="M3 6h18M3 12h12M3 18h16" />
+            @break
+        @case('user')
+            <circle cx="12" cy="8" r="4" />
+            <path d="M4 21a8 8 0 0 1 16 0" />
+            @break
+        @case('play')
+            <path d="m8 5 11 7-11 7Z" />
+            @break
         @case('panel-left-open')
             <rect width="18" height="18" x="3" y="3" rx="2" />
             <path d="M9 3v18M14 9l3 3-3 3" />

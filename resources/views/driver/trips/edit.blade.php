@@ -1,0 +1,3 @@
+<x-app-layout>
+    <div class="min-h-screen bg-[#F8FAFC] px-4 py-8 sm:px-6 lg:px-8"><div class="mx-auto max-w-7xl"><div class="mb-8 flex items-center gap-3"><a href="{{ route($returnTo) }}" class="rounded-xl p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-700"><x-icons.lucide name="arrow-left" class="h-[18px] w-[18px]" /></a><h1 class="text-2xl font-bold text-gray-900">Edit Trip</h1></div><div class="mb-6 max-w-2xl rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">Trip information can only be changed before the journey starts.</div>@include('driver.trips._form')</div></div>
+</x-app-layout>

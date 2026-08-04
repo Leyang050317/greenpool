@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Driver\HomeController as DriverHomeController;
 use App\Http\Controllers\Driver\VehicleController;
+use App\Http\Controllers\Driver\TripController;
 use App\Http\Controllers\Passenger\HomeController as PassengerHomeController;
 use App\Http\Controllers\Passenger\PassengerBookingController;
 use App\Http\Controllers\ProfileController;
@@ -29,6 +30,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('passenger.booking');
 
     Route::middleware('driver')->prefix('driver')->name('driver.')->group(function () {
+        Route::get('trips/journey', [TripController::class, 'journey'])->name('trips.journey');
+        Route::get('trips/history', [TripController::class, 'history'])->name('trips.history');
+        Route::patch('trips/{trip}/start', [TripController::class, 'start'])->name('trips.start');
+        Route::patch('trips/{trip}/complete', [TripController::class, 'complete'])->name('trips.complete');
+        Route::patch('trips/{trip}/cancel', [TripController::class, 'cancel'])->name('trips.cancel');
+        Route::resource('trips', TripController::class);
         Route::patch('vehicles/{vehicle}/activate', [VehicleController::class, 'activate'])
             ->name('vehicles.activate');
         Route::patch('vehicles/{vehicle}/deactivate', [VehicleController::class, 'deactivate'])
