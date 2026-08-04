@@ -23,7 +23,7 @@
                         class="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-xl border px-5 py-2.5 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2E7D32] focus-visible:ring-offset-2"
                     >
                         <x-icons.lucide name="circle-check" class="h-5 w-5" />
-                        Availability
+                        Status
                     </button>
                     <a href="{{ route('driver.vehicles.create') }}" class="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-xl bg-[#2E7D32] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#256b29] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2E7D32] focus-visible:ring-offset-2">
                         <x-icons.lucide name="plus" class="h-5 w-5" />
@@ -47,7 +47,7 @@
                     </a>
                 </div>
             @else
-                <div class="grid gap-5 lg:grid-cols-2" id="vehicle-list">
+                <div class="grid gap-5 md:grid-cols-2 xl:grid-cols-3" id="vehicle-list">
                     @foreach ($vehicles as $vehicle)
                         @php
                             $vehicleColour = mb_strtolower(trim($vehicle->colour));
@@ -70,7 +70,7 @@
                                 default => ['panel' => 'bg-gray-100', 'icon' => 'text-gray-400'],
                             };
                         @endphp
-                        <article class="rounded-2xl border border-gray-200 bg-white p-5" x-data="{ confirmDelete: false, submitting: false }">
+                        <article class="rounded-2xl border border-gray-200 bg-white p-5" x-data="{ submitting: false }">
                             <div class="flex h-24 items-center justify-center rounded-xl {{ $colourTheme['panel'] }} {{ $colourTheme['icon'] }}">
                                 <x-icons.lucide name="car-front" class="h-9 w-9" />
                             </div>
@@ -99,13 +99,13 @@
                                 </div>
                             </dl>
 
-                            <div class="mt-3 grid grid-cols-3 gap-2.5">
+                            <div class="mt-3">
                                 <a
                                     x-show="managementMode === 'details'"
                                     href="{{ route('driver.vehicles.show', $vehicle) }}"
-                                    class="inline-flex min-h-[38px] items-center justify-center rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2E7D32]"
+                                    class="inline-flex min-h-[40px] w-full items-center justify-center rounded-lg bg-[#2E7D32] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#256b29] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2E7D32] focus-visible:ring-offset-2"
                                 >
-                                    View
+                                    Manage
                                 </a>
 
                                 <form
@@ -117,36 +117,10 @@
                                 >
                                     @csrf
                                     @method('PATCH')
-                                    <button type="submit" :disabled="submitting" class="inline-flex min-h-[38px] w-full items-center justify-center rounded-lg border border-[#2E7D32] px-3 py-2 text-sm font-semibold text-[#2E7D32] hover:bg-green-50 disabled:cursor-wait disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2E7D32]">
+                                    <button type="submit" :disabled="submitting" class="inline-flex min-h-[40px] w-full items-center justify-center rounded-lg border border-[#2E7D32] px-4 py-2 text-sm font-semibold text-[#2E7D32] hover:bg-green-50 disabled:cursor-wait disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2E7D32]">
                                         {{ $vehicle->status === 'Active' ? 'Deactivate' : 'Activate' }}
                                     </button>
                                 </form>
-
-                                <a href="{{ route('driver.vehicles.edit', $vehicle) }}" class="inline-flex min-h-[38px] items-center justify-center rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2E7D32]">
-                                    Edit
-                                </a>
-                                <button type="button" @click="confirmDelete = true" class="inline-flex min-h-[38px] items-center justify-center rounded-lg border border-red-200 px-3 py-2 text-sm font-semibold text-red-600 hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600">
-                                    Delete
-                                </button>
-                            </div>
-
-                            <div x-cloak x-show="confirmDelete" @keydown.escape.window="confirmDelete = false" class="fixed inset-0 z-[60] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="delete-title-{{ $vehicle->vehicle_id }}">
-                                <button type="button" class="absolute inset-0 bg-gray-950/45" @click="confirmDelete = false" aria-label="Close confirmation"></button>
-                                <div x-show="confirmDelete" x-transition class="relative w-full max-w-md rounded-2xl border border-gray-200 bg-white p-6">
-                                    <h4 id="delete-title-{{ $vehicle->vehicle_id }}" class="text-lg font-bold text-gray-900">Delete this vehicle?</h4>
-                                    <p class="mt-2 text-sm leading-6 text-gray-600">This permanently removes {{ $vehicle->brand }} {{ $vehicle->model }} ({{ $vehicle->plate_number }}). This action cannot be undone.</p>
-                                    <div class="mt-6 flex justify-end gap-3">
-                                        <button type="button" @click="confirmDelete = false" class="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-gray-300 px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2E7D32]">Cancel</button>
-                                        <form method="POST" action="{{ route('driver.vehicles.destroy', $vehicle) }}" @submit="submitting = true">
-                                            @csrf
-                                            @method('DELETE')
-                                            <button type="submit" :disabled="submitting" class="inline-flex min-h-[44px] items-center justify-center rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-700 disabled:cursor-wait disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600 focus-visible:ring-offset-2">
-                                                <span x-show="!submitting">Delete vehicle</span>
-                                                <span x-cloak x-show="submitting">Deleting…</span>
-                                            </button>
-                                        </form>
-                                    </div>
-                                </div>
                             </div>
                         </article>
                     @endforeach
