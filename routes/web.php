@@ -3,6 +3,7 @@
 use App\Http\Controllers\Driver\HomeController as DriverHomeController;
 use App\Http\Controllers\Driver\VehicleController;
 use App\Http\Controllers\Driver\TripController;
+use App\Http\Controllers\AttractionController;
 use App\Http\Controllers\Passenger\HomeController as PassengerHomeController;
 use App\Http\Controllers\Passenger\PassengerBookingController;
 use App\Http\Controllers\ProfileController;
@@ -19,6 +20,15 @@ Route::middleware('auth')->group(function () {
 });
 
 Route::middleware(['auth', 'verified'])->group(function () {
+
+    Route::get('/attractions', [AttractionController::class, 'index'])
+        ->name('attractions.index');
+    Route::get('/attractions/{attraction}', [AttractionController::class, 'show'])
+        ->name('attractions.show');
+    Route::post('/attractions/{attraction}/favourites', [AttractionController::class, 'storeFavourite'])
+        ->name('attractions.favourites.store');
+    Route::delete('/attractions/{attraction}/favourites', [AttractionController::class, 'destroyFavourite'])
+        ->name('attractions.favourites.destroy');
 
     Route::get('/passenger/home', [PassengerHomeController::class, 'index'])
         ->name('passenger.home');

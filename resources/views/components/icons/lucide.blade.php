@@ -68,6 +68,9 @@
         @case('arrow-right')
             <path d="M5 12h14M13 6l6 6-6 6" />
             @break
+        @case('arrow-up-right')
+            <path d="M7 17 17 7M7 7h10v10" />
+            @break
         @case('arrow-left')
             <path d="M19 12H5M11 18l-6-6 6-6" />
             @break
@@ -95,6 +98,15 @@
         @case('map-pin')
             <path d="M20 10c0 5-8 12-8 12S4 15 4 10a8 8 0 1 1 16 0Z" />
             <circle cx="12" cy="10" r="2.5" />
+            @break
+        @case('search')
+            <circle cx="11" cy="11" r="7" />
+            <path d="m20 20-3.5-3.5" />
+            @break
+        @case('car')
+            <path d="m5 11 1.5-3.7A2 2 0 0 1 8.35 6h7.3a2 2 0 0 1 1.85 1.3L19 11" />
+            <path d="M5 11h14a2 2 0 0 1 2 2v4H3v-4a2 2 0 0 1 2-2Z" />
+            <path d="M5 17v2M19 17v2M7 14h.01M17 14h.01" />
             @break
         @case('armchair')
             <path d="M4 11V6a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v5M12 11V7a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v4M4 11h16v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2ZM6 18v2M18 18v2" />
