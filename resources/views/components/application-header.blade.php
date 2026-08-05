@@ -6,7 +6,9 @@
         request()->routeIs('driver.vehicles.*') => 'My Vehicles',
         request()->routeIs('passenger.find-ride.*') => 'Find a Ride',
         request()->routeIs('passenger.booking', 'passenger.bookings.*') => 'My Bookings',
-        request()->routeIs('driver.attractions.*', 'passenger.attractions.*') => 'Tourist Attractions',
+        request()->routeIs('attractions.show') => request()->route('attraction')->attraction_name,
+        request()->routeIs('attractions.index') && request()->query('tab') === 'favourites' => 'Favourite Attractions',
+        request()->routeIs('attractions.index', 'driver.attractions.*', 'passenger.attractions.*') => 'Tourist Attractions',
         request()->routeIs('driver.notifications.*', 'passenger.notifications.*', 'notifications.*') => 'Notifications',
         request()->routeIs('profile.*', 'driver.profile.*', 'passenger.profile.*') => 'Profile',
         request()->routeIs('driver.settings.*', 'passenger.settings.*') => 'Settings',
@@ -27,7 +29,7 @@
         ->implode('');
 @endphp
 
-<header class="flex h-[72px] w-full items-center border-b border-[#E5E7EB] bg-white px-6 [font-family:Inter,sans-serif]">
+<header class="flex h-16 w-full items-center border-b border-[#E5E7EB] bg-white px-8 [font-family:Inter,sans-serif]">
     <div class="flex min-w-0 flex-1 items-center gap-3">
         <button
             type="button"
@@ -39,7 +41,7 @@
             <x-icons.lucide name="menu" />
         </button>
 
-        <h1 class="truncate text-[28px] font-bold leading-none text-[#111827]">
+        <h1 class="truncate text-lg font-semibold leading-none text-[#111827]">
             {{ $pageTitle }}
         </h1>
     </div>
