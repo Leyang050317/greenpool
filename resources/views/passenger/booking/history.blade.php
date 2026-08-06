@@ -69,6 +69,10 @@
                                                     @method('PATCH')
                                                     <button type="submit" class="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100">Cancel</button>
                                                 </form>
+                                            @elseif($booking->booking_status === 'Accepted' && $booking->trip->status === 'Completed' && ! $booking->ratings->contains('reviewer_id', Auth::id()))
+                                                <a href="{{ route('ratings.create', $booking) }}" class="rounded-lg bg-green-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-green-700">Rate Driver</a>
+                                            @elseif($booking->ratings->contains('reviewer_id', Auth::id()))
+                                                <span class="text-xs font-medium text-green-600">Rated</span>
                                             @else
                                                 <span class="text-xs text-gray-400">No action</span>
                                             @endif

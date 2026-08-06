@@ -5,20 +5,13 @@ import Alpine from 'alpinejs';
 window.Alpine = Alpine;
 
 Alpine.data('driverNavigation', () => ({
-    sidebarExpanded: false,
+    sidebarExpanded: true,
     mobileDrawerOpen: false,
     previousOverflow: '',
     mobileMenuTrigger: null,
 
     init() {
-        const savedPreference = window.localStorage.getItem('greenpool.driver.sidebar-expanded');
-        this.sidebarExpanded = savedPreference === null
-            ? window.matchMedia('(min-width: 1280px)').matches
-            : savedPreference === 'true';
-
-        if (window.matchMedia('(max-width: 1023px)').matches) {
-            this.sidebarExpanded = false;
-        }
+        this.sidebarExpanded = true;
 
         this.$watch('mobileDrawerOpen', (isOpen) => {
             if (isOpen) {
@@ -31,11 +24,6 @@ Alpine.data('driverNavigation', () => ({
                 document.body.style.overflow = this.previousOverflow;
             }
         });
-    },
-
-    setSidebarExpanded(isExpanded) {
-        this.sidebarExpanded = isExpanded;
-        window.localStorage.setItem('greenpool.driver.sidebar-expanded', String(isExpanded));
     },
 
     openMobileDrawer() {
