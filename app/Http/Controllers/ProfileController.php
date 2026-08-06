@@ -14,6 +14,12 @@ class ProfileController extends Controller
 {
     public function edit(Request $request): View
     {
+        if ($request->user()->role === 'passenger') {
+            return view('passenger.profile', [
+                'user' => $request->user(),
+            ]);
+        }
+
         return view('profile.edit', [
             'user' => $request->user(),
         ]);

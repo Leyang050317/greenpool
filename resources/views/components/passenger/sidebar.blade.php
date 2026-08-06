@@ -10,7 +10,7 @@
 
         </a>
 
-        <a href="#"
+        <a href="{{ route('passenger.bookings.history') }}"
             class="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-100">
 
             📋
@@ -18,7 +18,7 @@
 
         </a>
 
-        <a href="{{ route('myprofile') }}"
+        <a href="{{ route('profile.edit') }}"
             class="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-100">
 
             👤
