@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Driver\HomeController as DriverHomeController;
+use App\Http\Controllers\Driver\DriverBookingController;
 use App\Http\Controllers\Driver\VehicleController;
 use App\Http\Controllers\Driver\TripController;
 use App\Http\Controllers\AttractionController;
@@ -38,8 +39,24 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('/passenger/booking', [PassengerBookingController::class, 'index'])
         ->name('passenger.booking');
+    Route::get('/passenger/booking/create', [PassengerBookingController::class, 'create'])
+        ->name('passenger.bookings.create');
+    Route::post('/passenger/booking', [PassengerBookingController::class, 'store'])
+        ->name('passenger.bookings.store');
+    Route::get('/passenger/booking/history', [PassengerBookingController::class, 'history'])
+        ->name('passenger.bookings.history');
+    Route::patch('/passenger/booking/{booking}/cancel', [PassengerBookingController::class, 'cancel'])
+        ->name('passenger.bookings.cancel');
 
     Route::middleware('driver')->prefix('driver')->name('driver.')->group(function () {
+        Route::get('booking', [DriverBookingController::class, 'index'])
+            ->name('booking-requests.index');
+        Route::get('booking/{booking}', [DriverBookingController::class, 'show'])
+            ->name('booking-requests.show');
+        Route::patch('booking/{booking}/accept', [DriverBookingController::class, 'accept'])
+            ->name('booking-requests.accept');
+        Route::patch('booking/{booking}/reject', [DriverBookingController::class, 'reject'])
+            ->name('booking-requests.reject');
         Route::get('trips/journey', [TripController::class, 'journey'])->name('trips.journey');
         Route::get('trips/history', [TripController::class, 'history'])->name('trips.history');
         Route::patch('trips/{trip}/start', [TripController::class, 'start'])->name('trips.start');
