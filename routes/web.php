@@ -8,6 +8,7 @@ use App\Http\Controllers\AttractionController;
 use App\Http\Controllers\Passenger\HomeController as PassengerHomeController;
 use App\Http\Controllers\Passenger\PassengerBookingController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\RatingController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -21,6 +22,13 @@ Route::middleware('auth')->group(function () {
 });
 
 Route::middleware(['auth', 'verified'])->group(function () {
+    Route::get('/ratings', [RatingController::class, 'hub'])->name('ratings.index');
+    Route::get('/ratings/history', [RatingController::class, 'index'])->name('ratings.history');
+    Route::get('/ratings/people', [RatingController::class, 'people'])->name('ratings.people');
+    Route::get('/ratings/pending', [RatingController::class, 'pending'])->name('ratings.pending');
+    Route::get('/ratings/received/{user}', [RatingController::class, 'received'])->name('ratings.received');
+    Route::get('/ratings/bookings/{booking}/create', [RatingController::class, 'create'])->name('ratings.create');
+    Route::post('/ratings/bookings/{booking}', [RatingController::class, 'store'])->name('ratings.store');
 
     Route::get('/attractions', [AttractionController::class, 'index'])
         ->name('attractions.index');

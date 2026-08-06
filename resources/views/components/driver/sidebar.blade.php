@@ -6,6 +6,7 @@
         ['label' => 'My Vehicles', 'icon' => 'car-front', 'href' => route('driver.vehicles.index'), 'active' => request()->routeIs('driver.vehicles.*')],
         ['label' => 'Tourist Attractions', 'icon' => 'map-pinned', 'href' => route('attractions.index'), 'active' => request()->routeIs('attractions.*')],
         ['label' => 'Notifications', 'icon' => 'bell', 'href' => '#', 'active' => request()->routeIs('driver.notifications.*'), 'unread' => true],
+        ['label' => 'Ratings', 'icon' => 'star', 'href' => route('ratings.index'), 'active' => request()->routeIs('ratings.*')],
         ['label' => 'Profile', 'icon' => 'user-circle', 'href' => route('profile.edit'), 'active' => request()->routeIs('profile.edit')],
     ];
 
@@ -42,17 +43,6 @@
                 GreenPool
             </span>
         </a>
-
-        <button
-            type="button"
-            class="ml-auto hidden h-10 w-10 shrink-0 items-center justify-center rounded-lg text-slate-500 transition duration-150 hover:bg-slate-100 hover:text-[#2E7D32] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2E7D32] focus-visible:ring-offset-2 lg:flex"
-            @click="setSidebarExpanded(!sidebarExpanded)"
-            :aria-label="sidebarExpanded ? 'Collapse sidebar' : 'Expand sidebar'"
-            :title="sidebarExpanded ? 'Collapse sidebar' : 'Expand sidebar'"
-        >
-            <x-icons.lucide name="panel-left-close" x-show="sidebarExpanded" />
-            <x-icons.lucide name="panel-left-open" x-show="!sidebarExpanded" />
-        </button>
 
         <button
             type="button"

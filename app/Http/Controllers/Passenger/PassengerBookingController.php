@@ -109,7 +109,7 @@ class PassengerBookingController extends Controller
 
         $bookings = $request->user()
             ->bookings()
-            ->with(['trip.user', 'trip.vehicle'])
+            ->with(['trip.user', 'trip.vehicle', 'ratings'])
             ->latest()
             ->paginate(8);
 

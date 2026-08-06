@@ -22,10 +22,7 @@
                 @open-navigation-drawer.window="openMobileDrawer()"
                 class="min-h-screen overflow-x-hidden bg-gray-100"
             >
-                <div
-                    class="fixed inset-y-0 left-0 z-40 hidden transition-[width] duration-200 ease-out md:block"
-                    :class="sidebarExpanded ? 'w-72' : 'w-20'"
-                >
+                <div class="fixed inset-y-0 left-0 z-40 hidden w-72 md:block">
                     <x-driver.sidebar />
                 </div>
 
@@ -56,10 +53,7 @@
                     <x-driver.sidebar />
                 </div>
 
-                <div
-                    class="min-h-screen transition-[padding] duration-200 ease-out"
-                    :class="sidebarExpanded ? 'md:pl-72' : 'md:pl-20'"
-                >
+                <div class="min-h-screen md:pl-72">
                     <x-application-header />
 
                     <main>
