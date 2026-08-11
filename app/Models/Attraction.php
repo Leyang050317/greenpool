@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Attraction extends Model
 {
@@ -69,6 +70,28 @@ class Attraction extends Model
         return $this->hasMany(Favourite::class, 'attraction_id', 'attraction_id');
     }
 
+    public function displayImageUrl(): string
+    {
+        if (filled($this->image_url)) {
+            return $this->image_url;
+        }
+
+        $category = strtolower((string) $this->category);
+        $fallback = match (true) {
+            str_contains($category, 'nature'), str_contains($category, 'beach'), str_contains($category, 'park') => 'nature.svg',
+            str_contains($category, 'heritage'), str_contains($category, 'culture'), str_contains($category, 'museum'), str_contains($category, 'religion') => 'heritage.svg',
+            str_contains($category, 'landmark'), str_contains($category, 'architecture'), str_contains($category, 'tower') => 'landmark.svg',
+            default => 'placeholder.svg',
+        };
+
+        return asset("images/attractions/{$fallback}");
+    }
+
+    public function detail(): HasOne
+    {
+        return $this->hasOne(AttractionDetail::class, 'attraction_id', 'attraction_id');
+    }
+
     public function getCategoryAttribute(): string
     {
         return $this->presentationValue('category') ?? 'Attraction';
@@ -96,6 +119,10 @@ class Attraction extends Model
 
     private function presentationValue(string $key): ?string
     {
+        if ($this->relationLoaded('detail') && $this->detail) {
+            return $this->detail->{$key};
+        }
+
         return self::PRESENTATION[$this->attraction_name][$key] ?? null;
     }
 }

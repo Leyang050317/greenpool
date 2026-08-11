@@ -64,9 +64,10 @@
                 <h2 class="mb-4 text-[15px] font-semibold text-slate-900">Featured Attractions</h2>
                 <div class="grid gap-3 lg:grid-cols-[2fr_1fr]">
                     @php($primaryFeatured = $featured->first())
+                    @php($primaryFeaturedFallback = $primaryFeatured->displayImageUrl())
                     <article class="group relative min-h-[390px] overflow-hidden rounded-[14px] bg-slate-200 lg:row-span-2">
                         <a href="{{ route('attractions.show', $primaryFeatured) }}" class="block h-full">
-                            <img src="{{ $primaryFeatured->image_url }}" alt="{{ $primaryFeatured->attraction_name }}" class="absolute inset-0 h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]">
+                            <img src="{{ $googleAutoCards && ! $primaryFeatured->image_url ? route('attractions.google-card-photo', $primaryFeatured) : $primaryFeaturedFallback }}" data-fallback="{{ $primaryFeaturedFallback }}" onerror="this.src = this.dataset.fallback" alt="{{ $primaryFeatured->attraction_name }}" class="absolute inset-0 h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]">
                             <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/75 via-slate-900/25 to-transparent p-5 pt-20 text-white">
                                 <span class="rounded-md bg-white/20 px-2 py-0.5 text-[11px] font-medium backdrop-blur">{{ $primaryFeatured->category }}</span>
                                 <h3 class="mt-2 text-lg font-semibold">{{ $primaryFeatured->attraction_name }}</h3>
@@ -80,9 +81,10 @@
                         </form>
                     </article>
                     @foreach ($featured->skip(1) as $attraction)
+                        @php($featuredFallback = $attraction->displayImageUrl())
                         <article class="group relative min-h-[189px] overflow-hidden rounded-[14px] bg-slate-200">
                             <a href="{{ route('attractions.show', $attraction) }}" class="block h-full">
-                                <img src="{{ $attraction->image_url }}" alt="{{ $attraction->attraction_name }}" class="absolute inset-0 h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]">
+                                <img src="{{ $googleAutoCards && ! $attraction->image_url ? route('attractions.google-card-photo', $attraction) : $featuredFallback }}" data-fallback="{{ $featuredFallback }}" onerror="this.src = this.dataset.fallback" alt="{{ $attraction->attraction_name }}" class="absolute inset-0 h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]">
                                 <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/75 via-slate-900/25 to-transparent p-4 pt-16 text-white">
                                     <span class="rounded-md bg-white/20 px-2 py-0.5 text-[11px] font-medium backdrop-blur">{{ $attraction->category }}</span>
                                     <h3 class="mt-2 text-[15px] font-semibold">{{ $attraction->attraction_name }}</h3>
@@ -129,14 +131,11 @@
             @else
                 <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                     @foreach ($attractions as $attraction)
+                        @php($cardFallback = $attraction->displayImageUrl())
                         <article class="group overflow-hidden rounded-xl border border-slate-100 bg-white transition duration-200 hover:border-slate-200 hover:shadow-[0_4px_16px_rgba(0,0,0,0.08)]">
                             <div class="relative aspect-[4/3] overflow-hidden bg-slate-200">
                                 <a href="{{ route('attractions.show', $attraction) }}" class="block h-full w-full">
-                                    @if ($attraction->image_url)
-                                        <img src="{{ $attraction->image_url }}" alt="{{ $attraction->attraction_name }}" class="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]">
-                                    @else
-                                        <span class="flex h-full w-full items-center justify-center bg-gradient-to-br from-green-100 to-emerald-200 text-green-700"><x-icons.lucide name="map-pinned" /></span>
-                                    @endif
+                                    <img src="{{ $googleAutoCards && ! $attraction->image_url ? route('attractions.google-card-photo', $attraction) : $cardFallback }}" data-fallback="{{ $cardFallback }}" onerror="this.src = this.dataset.fallback" alt="{{ $attraction->attraction_name }}" loading="lazy" class="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]">
                                 </a>
                                 <form method="POST" action="{{ $attraction->is_favourited ? route('attractions.favourites.destroy', $attraction) : route('attractions.favourites.store', $attraction) }}" class="absolute right-2.5 top-2.5">
                                     @csrf
@@ -161,5 +160,6 @@
                 <div class="mt-7">{{ $attractions->links() }}</div>
             @endif
         </section>
+        <p class="mt-8 text-xs text-slate-400">Explore Malaysian attractions and load live Google details when needed.</p>
     </main>
 </x-app-layout>

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" role="img" aria-label="Culture and heritage illustration">
+  <rect width="800" height="600" fill="#fff7ed"/><circle cx="635" cy="110" r="55" fill="#facc15"/>
+  <path d="M0 460 150 390l105 52 105-72 120 57 105-67 115 100v140H0Z" fill="#fdba74"/>
+  <path d="M170 470V235h165v235m-195 0h225m-200-235 88-112 88 112m-67 0v-78h-42v78m198 235V190h160v280m-190 0h220m-191-280 80-95 80 95" fill="#9a3412"/>
+  <rect x="0" y="470" width="800" height="130" fill="#7c2d12"/><text x="400" y="550" text-anchor="middle" font-family="Arial,sans-serif" font-size="30" font-weight="700" fill="white">Culture &amp; Heritage</text>
+</svg>

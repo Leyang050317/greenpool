@@ -1,10 +1,10 @@
 <?php
 
-use App\Http\Controllers\Driver\HomeController as DriverHomeController;
-use App\Http\Controllers\Driver\DriverBookingController;
-use App\Http\Controllers\Driver\VehicleController;
-use App\Http\Controllers\Driver\TripController;
 use App\Http\Controllers\AttractionController;
+use App\Http\Controllers\Driver\DriverBookingController;
+use App\Http\Controllers\Driver\HomeController as DriverHomeController;
+use App\Http\Controllers\Driver\TripController;
+use App\Http\Controllers\Driver\VehicleController;
 use App\Http\Controllers\Passenger\HomeController as PassengerHomeController;
 use App\Http\Controllers\Passenger\PassengerBookingController;
 use App\Http\Controllers\ProfileController;
@@ -32,6 +32,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('/attractions', [AttractionController::class, 'index'])
         ->name('attractions.index');
+    Route::get('/attractions/{attraction}/google-photo', [AttractionController::class, 'googlePhoto'])
+        ->name('attractions.google-photo');
+    Route::get('/attractions/{attraction}/google-card-photo', [AttractionController::class, 'googleCardPhoto'])
+        ->name('attractions.google-card-photo');
     Route::get('/attractions/{attraction}', [AttractionController::class, 'show'])
         ->name('attractions.show');
     Route::post('/attractions/{attraction}/favourites', [AttractionController::class, 'storeFavourite'])
