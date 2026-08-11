@@ -9,7 +9,7 @@
                     <p class="mt-1 text-sm text-gray-600">Enter the details exactly as shown on the vehicle registration.</p>
                 </div>
 
-                <form method="POST" action="{{ route('driver.vehicles.store') }}" x-data="{ submitting: false }" @submit="submitting = true">
+                <form method="POST" action="{{ route('driver.vehicles.store') }}" enctype="multipart/form-data" x-data="{ submitting: false }" @submit="submitting = true">
                     @csrf
                     @include('driver.vehicles._form', ['vehicle' => null])
 

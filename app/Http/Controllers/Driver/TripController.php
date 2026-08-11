@@ -40,7 +40,7 @@ class TripController extends Controller
 
     public function create(Request $request): View
     {
-        $vehicles = $request->user()->vehicles()->where('status', 'Active')->orderByDesc('vehicle_id')->get();
+        $vehicles = $request->user()->vehicles()->selectableForTrips()->orderByDesc('vehicle_id')->get();
 
         return view('driver.trips.create', compact('vehicles'));
     }
@@ -72,7 +72,7 @@ class TripController extends Controller
     public function edit(Request $request, Trip $trip): View
     {
         $this->ensureEditable($request, $trip);
-        $vehicles = $request->user()->vehicles()->where('status', 'Active')->orderByDesc('vehicle_id')->get();
+        $vehicles = $request->user()->vehicles()->selectableForTrips()->orderByDesc('vehicle_id')->get();
         $returnTo = $this->returnRoute($request);
 
         return view('driver.trips.edit', compact('trip', 'vehicles', 'returnTo'));

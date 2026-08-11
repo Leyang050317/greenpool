@@ -33,8 +33,8 @@ class StoreTripRequest extends FormRequest
         return [function (Validator $validator): void {
             $vehicle = Vehicle::find($this->integer('vehicle_id'));
 
-            if ($vehicle && ($vehicle->user_id !== $this->user()->id || $vehicle->status !== 'Active')) {
-                $validator->errors()->add('vehicle_id', 'Please select one of your active vehicles.');
+            if ($vehicle && ($vehicle->user_id !== $this->user()->id || $vehicle->status !== 'Active' || $vehicle->verification_status !== 'Verified')) {
+                $validator->errors()->add('vehicle_id', 'Please select one of your active, verified vehicles.');
             }
 
             if ($vehicle && $this->integer('available_seats') > $vehicle->seat_capacity) {
