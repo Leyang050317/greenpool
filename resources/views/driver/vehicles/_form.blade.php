@@ -1,4 +1,83 @@
 <div class="grid gap-6 md:grid-cols-2">
+    <div
+        class="md:col-span-2"
+        x-data="{
+            previewUrl: null,
+            fileName: '',
+            dragging: false,
+            previewFile(file) {
+                if (!file) return;
+                if (this.previewUrl) URL.revokeObjectURL(this.previewUrl);
+                this.previewUrl = URL.createObjectURL(file);
+                this.fileName = file.name;
+            },
+            chooseDroppedFile(event) {
+                const file = event.dataTransfer.files[0];
+                if (!file) return;
+                const transfer = new DataTransfer();
+                transfer.items.add(file);
+                this.$refs.vehicleImage.files = transfer.files;
+                this.previewFile(file);
+            }
+        }"
+    >
+        <label for="vehicle_image" class="block text-sm font-semibold text-gray-800">
+            Vehicle Picture @unless($vehicle)<span class="text-red-600" aria-hidden="true">*</span>@endunless
+        </label>
+        <p id="vehicle_image_help" class="mt-1.5 text-sm text-gray-500">Upload a clear picture of the vehicle. JPG, PNG or WEBP, maximum 5 MB.</p>
+
+        <input
+            id="vehicle_image"
+            x-ref="vehicleImage"
+            name="vehicle_image"
+            type="file"
+            accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+            class="sr-only"
+            @change="previewFile($event.target.files[0])"
+            @unless($vehicle) required @endunless
+            aria-describedby="vehicle_image_help @error('vehicle_image') vehicle_image_error @enderror"
+        >
+
+        <button
+            type="button"
+            @click="$refs.vehicleImage.click()"
+            @dragover.prevent="dragging = true"
+            @dragleave.prevent="dragging = false"
+            @drop.prevent="dragging = false; chooseDroppedFile($event)"
+            :class="dragging ? 'border-[#2E7D32] bg-green-50' : 'border-gray-300 bg-gray-50 hover:bg-gray-100'"
+            class="mt-3 flex w-full flex-col items-center justify-center overflow-hidden rounded-xl border-2 border-dashed p-3 text-center transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2E7D32] focus-visible:ring-offset-2"
+        >
+            <img
+                x-cloak
+                x-show="previewUrl"
+                :src="previewUrl"
+                alt="Selected vehicle picture preview"
+                class="aspect-[16/7] w-full rounded-lg object-cover"
+            >
+
+            @if ($vehicle?->vehicle_image_path)
+                <img
+                    x-show="!previewUrl"
+                    src="{{ asset('storage/'.$vehicle->vehicle_image_path) }}"
+                    alt="{{ $vehicle->brand }} {{ $vehicle->model }} vehicle"
+                    class="aspect-[16/7] w-full rounded-lg object-cover"
+                >
+            @else
+                <span x-show="!previewUrl" class="flex min-h-40 flex-col items-center justify-center py-8">
+                    <x-icons.lucide name="car-front" class="h-8 w-8 text-gray-400" />
+                    <span class="mt-3 text-sm font-semibold text-gray-700">Click to select or drag and drop</span>
+                </span>
+            @endif
+
+            <span x-show="fileName" x-text="fileName" class="mt-3 max-w-full truncate text-sm font-medium text-[#2E7D32]"></span>
+            <span x-show="previewUrl" class="mt-1 text-xs text-gray-500">Click to choose another picture</span>
+        </button>
+
+        @error('vehicle_image')
+            <p id="vehicle_image_error" class="mt-2 text-sm font-medium text-red-600">{{ $message }}</p>
+        @enderror
+    </div>
+
     <div class="md:col-span-2">
         <label for="plate_number" class="block text-sm font-semibold text-gray-800">Plate number</label>
         <input

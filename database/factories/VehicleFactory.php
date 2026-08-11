@@ -23,6 +23,17 @@ class VehicleFactory extends Factory
             'colour' => fake()->safeColorName(),
             'seat_capacity' => fake()->numberBetween(1, 4),
             'status' => 'Inactive',
+            'vehicle_image_path' => null,
+            'verification_status' => 'Pending',
+            'verified_at' => null,
         ];
+    }
+
+    public function verified(): static
+    {
+        return $this->state(fn () => [
+            'verification_status' => 'Verified',
+            'verified_at' => now(),
+        ]);
     }
 }

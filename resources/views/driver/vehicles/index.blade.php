@@ -71,8 +71,12 @@
                             };
                         @endphp
                         <article class="rounded-2xl border border-gray-200 bg-white p-5" x-data="{ submitting: false }">
-                            <div class="flex h-24 items-center justify-center rounded-xl {{ $colourTheme['panel'] }} {{ $colourTheme['icon'] }}">
-                                <x-icons.lucide name="car-front" class="h-9 w-9" />
+                            <div class="relative flex h-24 items-center justify-center overflow-hidden rounded-xl {{ $colourTheme['panel'] }} {{ $colourTheme['icon'] }}">
+                                @if ($vehicle->vehicle_image_path)
+                                    <img src="{{ asset('storage/'.$vehicle->vehicle_image_path) }}" alt="{{ $vehicle->brand }} {{ $vehicle->model }} vehicle" class="h-full w-full object-cover">
+                                @else
+                                    <x-icons.lucide name="car-front" class="h-9 w-9" />
+                                @endif
                             </div>
 
                             <div class="mt-5 flex items-start justify-between gap-4">
@@ -84,6 +88,9 @@
                                     <span class="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold {{ $vehicle->status === 'Active' ? 'border-green-200 bg-green-50 text-green-700' : 'border-gray-200 bg-gray-50 text-gray-500' }}">
                                         <span class="h-2 w-2 rounded-full {{ $vehicle->status === 'Active' ? 'bg-green-600' : 'bg-gray-400' }}" aria-hidden="true"></span>
                                         {{ $vehicle->status }}
+                                    </span>
+                                    <span class="rounded-full border px-2.5 py-1 text-[11px] font-semibold {{ match($vehicle->verification_status) { 'Verified' => 'border-green-200 bg-green-50 text-green-700', 'Rejected' => 'border-red-200 bg-red-50 text-red-700', default => 'border-amber-200 bg-amber-50 text-amber-700' } }}">
+                                        {{ $vehicle->verification_status }}
                                     </span>
                                 </div>
                             </div>

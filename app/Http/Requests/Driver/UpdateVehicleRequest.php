@@ -33,6 +33,7 @@ class UpdateVehicleRequest extends StoreVehicleRequest
             'model' => ['required', 'string', 'max:50'],
             'colour' => ['required', 'string', 'max:20'],
             'seat_capacity' => ['required', 'integer', 'between:1,4'],
+            'vehicle_image' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
         ];
     }
 }

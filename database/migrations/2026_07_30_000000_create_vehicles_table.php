@@ -18,8 +18,12 @@ return new class extends Migration
             $table->string('colour', 20);
             $table->unsignedTinyInteger('seat_capacity')->default(4);
             $table->enum('status', ['Active', 'Inactive'])->default('Inactive');
+            $table->string('vehicle_image_path')->nullable();
+            $table->enum('verification_status', ['Pending', 'Verified', 'Rejected'])->default('Pending');
+            $table->timestamp('verified_at')->nullable();
 
             $table->index('status');
+            $table->index('verification_status');
         });
 
         if (DB::getDriverName() === 'mysql') {

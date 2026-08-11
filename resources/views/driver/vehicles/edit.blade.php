@@ -9,7 +9,7 @@
                     <p class="mt-1 text-sm text-gray-600">Update the registered information for {{ $vehicle->plate_number }}.</p>
                 </div>
 
-                <form method="POST" action="{{ route('driver.vehicles.update', $vehicle) }}" x-data="{ submitting: false }" @submit="submitting = true">
+                <form method="POST" action="{{ route('driver.vehicles.update', $vehicle) }}" enctype="multipart/form-data" x-data="{ submitting: false }" @submit="submitting = true">
                     @csrf
                     @method('PUT')
                     @include('driver.vehicles._form', ['vehicle' => $vehicle])

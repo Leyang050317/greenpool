@@ -12,6 +12,15 @@
             </div>
 
             <article class="rounded-2xl border border-gray-200 bg-white">
+                <div class="p-6 pb-0">
+                    @if ($vehicle->vehicle_image_path)
+                        <img src="{{ asset('storage/'.$vehicle->vehicle_image_path) }}" alt="{{ $vehicle->brand }} {{ $vehicle->model }} vehicle" class="aspect-[16/7] w-full rounded-xl object-cover">
+                    @else
+                        <div class="flex aspect-[16/7] w-full items-center justify-center rounded-xl bg-gray-100 text-gray-400">
+                            <x-icons.lucide name="car-front" class="h-10 w-10" />
+                        </div>
+                    @endif
+                </div>
                 <div class="flex flex-col gap-5 border-b border-gray-100 p-6 sm:flex-row sm:items-center sm:justify-between">
                     <div class="flex items-center gap-4">
                         <span class="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-green-50 text-[#2E7D32]">
@@ -24,9 +33,10 @@
                             <p class="mt-1 font-mono text-sm font-semibold tracking-wide text-gray-600">{{ $vehicle->plate_number }}</p>
                         </div>
                     </div>
-                    <span class="self-start rounded-full px-3 py-1.5 text-sm font-semibold sm:self-auto {{ $vehicle->status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600' }}">
-                        {{ $vehicle->status }}
-                    </span>
+                    <div class="flex flex-wrap gap-2 self-start sm:self-auto">
+                        <span class="rounded-full px-3 py-1.5 text-sm font-semibold {{ $vehicle->status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600' }}">{{ $vehicle->status }}</span>
+                        <span class="rounded-full border px-3 py-1.5 text-sm font-semibold {{ match($vehicle->verification_status) { 'Verified' => 'border-green-200 bg-green-50 text-green-700', 'Rejected' => 'border-red-200 bg-red-50 text-red-700', default => 'border-amber-200 bg-amber-50 text-amber-700' } }}">{{ $vehicle->verification_status }}</span>
+                    </div>
                 </div>
 
                 <dl class="grid gap-px bg-gray-100 sm:grid-cols-2">

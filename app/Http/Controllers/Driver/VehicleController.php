@@ -9,8 +9,11 @@ use App\Models\Vehicle;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
+use Throwable;
 
 class VehicleController extends Controller
 {
@@ -35,7 +38,20 @@ class VehicleController extends Controller
 
     public function store(StoreVehicleRequest $request): RedirectResponse|JsonResponse
     {
-        $vehicle = $request->user()->vehicles()->create($request->validated());
+        $imagePath = $this->storeVehicleImage($request->file('vehicle_image'));
+
+        try {
+            $vehicle = $request->user()->vehicles()->create([
+                ...$request->safe()->except('vehicle_image'),
+                'vehicle_image_path' => $imagePath,
+                'verification_status' => 'Pending',
+                'verified_at' => null,
+            ]);
+        } catch (Throwable $exception) {
+            $this->deleteVehicleImage($imagePath);
+
+            throw $exception;
+        }
 
         if ($request->expectsJson()) {
             return response()->json([
@@ -69,8 +85,21 @@ class VehicleController extends Controller
 
     public function update(UpdateVehicleRequest $request, Vehicle $vehicle): RedirectResponse|JsonResponse
     {
-        $vehicle->update($request->validated());
-        $vehicle->refresh();
+        $data = $request->safe()->except('vehicle_image');
+        $identityChanged = collect(['plate_number', 'brand', 'model', 'colour'])
+            ->contains(fn (string $field) => $data[$field] !== $vehicle->{$field});
+
+        if ($request->hasFile('vehicle_image')) {
+            $vehicle = $this->replaceVehicleImage($vehicle, $request->file('vehicle_image'), $data);
+        } else {
+            if ($identityChanged) {
+                $data['verification_status'] = 'Pending';
+                $data['verified_at'] = null;
+            }
+
+            $vehicle->update($data);
+            $vehicle->refresh();
+        }
 
         if ($request->expectsJson()) {
             return response()->json([
@@ -87,7 +116,15 @@ class VehicleController extends Controller
     public function destroy(Request $request, Vehicle $vehicle): RedirectResponse|JsonResponse
     {
         $this->ensureOwnership($request, $vehicle);
-        $vehicle->delete();
+        abort_if(
+            $vehicle->trips()->whereIn('status', ['Scheduled', 'In Progress'])->exists(),
+            422,
+            'This vehicle cannot be deleted while it is assigned to an active or upcoming trip.'
+        );
+
+        $imagePath = $vehicle->vehicle_image_path;
+        DB::transaction(fn () => $vehicle->delete());
+        $this->deleteVehicleImage($imagePath);
 
         if ($request->expectsJson()) {
             return response()->json(['message' => 'Vehicle deleted successfully.']);
@@ -147,5 +184,42 @@ class VehicleController extends Controller
         }
 
         return back()->with('success', $message);
+    }
+
+    private function storeVehicleImage(UploadedFile $image): string
+    {
+        return $image->store('vehicles', 'public');
+    }
+
+    private function replaceVehicleImage(Vehicle $vehicle, UploadedFile $image, array $data): Vehicle
+    {
+        $newImagePath = $this->storeVehicleImage($image);
+        $oldImagePath = $vehicle->vehicle_image_path;
+
+        try {
+            DB::transaction(function () use ($vehicle, $data, $newImagePath): void {
+                $vehicle->update([
+                    ...$data,
+                    'vehicle_image_path' => $newImagePath,
+                    'verification_status' => 'Pending',
+                    'verified_at' => null,
+                ]);
+            });
+        } catch (Throwable $exception) {
+            $this->deleteVehicleImage($newImagePath);
+
+            throw $exception;
+        }
+
+        $this->deleteVehicleImage($oldImagePath);
+
+        return $vehicle->refresh();
+    }
+
+    private function deleteVehicleImage(?string $imagePath): void
+    {
+        if ($imagePath) {
+            Storage::disk('public')->delete($imagePath);
+        }
     }
 }
