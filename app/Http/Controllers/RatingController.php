@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreRatingRequest;
+use App\Http\Requests\UpdateRatingRequest;
 use App\Models\Booking;
 use App\Models\Rating;
 use App\Models\User;
@@ -67,6 +68,39 @@ class RatingController extends Controller
         return view('ratings.people', compact('people', 'targetRole'));
     }
 
+    public function reviews(Request $request): View
+    {
+        $user = $request->user();
+        $targetRole = $user->role === 'passenger' ? 'driver' : 'passenger';
+        $query = Rating::query()->with(['reviewer', 'reviewee'])
+            ->whereHas('reviewee', function ($reviewee) use ($user, $targetRole) {
+                $reviewee->where('role', $targetRole);
+                if ($user->role === 'passenger') {
+                    $reviewee->whereHas('trips.bookings', fn ($booking) => $booking
+                        ->where('passenger_id', $user->id)->where('booking_status', 'Accepted'));
+                } else {
+                    $reviewee->whereHas('bookings', fn ($booking) => $booking
+                        ->where('booking_status', 'Accepted')
+                        ->whereHas('trip', fn ($trip) => $trip->where('user_id', $user->id)));
+                }
+            });
+
+        if ($request->filled('search')) {
+            $search = $request->string('search')->trim();
+            $query->where(fn ($rating) => $rating->where('comment', 'like', "%{$search}%")
+                ->orWhereHas('reviewee', fn ($reviewee) => $reviewee->where('name', 'like', "%{$search}%"))
+                ->orWhereHas('reviewer', fn ($reviewer) => $reviewer->where('name', 'like', "%{$search}%")));
+        }
+
+        if ($request->input('sort') === 'highest') $query->orderByDesc('score')->latest();
+        elseif ($request->input('sort') === 'lowest') $query->orderBy('score')->latest();
+        else $query->latest();
+
+        $ratings = $query->paginate(8)->withQueryString();
+
+        return view('ratings.reviews', compact('ratings', 'targetRole'));
+    }
+
     public function create(Request $request, Booking $booking): View
     {
         [$reviewee] = $this->ratingParticipants($request, $booking);
@@ -101,14 +135,37 @@ class RatingController extends Controller
     {
         [$reviewee] = $this->ratingParticipants($request, $booking);
         abort_if($booking->ratings()->where('reviewer_id', $request->user()->id)->exists(), 409, 'You have already rated this booking.');
-        Rating::create([
+        $rating = Rating::create([
             'booking_id' => $booking->id,
             'reviewer_id' => $request->user()->id,
             'reviewee_id' => $reviewee->id,
             ...$request->validated(),
         ]);
 
-        return redirect()->route('ratings.index')->with('success', 'Thank you! Your rating was submitted.');
+        return redirect()->route('ratings.submitted', $rating);
+    }
+
+    public function submitted(Request $request, Rating $rating): View
+    {
+        $this->ensureRatingOwnership($request, $rating);
+        $rating->loadMissing(['reviewee', 'booking.trip']);
+
+        return view('ratings.submitted', compact('rating'));
+    }
+
+    public function edit(Request $request, Rating $rating): View
+    {
+        $this->ensureRatingOwnership($request, $rating);
+        $rating->loadMissing(['booking.trip', 'reviewee']);
+
+        return view('ratings.edit', compact('rating'));
+    }
+
+    public function update(UpdateRatingRequest $request, Rating $rating): RedirectResponse
+    {
+        $rating->update($request->validated());
+
+        return redirect()->route('ratings.history')->with('success', 'Your rating was updated successfully.');
     }
 
     public function received(Request $request, User $user): View
@@ -146,5 +203,10 @@ class RatingController extends Controller
             ->whereHas('trip', fn ($q) => $q->where('user_id', $user->id))->exists()
             || Booking::where('passenger_id', $user->id)
                 ->whereHas('trip', fn ($q) => $q->where('user_id', $request->user()->id))->exists();
+    }
+
+    private function ensureRatingOwnership(Request $request, Rating $rating): void
+    {
+        abort_unless($rating->reviewer_id === $request->user()->id, 403);
     }
 }
