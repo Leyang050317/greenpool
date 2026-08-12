@@ -18,9 +18,19 @@
             <div class="space-y-3">
                 @forelse($ratings as $rating)
                     <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                        <div class="flex gap-4"><div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-slate-500 text-sm font-bold text-white">{{ strtoupper(substr($rating->reviewee->name,0,2)) }}</div><div class="min-w-0 flex-1"><div class="flex flex-wrap items-center justify-between gap-2"><div><span class="font-semibold text-slate-900">{{ $rating->reviewee->name }}</span><span class="ml-2 rounded-full bg-green-50 px-2 py-1 text-[11px] font-semibold text-green-700">{{ ucfirst($rating->reviewee->role) }}</span></div><span class="text-xs text-slate-400">Trip: {{ $rating->booking->trip->departure_at->format('j M Y') }}</span></div><div class="mt-1 text-lg leading-none text-amber-400" aria-label="{{ $rating->score }} out of 5">{{ str_repeat('★',$rating->score) }}<span class="text-slate-200">{{ str_repeat('★',5-$rating->score) }}</span></div>@if($rating->comment)<p class="mt-2 text-sm text-slate-600">{{ $rating->comment }}</p>@endif<p class="mt-2 text-xs text-slate-400">Submitted {{ $rating->created_at->format('j M Y') }}</p></div></div>
+                        <div class="flex gap-4">
+                            <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-slate-500 text-sm font-bold text-white">{{ strtoupper(substr($rating->reviewee->name,0,2)) }}</div>
+                            <div class="min-w-0 flex-1">
+                                <div class="flex flex-wrap items-center justify-between gap-2"><div><span class="font-semibold text-slate-900">{{ $rating->reviewee->name }}</span><span class="ml-2 rounded-full bg-green-50 px-2 py-1 text-[11px] font-semibold text-green-700">{{ ucfirst($rating->reviewee->role) }}</span></div><span class="text-xs text-slate-400">Trip: {{ $rating->booking->trip->departure_at->format('j M Y') }}</span></div>
+                                <div class="mt-1 text-lg leading-none text-amber-400" aria-label="{{ $rating->score }} out of 5">{{ str_repeat('★',$rating->score) }}<span class="text-slate-200">{{ str_repeat('★',5-$rating->score) }}</span></div>
+                                @if($rating->comment)<p class="mt-2 text-sm text-slate-600">{{ $rating->comment }}</p>@endif
+                                <div class="mt-3 flex items-center justify-between gap-3"><p class="text-xs text-slate-400">Submitted {{ $rating->created_at->format('j M Y') }}</p><a href="{{ route('ratings.edit', $rating) }}" class="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50">Edit Rating</a></div>
+                            </div>
+                        </div>
                     </article>
-                @empty<div class="rounded-2xl border border-slate-200 bg-white py-16 text-center text-sm text-slate-500">You have not submitted any ratings yet.</div>@endforelse
+                @empty
+                    <div class="rounded-2xl border border-slate-200 bg-white py-16 text-center text-sm text-slate-500">You have not submitted any ratings yet.</div>
+                @endforelse
             </div>
             <div class="mt-6">{{ $ratings->links() }}</div>
         </div>

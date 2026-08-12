@@ -111,6 +111,19 @@ class TripController extends Controller
         $this->ensureStatus($request, $trip, ['In Progress']);
         $trip->update(['status' => 'Completed', 'completed_at' => now()]);
 
+        if (! $request->expectsJson()) {
+            $bookingToRate = $trip->bookings()
+                ->where('booking_status', 'Accepted')
+                ->whereDoesntHave('ratings', fn ($rating) => $rating->where('reviewer_id', $request->user()->id))
+                ->oldest()
+                ->first();
+
+            if ($bookingToRate) {
+                return redirect()->route('ratings.create', $bookingToRate)
+                    ->with('success', 'Journey completed. Please rate your passenger.');
+            }
+        }
+
         return $this->response($request, $trip->refresh(), 'Journey completed successfully.', 200, 'driver.trips.journey');
     }
 

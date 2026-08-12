@@ -8,9 +8,16 @@
     <title>{{ $resolvedPageTitle }} - GreenPool</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
-<body class="font-sans antialiased text-gray-900 bg-[#F9FAFB] flex h-screen overflow-hidden">
-    <div class="flex w-full h-full">
-        <aside class="w-64 bg-white border-r border-gray-200 flex flex-col justify-between hidden md:flex shrink-0">
+<body class="flex min-h-[100dvh] overflow-hidden bg-[#F9FAFB] font-sans text-gray-900 antialiased">
+    <div class="flex min-h-[100dvh] w-full" x-data="{ mobileDrawerOpen: false }" @keydown.escape.window="mobileDrawerOpen = false">
+        <div x-cloak x-show="mobileDrawerOpen" x-transition.opacity class="fixed inset-0 z-40 bg-slate-950/40 md:hidden" @click="mobileDrawerOpen = false" aria-hidden="true"></div>
+        <aside
+            x-cloak
+            class="fixed inset-y-0 left-0 z-50 flex w-64 shrink-0 flex-col justify-between border-r border-gray-200 bg-white transition-transform duration-200 md:static md:z-auto md:translate-x-0"
+            :class="mobileDrawerOpen ? 'translate-x-0' : '-translate-x-full'"
+            @click="if ($event.target.closest('a')) mobileDrawerOpen = false"
+            aria-label="Passenger navigation"
+        >
             <div>
                 <div class="h-16 flex items-center px-6 mb-4 mt-2">
                     <div class="bg-[#2E7D32] text-white p-2 rounded-xl mr-3 shadow-sm">
@@ -92,9 +99,12 @@
             </div>
         </aside>
 
-        <main class="flex-1 flex flex-col h-screen overflow-hidden relative">
-            <header class="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-8 shrink-0">
-                <h2 class="text-sm font-semibold text-gray-700">{{ $resolvedPageTitle }}</h2>
+        <main class="relative flex min-w-0 flex-1 flex-col overflow-hidden">
+            <header class="flex h-16 shrink-0 items-center justify-between border-b border-gray-200 bg-white px-4 sm:px-8">
+                <div class="flex min-w-0 items-center gap-3">
+                    <button type="button" class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100 md:hidden" @click="mobileDrawerOpen = true" aria-label="Open navigation menu"><x-icons.lucide name="menu" /></button>
+                    <h2 class="truncate text-sm font-semibold text-gray-700">{{ $resolvedPageTitle }}</h2>
+                </div>
                 <div class="flex items-center space-x-4">
                     <button class="text-gray-400 hover:text-gray-600 relative">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>

@@ -122,6 +122,24 @@
                         Welcome back to GreenPool.
                     </p>
 
+                    @if($pendingRatingBooking)
+                        <section class="mt-8 overflow-hidden rounded-2xl border border-green-200 bg-white shadow-sm" aria-labelledby="pending-rating-title">
+                            <div class="bg-green-50 px-5 py-4 sm:px-6">
+                                <p class="text-xs font-semibold uppercase tracking-wide text-green-700">Trip completed</p>
+                                <h2 id="pending-rating-title" class="mt-1 text-xl font-bold text-slate-900">How was your ride?</h2>
+                            </div>
+                            <div class="flex flex-col gap-5 p-5 sm:flex-row sm:items-center sm:p-6">
+                                <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#2E7D32] text-sm font-bold text-white">{{ strtoupper(substr($pendingRatingBooking->trip->user->name, 0, 2)) }}</div>
+                                <div class="min-w-0 flex-1">
+                                    <p class="font-semibold text-slate-900">{{ $pendingRatingBooking->trip->user->name }}</p>
+                                    <p class="mt-1 text-sm text-slate-500">{{ $pendingRatingBooking->trip->departure_location }} to {{ $pendingRatingBooking->trip->destination }}</p>
+                                    <p class="mt-2 text-2xl tracking-wide text-amber-400" aria-hidden="true">★★★★★</p>
+                                </div>
+                                <a href="{{ route('ratings.create', $pendingRatingBooking) }}" class="w-full rounded-xl bg-[#22C55E] px-5 py-3 text-center text-sm font-bold text-white hover:bg-green-600 sm:w-auto">Rate Now</a>
+                            </div>
+                        </section>
+                    @endif
+
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-10">
                         <div class="bg-white rounded-xl shadow p-6">
                             <h2 class="font-semibold text-lg">
