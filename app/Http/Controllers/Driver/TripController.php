@@ -7,6 +7,7 @@ use App\Http\Requests\Driver\StoreTripRequest;
 use App\Http\Requests\Driver\UpdateTripRequest;
 use App\Models\Trip;
 use App\Services\Routing\TripDistanceService;
+use App\Services\Routing\TripLocationService;
 use App\Services\Routing\TripRoutingException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -16,7 +17,18 @@ use Illuminate\View\View;
 
 class TripController extends Controller
 {
-    public function __construct(private readonly TripDistanceService $tripDistanceService) {}
+    public function __construct(private readonly TripDistanceService $tripDistanceService, private readonly TripLocationService $tripLocationService) {}
+
+    public function autocomplete(Request $request): JsonResponse
+    {
+        $request->validate(['input' => ['required', 'string', 'min:2', 'max:255']]);
+
+        try {
+            return response()->json(['data' => $this->tripLocationService->autocomplete($request->string('input')->trim()->toString())]);
+        } catch (TripRoutingException $exception) {
+            return response()->json(['message' => $exception->getMessage(), 'errors' => [$exception->errorField => [$exception->getMessage()]]], 422);
+        }
+    }
 
     public function index(Request $request): View|JsonResponse
     {
@@ -48,12 +60,13 @@ class TripController extends Controller
     public function store(StoreTripRequest $request): RedirectResponse|JsonResponse
     {
         try {
-            $routingData = $this->tripDistanceService->calculate($request->string('departure_location')->trim()->toString(), $request->string('destination')->trim()->toString());
+            $locations = $this->selectedLocations($request);
+            $routingData = $this->tripDistanceService->calculate($locations['departure'], $locations['destination']);
         } catch (TripRoutingException $exception) {
             return $this->routingError($request, $exception);
         }
 
-        $trip = $request->user()->trips()->create([...$request->tripData(), ...$routingData]);
+        $trip = $request->user()->trips()->create([...$request->tripData(), ...$locations['attributes'], ...$routingData]);
 
         return $this->response($request, $trip, 'Trip published successfully.', 201, 'driver.trips.index');
     }
@@ -81,10 +94,11 @@ class TripController extends Controller
     public function update(UpdateTripRequest $request, Trip $trip): RedirectResponse|JsonResponse
     {
         $data = $request->tripData();
-        $locationsChanged = $data['departure_location'] !== $trip->departure_location || $data['destination'] !== $trip->destination;
+        $locationsChanged = $request->filled('departure_place_id') || $request->filled('destination_place_id');
         if ($locationsChanged) {
             try {
-                $data = [...$data, ...$this->tripDistanceService->calculate($data['departure_location'], $data['destination'])];
+                $locations = $this->selectedLocations($request, $trip);
+                $data = [...$data, ...$locations['attributes'], ...$this->tripDistanceService->calculate($locations['departure'], $locations['destination'])];
             } catch (TripRoutingException $exception) {
                 return $this->routingError($request, $exception);
             }
@@ -226,5 +240,45 @@ class TripController extends Controller
         }
 
         return back()->withInput()->withErrors([$exception->errorField => $exception->getMessage()]);
+    }
+
+    private function selectedLocations(Request $request, ?Trip $trip = null): array
+    {
+        $departure = $request->filled('departure_place_id')
+            ? $this->tripLocationService->resolve($request->string('departure_place_id')->toString(), 'departure_place_id')
+            : $this->storedLocation($trip, 'departure');
+        $destination = $request->filled('destination_place_id')
+            ? $this->tripLocationService->resolve($request->string('destination_place_id')->toString(), 'destination_place_id')
+            : $this->storedLocation($trip, 'destination');
+
+        if ($departure['latitude'] === $destination['latitude'] && $departure['longitude'] === $destination['longitude']) {
+            throw new TripRoutingException('destination_place_id', 'Departure location and destination cannot be the same.');
+        }
+
+        return [
+            'departure' => $departure,
+            'destination' => $destination,
+            'attributes' => [
+                'departure_location' => $departure['display'],
+                'departure_latitude' => $departure['latitude'],
+                'departure_longitude' => $departure['longitude'],
+                'destination' => $destination['display'],
+                'destination_latitude' => $destination['latitude'],
+                'destination_longitude' => $destination['longitude'],
+            ],
+        ];
+    }
+
+    private function storedLocation(?Trip $trip, string $prefix): array
+    {
+        if (! $trip || $trip->{"{$prefix}_latitude"} === null || $trip->{"{$prefix}_longitude"} === null) {
+            throw new TripRoutingException("{$prefix}_place_id", 'Please select a location from the suggestions.');
+        }
+
+        return [
+            'display' => $prefix === 'departure' ? $trip->departure_location : $trip->destination,
+            'latitude' => (float) $trip->{"{$prefix}_latitude"},
+            'longitude' => (float) $trip->{"{$prefix}_longitude"},
+        ];
     }
 }

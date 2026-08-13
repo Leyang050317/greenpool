@@ -35,10 +35,10 @@ return [
         ],
     ],
 
-    'routing' => [
-        'nominatim_url' => env('NOMINATIM_URL', 'https://nominatim.openstreetmap.org'),
-        'osrm_url' => env('OSRM_URL', 'https://router.project-osrm.org'),
-        'user_agent' => env('NOMINATIM_USER_AGENT', 'GreenPool Trip Management/1.0'),
+    'google_maps' => [
+        'key' => env('GOOGLE_MAPS_API_KEY'),
+        'places_base_url' => env('GOOGLE_PLACES_URL', 'https://places.googleapis.com/v1'),
+        'routes_base_url' => env('GOOGLE_ROUTES_URL', 'https://routes.googleapis.com/directions/v2'),
     ],
 
     'google_places' => [
@@ -56,5 +56,5 @@ return [
         'client_secret' => env('GOOGLE_CLIENT_SECRET'),
         'redirect' => env('GOOGLE_REDIRECT_URL'),
     ],
-    
+
 ];

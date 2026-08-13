@@ -2,73 +2,66 @@
 
 namespace App\Services\Routing;
 
-use Illuminate\Http\Client\ConnectionException;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Throwable;
 
 class TripDistanceService
 {
-    public function calculate(string $departure, string $destination): array
+    public function calculate(array $departure, array $destination): array
     {
-        $from = $this->geocode($departure, 'departure_location');
-        $to = $this->geocode($destination, 'destination');
+        $this->assertConfigured();
 
         try {
             $response = Http::acceptJson()->connectTimeout(5)->timeout(12)
-                ->get(rtrim(config('services.routing.osrm_url'), '/')."/route/v1/driving/{$from['longitude']},{$from['latitude']};{$to['longitude']},{$to['latitude']}", [
-                    'overview' => 'false',
+                ->withHeaders([
+                    'X-Goog-Api-Key' => config('services.google_maps.key'),
+                    'X-Goog-FieldMask' => 'routes.distanceMeters,routes.duration',
+                ])->post(rtrim(config('services.google_maps.routes_base_url'), '/').':computeRoutes', [
+                    'origin' => ['location' => ['latLng' => $this->latLng($departure)]],
+                    'destination' => ['location' => ['latLng' => $this->latLng($destination)]],
+                    'travelMode' => 'DRIVE',
                 ]);
-        } catch (ConnectionException) {
+        } catch (Throwable) {
             throw new TripRoutingException('destination', 'Unable to calculate route distance. Please try again.');
         }
 
         $route = $response->json('routes.0');
-        if ($response->json('code') === 'NoRoute' || ($response->successful() && ! $route)) {
+        if ($response->successful() && ! $route) {
             throw new TripRoutingException('destination', 'No driving route available between these locations.');
         }
-        if (! $response->successful() || ! isset($route['distance'])) {
+        if (! $response->successful() || ! is_array($route) || ! isset($route['distanceMeters'], $route['duration'])) {
+            throw new TripRoutingException('destination', 'Unable to calculate route distance. Please try again.');
+        }
+
+        $duration = $this->durationSeconds($route['duration']);
+        if (! is_numeric($route['distanceMeters']) || (float) $route['distanceMeters'] < 0 || $duration === null) {
             throw new TripRoutingException('destination', 'Unable to calculate route distance. Please try again.');
         }
 
         return [
-            'departure_latitude' => $from['latitude'],
-            'departure_longitude' => $from['longitude'],
-            'destination_latitude' => $to['latitude'],
-            'destination_longitude' => $to['longitude'],
-            'estimated_distance_km' => round(((float) $route['distance']) / 1000, 2),
+            'estimated_distance_km' => round(((float) $route['distanceMeters']) / 1000, 2),
+            'estimated_duration_seconds' => $duration,
         ];
     }
 
-    private function geocode(string $address, string $field): array
+    private function assertConfigured(): void
     {
-        $key = 'trip-geocode:'.sha1(mb_strtolower(trim($address)));
+        if (blank(config('services.google_maps.key'))) {
+            throw new TripRoutingException('destination', 'Google Maps is not configured. Please contact support.');
+        }
+    }
 
-        return Cache::remember($key, now()->addDays(30), function () use ($address, $field) {
-            try {
-                $response = Http::acceptJson()
-                    ->withHeaders(['User-Agent' => config('services.routing.user_agent')])
-                    ->connectTimeout(5)->timeout(12)
-                    ->get(rtrim(config('services.routing.nominatim_url'), '/').'/search', [
-                        'q' => $address,
-                        'format' => 'jsonv2',
-                        'limit' => 1,
-                        'addressdetails' => 1,
-                        'countrycodes' => 'my',
-                    ]);
-            } catch (ConnectionException) {
-                throw new TripRoutingException($field, 'Unable to process location information. Please try again later.');
-            }
+    private function latLng(array $location): array
+    {
+        return ['latitude' => (float) $location['latitude'], 'longitude' => (float) $location['longitude']];
+    }
 
-            if (! $response->successful()) {
-                throw new TripRoutingException($field, 'Unable to process location information. Please try again later.');
-            }
+    private function durationSeconds(mixed $duration): ?int
+    {
+        if (! is_string($duration) || ! preg_match('/^(\d+(?:\.\d+)?)s$/', $duration, $matches)) {
+            return null;
+        }
 
-            $result = $response->json('0');
-            if (! $result || data_get($result, 'address.country_code') !== 'my' || ! isset($result['lat'], $result['lon'])) {
-                throw new TripRoutingException($field, 'Unable to find the selected location. Please enter a valid address.');
-            }
-
-            return ['latitude' => (float) $result['lat'], 'longitude' => (float) $result['lon']];
-        });
+        return (int) round((float) $matches[1]);
     }
 }

@@ -6,6 +6,15 @@ use App\Models\Trip;
 
 class UpdateTripRequest extends StoreTripRequest
 {
+    public function rules(): array
+    {
+        return [
+            ...parent::rules(),
+            'departure_place_id' => ['nullable', 'string', 'max:255'],
+            'destination_place_id' => ['nullable', 'string', 'max:255'],
+        ];
+    }
+
     public function authorize(): bool
     {
         $trip = $this->route('trip');
