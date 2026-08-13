@@ -151,7 +151,8 @@
 
                     <div class="mb-6">
                         <label for="email" class="block text-xs font-bold text-gray-400 mb-1">Email Address</label>
-                        <input id="email" name="email" type="email" class="block w-full border border-gray-200 rounded-md shadow-sm focus:border-green-500 focus:ring-green-500 sm:text-sm p-2.5 text-gray-900" value="{{ old('email', $user->email) }}" required autocomplete="username" />
+                        <input id="email" name="email" type="email" class="block w-full border border-gray-200 rounded-md shadow-sm bg-gray-100 text-gray-500 cursor-not-allowed sm:text-sm p-2.5" value="{{ old('email', $user->email) }}" readonly autocomplete="username" />
+                        <p class="mt-1.5 text-xs text-gray-400">Email address cannot be changed.</p>
                         @error('email')
                             <p class="text-sm text-red-600 mt-2">{{ $message }}</p>
                         @enderror
