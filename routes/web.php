@@ -97,3 +97,11 @@ Route::view('/email-verified', 'auth.verification-success')
     ->name('verification.success');
 
 require __DIR__.'/auth.php';
+
+use App\Http\Controllers\Auth\GoogleLoginController;
+
+Route::get('/auth/google', [GoogleLoginController::class, 'redirectToGoogle'])->name('auth.google');
+Route::get('/auth/google/callback', [GoogleLoginController::class, 'handleGoogleCallback']);
+
+Route::get('/auth/google/role', [App\Http\Controllers\Auth\GoogleLoginController::class, 'showRoleSelection'])->name('auth.google.role');
+Route::post('/auth/google/role', [App\Http\Controllers\Auth\GoogleLoginController::class, 'storeRole'])->name('auth.google.storeRole');
