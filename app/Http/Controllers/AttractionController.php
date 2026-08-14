@@ -115,7 +115,19 @@ class AttractionController extends Controller
             ->where('user_id', $request->user()->getKey())
             ->exists();
 
-        return view('attractions.show', compact('attraction', 'isFavourited', 'googlePlace', 'googlePhotoUrl', 'googleError'));
+        $rideDestination = $attraction->attraction_name;
+        $mapDestination = $attraction->location ?: "{$attraction->attraction_name}, {$attraction->state}, Malaysia";
+        $googleDirectionsUrl = 'https://www.google.com/maps/dir/?api=1&destination='.rawurlencode($mapDestination);
+
+        return view('attractions.show', compact(
+            'attraction',
+            'isFavourited',
+            'googlePlace',
+            'googlePhotoUrl',
+            'googleError',
+            'rideDestination',
+            'googleDirectionsUrl',
+        ));
     }
 
     public function googlePhoto(Request $request, Attraction $attraction, GooglePlacesService $googlePlaces): Response
