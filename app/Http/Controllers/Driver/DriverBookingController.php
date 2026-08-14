@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Driver;
 
+use App\Events\BookingStatusUpdated;
 use App\Http\Controllers\Controller;
 use App\Models\Booking;
 use App\Models\Trip;
@@ -38,7 +39,7 @@ class DriverBookingController extends Controller
 
     public function accept(Request $request, Booking $booking): RedirectResponse
     {
-        DB::transaction(function () use ($request, $booking) {
+        $booking = DB::transaction(function () use ($request, $booking) {
             $booking = Booking::query()
                 ->whereKey($booking->getKey())
                 ->lockForUpdate()
@@ -66,14 +67,18 @@ class DriverBookingController extends Controller
 
             $booking->update(['booking_status' => 'Accepted']);
             $trip->decrement('available_seats', $booking->number_of_seats);
+
+            return $booking;
         });
+
+        BookingStatusUpdated::dispatch($booking);
 
         return redirect()->route('driver.booking-requests.index')->with('success', 'Booking request accepted successfully.');
     }
 
     public function reject(Request $request, Booking $booking): RedirectResponse
     {
-        DB::transaction(function () use ($request, $booking) {
+        $booking = DB::transaction(function () use ($request, $booking) {
             $booking = Booking::query()
                 ->whereKey($booking->getKey())
                 ->lockForUpdate()
@@ -88,7 +93,11 @@ class DriverBookingController extends Controller
             $this->ensurePending($booking);
 
             $booking->update(['booking_status' => 'Rejected']);
+
+            return $booking;
         });
+
+        BookingStatusUpdated::dispatch($booking);
 
         return redirect()->route('driver.booking-requests.index')->with('success', 'Booking request rejected successfully.');
     }

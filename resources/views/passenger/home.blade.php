@@ -7,7 +7,11 @@
     <title>Dashboard - GreenPool</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
-<body class="font-sans antialiased text-gray-900 bg-[#F9FAFB] flex h-screen overflow-hidden">
+<body
+    class="font-sans antialiased text-gray-900 bg-[#F9FAFB] flex h-screen overflow-hidden"
+    data-auth-id="{{ Auth::id() }}"
+    data-auth-role="{{ Auth::user()?->role }}"
+>
 
     <div class="flex w-full h-full" x-data="{ showLogoutModal: false }">
         

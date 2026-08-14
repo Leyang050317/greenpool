@@ -8,7 +8,11 @@
     <title>{{ $resolvedPageTitle }} - GreenPool</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
-<body class="flex h-screen overflow-hidden bg-[#F9FAFB] font-sans text-gray-900 antialiased">
+<body
+    class="flex h-screen overflow-hidden bg-[#F9FAFB] font-sans text-gray-900 antialiased"
+    data-auth-id="{{ Auth::id() }}"
+    data-auth-role="{{ Auth::user()?->role }}"
+>
     <div class="flex h-screen w-full" x-data="{ mobileDrawerOpen: false }" @keydown.escape.window="mobileDrawerOpen = false">
         <div x-cloak x-show="mobileDrawerOpen" x-transition.opacity class="fixed inset-0 z-40 bg-slate-950/40 md:hidden" @click="mobileDrawerOpen = false" aria-hidden="true"></div>
         <aside

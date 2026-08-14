@@ -14,7 +14,11 @@
         <!-- Scripts -->
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     </head>
-    <body class="font-sans antialiased">
+    <body
+        class="font-sans antialiased"
+        data-auth-id="{{ Auth::id() }}"
+        data-auth-role="{{ Auth::user()?->role }}"
+    >
         @if(Auth::user()?->role === 'driver')
             <div
                 x-data="driverNavigation"
