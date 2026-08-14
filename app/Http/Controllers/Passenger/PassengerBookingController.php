@@ -2,10 +2,14 @@
 
 namespace App\Http\Controllers\Passenger;
 
+use App\Events\BookingCreated;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Passenger\StoreBookingRequest;
 use App\Models\Booking;
 use App\Models\Trip;
+use App\Services\Routing\TripLocationService;
+use App\Services\Routing\TripRoutingException;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -14,6 +18,20 @@ use Illuminate\View\View;
 
 class PassengerBookingController extends Controller
 {
+    public function __construct(private readonly TripLocationService $tripLocationService) {}
+
+    public function autocomplete(Request $request): JsonResponse
+    {
+        $this->ensurePassenger($request);
+        $request->validate(['input' => ['required', 'string', 'min:2', 'max:255']]);
+
+        try {
+            return response()->json(['data' => $this->tripLocationService->autocomplete($request->string('input')->trim()->toString())]);
+        } catch (TripRoutingException $exception) {
+            return response()->json(['message' => $exception->getMessage(), 'errors' => ['pickup_place_id' => [$exception->getMessage()]]], 422);
+        }
+    }
+
     public function index(Request $request): View
     {
         $this->ensurePassenger($request);
@@ -62,7 +80,13 @@ class PassengerBookingController extends Controller
 
     public function store(StoreBookingRequest $request): RedirectResponse
     {
-        DB::transaction(function () use ($request) {
+        try {
+            $pickup = $this->tripLocationService->resolve($request->string('pickup_place_id')->toString(), 'pickup_place_id');
+        } catch (TripRoutingException $exception) {
+            return back()->withInput()->withErrors(['pickup_place_id' => $exception->getMessage()]);
+        }
+
+        $booking = DB::transaction(function () use ($request, $pickup) {
             $trip = Trip::query()
                 ->whereKey($request->integer('trip_id'))
                 ->lockForUpdate()
@@ -97,8 +121,10 @@ class PassengerBookingController extends Controller
                 ]);
             }
 
-            Booking::create($request->bookingData());
+            return Booking::create([...$request->bookingData(), 'pickup_point' => $pickup['display']]);
         });
+
+        BookingCreated::dispatch($booking);
 
         return redirect()->route('passenger.bookings.history')->with('success', 'Booking request submitted successfully.');
     }

@@ -10,7 +10,12 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 
-<body class="bg-gray-100" x-data="{ open: false }">
+<body
+    class="bg-gray-100"
+    x-data="{ open: false }"
+    data-auth-id="{{ Auth::id() }}"
+    data-auth-role="{{ Auth::user()?->role }}"
+>
 
     <!-- resources/views/components/passenger/header.blade.php -->
     <x-passenger.header />
