@@ -2,9 +2,11 @@
     $isEditing = isset($trip);
     $returnTo = $returnTo ?? 'driver.trips.index';
     $value = fn (string $key, mixed $default = null) => old($key, $default);
+    $prefilledDestination = $isEditing ? ($trip->destination ?? '') : request('destination', '');
+    $prefilledDestinationPlaceId = $isEditing ? '' : request('destination_place_id', '');
 @endphp
 
-<form method="POST" action="{{ $isEditing ? route('driver.trips.update', ['trip' => $trip, 'return_to' => $returnTo]) : route('driver.trips.store') }}" class="max-w-2xl space-y-6" x-data="tripLocationForm({{ Js::from(route('driver.trips.locations.autocomplete')) }}, {{ Js::from($isEditing) }}, {{ Js::from($value('departure_location', $trip->departure_location ?? '')) }}, {{ Js::from($value('destination', $trip->destination ?? '')) }}, {{ Js::from(old('departure_place_id', '')) }}, {{ Js::from(old('destination_place_id', '')) }})" x-ref="tripForm" @submit.prevent="submitForm()">
+<form method="POST" action="{{ $isEditing ? route('driver.trips.update', ['trip' => $trip, 'return_to' => $returnTo]) : route('driver.trips.store') }}" class="max-w-2xl space-y-6" x-data="tripLocationForm({{ Js::from(route('driver.trips.locations.autocomplete')) }}, {{ Js::from($isEditing) }}, {{ Js::from($value('departure_location', $trip->departure_location ?? '')) }}, {{ Js::from($value('destination', $prefilledDestination)) }}, {{ Js::from(old('departure_place_id', '')) }}, {{ Js::from(old('destination_place_id', $prefilledDestinationPlaceId)) }})" x-ref="tripForm" @submit.prevent="submitForm()">
     @csrf
     @if ($isEditing) @method('PATCH') @endif
 
@@ -48,7 +50,7 @@
                     <input id="destination" name="destination" x-model="destination.text" @input="search('destination')" @focus="destination.open = true" autocomplete="off" maxlength="255" required class="block w-full rounded-xl border-gray-200 text-sm focus:border-[#16A34A] focus:ring-[#16A34A]" placeholder="Search a Malaysian address or place" />
                     <input type="hidden" name="destination_place_id" :value="destination.placeId" />
                     <div x-cloak x-show="destination.open && destination.suggestions.length" class="absolute z-20 mt-1 w-full overflow-hidden rounded-xl border border-gray-200 bg-white py-1 shadow-lg"><template x-for="suggestion in destination.suggestions" :key="suggestion.place_id"><button type="button" @click="select('destination', suggestion)" class="block w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50" x-text="suggestion.text"></button></template></div>
-                    <p class="mt-1 text-xs text-gray-400">Select a suggestion in Malaysia to use it.</p><x-input-error :messages="$errors->get('destination_place_id')" class="mt-1.5" />
+                    <p class="mt-1 text-xs text-gray-400">Select a suggestion in Malaysia to use it.</p>@if (! $isEditing && filled($prefilledDestinationPlaceId))<p class="mt-1 text-xs font-medium text-green-700">Destination was added from Tourist Attractions.</p>@endif<x-input-error :messages="$errors->get('destination_place_id')" class="mt-1.5" />
                 </div>
             </div>
             <div class="grid gap-5 sm:grid-cols-2">
