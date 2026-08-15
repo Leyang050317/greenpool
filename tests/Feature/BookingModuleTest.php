@@ -2,11 +2,13 @@
 
 namespace Tests\Feature;
 
+use App\Events\BookingStatusUpdated;
 use App\Models\Booking;
 use App\Models\Trip;
 use App\Models\User;
 use App\Models\Vehicle;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Event;
 use Tests\TestCase;
 
 class BookingModuleTest extends TestCase
@@ -22,6 +24,32 @@ class BookingModuleTest extends TestCase
             ->get(route('passenger.booking'))
             ->assertOk()
             ->assertSee($trip->destination);
+    }
+
+    public function test_passenger_destination_search_matches_related_keywords(): void
+    {
+        $passenger = User::factory()->create(['role' => 'passenger']);
+        $matchingTrip = $this->createTrip(['destination' => 'Kuala Lumpur City Centre']);
+        $otherTrip = $this->createTrip(['destination' => 'Penang Hill']);
+
+        $this->actingAs($passenger)
+            ->get(route('passenger.booking', ['destination' => 'Kuala Lumpur, Malaysia']))
+            ->assertOk()
+            ->assertSee($matchingTrip->destination)
+            ->assertDontSee($otherTrip->destination);
+    }
+
+    public function test_passenger_history_shows_trip_lifecycle_status_for_accepted_booking(): void
+    {
+        $passenger = User::factory()->create(['role' => 'passenger']);
+        $trip = $this->createTrip(['status' => 'In Progress', 'started_at' => now()]);
+        $this->createBooking($passenger, $trip, bookingStatus: 'Accepted');
+
+        $this->actingAs($passenger)
+            ->get(route('passenger.bookings.history'))
+            ->assertOk()
+            ->assertSee('In Progress')
+            ->assertDontSee('Accepted</span>', false);
     }
 
     public function test_passenger_can_submit_booking_request(): void
@@ -94,6 +122,8 @@ class BookingModuleTest extends TestCase
 
     public function test_passenger_can_cancel_only_pending_booking(): void
     {
+        Event::fake([BookingStatusUpdated::class]);
+
         $passenger = User::factory()->create(['role' => 'passenger']);
         $pendingBooking = $this->createBooking($passenger, bookingStatus: 'Pending');
         $acceptedBooking = $this->createBooking($passenger, bookingStatus: 'Accepted');
@@ -107,6 +137,12 @@ class BookingModuleTest extends TestCase
             'id' => $pendingBooking->id,
             'booking_status' => 'Cancelled',
         ]);
+        Event::assertDispatched(
+            BookingStatusUpdated::class,
+            fn (BookingStatusUpdated $event) => $event->booking->is($pendingBooking)
+                && $event->booking->booking_status === 'Cancelled'
+                && collect($event->broadcastOn())->contains(fn ($channel) => (string) $channel === 'private-driver.'.$pendingBooking->trip->user_id)
+        );
 
         $this->actingAs($passenger)
             ->patch(route('passenger.bookings.cancel', $acceptedBooking))

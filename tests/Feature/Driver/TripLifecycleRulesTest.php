@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Driver;
 
+use App\Events\BookingStatusUpdated;
 use App\Models\Booking;
 use App\Models\Trip;
 use App\Models\User;
@@ -9,6 +10,7 @@ use App\Models\Vehicle;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
@@ -94,6 +96,31 @@ class TripLifecycleRulesTest extends TestCase
         $this->actingAs($driver)->patch(route('driver.trips.start', $cancelled))->assertStatus(422);
         $completed = $this->trip($driver, ['status' => 'Completed', 'completed_at' => now()]);
         $this->actingAs($driver)->patch(route('driver.trips.start', $completed))->assertStatus(422);
+    }
+
+    public function test_start_trip_notifies_accepted_passengers_in_real_time(): void
+    {
+        Event::fake([BookingStatusUpdated::class]);
+
+        $driver = $this->driver();
+        $trip = $this->trip($driver);
+        $acceptedPassenger = $this->passenger();
+        $pendingPassenger = $this->passenger();
+        $acceptedBooking = Booking::create(['trip_id' => $trip->trip_id, 'passenger_id' => $acceptedPassenger->id, 'booking_status' => 'Accepted', 'number_of_seats' => 1, 'pickup_point' => 'Main Gate']);
+        Booking::create(['trip_id' => $trip->trip_id, 'passenger_id' => $pendingPassenger->id, 'booking_status' => 'Pending', 'number_of_seats' => 1, 'pickup_point' => 'Library']);
+
+        $this->actingAs($driver)
+            ->patch(route('driver.trips.start', $trip))
+            ->assertRedirect(route('driver.trips.journey'));
+
+        $this->assertSame('In Progress', $trip->refresh()->status);
+        Event::assertDispatched(
+            BookingStatusUpdated::class,
+            fn (BookingStatusUpdated $event) => $event->booking->is($acceptedBooking)
+                && $event->booking->passenger_id === $acceptedPassenger->id
+                && $event->booking->trip->status === 'In Progress'
+        );
+        Event::assertDispatchedTimes(BookingStatusUpdated::class, 1);
     }
 
     private function fakeGoogle(): void

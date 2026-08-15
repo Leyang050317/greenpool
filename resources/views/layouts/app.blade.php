@@ -67,16 +67,16 @@
             </div>
         @else
             <div
-                x-data="{ mobileDrawerOpen: false }"
-                @keydown.escape.window="mobileDrawerOpen = false"
-                @open-navigation-drawer.window="mobileDrawerOpen = true"
+                x-data="passengerNavigation"
+                @keydown.escape.window="closeMobileDrawer()"
+                @open-navigation-drawer.window="openMobileDrawer()"
                 class="min-h-screen overflow-x-hidden bg-gray-100"
             >
                 <div class="fixed inset-y-0 left-0 z-40 hidden w-72 md:block">
                     <x-passenger.sidebar />
                 </div>
 
-                <div x-cloak x-show="mobileDrawerOpen" x-transition.opacity.duration.150ms class="fixed inset-0 z-40 bg-slate-950/45 md:hidden" @click="mobileDrawerOpen = false" aria-hidden="true"></div>
+                <div x-cloak x-show="mobileDrawerOpen" x-transition.opacity.duration.150ms class="fixed inset-0 z-40 bg-slate-950/45 md:hidden" @click="closeMobileDrawer()" aria-hidden="true"></div>
 
                 <div id="passenger-mobile-navigation" x-cloak x-show="mobileDrawerOpen" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="-translate-x-full" x-transition:enter-end="translate-x-0" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="translate-x-0" x-transition:leave-end="-translate-x-full" class="fixed inset-y-0 left-0 z-50 w-72 md:hidden" role="dialog" aria-modal="true" aria-label="Passenger navigation menu">
                     <x-passenger.sidebar />

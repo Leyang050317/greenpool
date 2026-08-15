@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers\Driver;
 
+use App\Events\BookingStatusUpdated;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Driver\StoreTripRequest;
 use App\Http\Requests\Driver\UpdateTripRequest;
+use App\Models\Booking;
 use App\Models\Trip;
 use App\Services\Routing\TripDistanceService;
 use App\Services\Routing\TripLocationService;
@@ -124,10 +126,13 @@ class TripController extends Controller
     public function start(Request $request, Trip $trip): RedirectResponse|JsonResponse
     {
         $this->ensureStatus($request, $trip, ['Scheduled']);
-        DB::transaction(function () use ($request, $trip) {
+        $bookingsToNotify = DB::transaction(function () use ($request, $trip) {
             abort_if($request->user()->trips()->where('status', 'In Progress')->exists(), 422, 'Complete your current trip before starting another.');
             $trip->update(['status' => 'In Progress', 'started_at' => now()]);
+
+            return $this->acceptedBookingsFor($trip);
         });
+        $this->broadcastBookingUpdates($bookingsToNotify);
 
         return $this->response($request, $trip->refresh(), 'Journey started successfully.', 200, 'driver.trips.journey');
     }
@@ -135,7 +140,12 @@ class TripController extends Controller
     public function complete(Request $request, Trip $trip): RedirectResponse|JsonResponse
     {
         $this->ensureStatus($request, $trip, ['In Progress']);
-        $trip->update(['status' => 'Completed', 'completed_at' => now()]);
+        $bookingsToNotify = DB::transaction(function () use ($trip) {
+            $trip->update(['status' => 'Completed', 'completed_at' => now()]);
+
+            return $this->acceptedBookingsFor($trip);
+        });
+        $this->broadcastBookingUpdates($bookingsToNotify);
 
         if (! $request->expectsJson()) {
             $bookingToRate = $trip->bookings()
@@ -156,7 +166,12 @@ class TripController extends Controller
     public function cancel(Request $request, Trip $trip): RedirectResponse|JsonResponse
     {
         $this->ensureStatus($request, $trip, ['Scheduled']);
-        $trip->update(['status' => 'Cancelled', 'cancelled_at' => now()]);
+        $bookingsToNotify = DB::transaction(function () use ($trip) {
+            $trip->update(['status' => 'Cancelled', 'cancelled_at' => now()]);
+
+            return $this->acceptedBookingsFor($trip);
+        });
+        $this->broadcastBookingUpdates($bookingsToNotify);
 
         return $this->response($request, $trip->refresh(), 'Trip cancelled successfully.', 200, 'driver.trips.index');
     }
@@ -273,6 +288,22 @@ class TripController extends Controller
                 'estimated_distance_km' => null,
                 'estimated_duration_seconds' => null,
             ];
+        }
+    }
+
+    private function acceptedBookingsFor(Trip $trip)
+    {
+        return Booking::query()
+            ->with('trip')
+            ->where('trip_id', $trip->getKey())
+            ->where('booking_status', 'Accepted')
+            ->get();
+    }
+
+    private function broadcastBookingUpdates($bookings): void
+    {
+        foreach ($bookings as $booking) {
+            BookingStatusUpdated::dispatch($booking);
         }
     }
 

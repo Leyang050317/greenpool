@@ -23,7 +23,8 @@ const subscribeToBookingUpdates = () => {
 
     if (userRole === 'driver' && path.startsWith('/driver/booking')) {
         window.Echo.private(`driver.${userId}`)
-            .listen('BookingCreated', refreshBookingPage);
+            .listen('BookingCreated', refreshBookingPage)
+            .listen('BookingStatusUpdated', refreshBookingPage);
     }
 
     if (userRole === 'passenger' && (path.startsWith('/passenger/booking') || path === '/passenger/home')) {
@@ -53,6 +54,26 @@ Alpine.data('driverNavigation', () => ({
             }
         });
     },
+
+    openMobileDrawer() {
+        this.mobileMenuTrigger = document.activeElement;
+        this.mobileDrawerOpen = true;
+    },
+
+    closeMobileDrawer() {
+        if (!this.mobileDrawerOpen) {
+            return;
+        }
+
+        this.mobileDrawerOpen = false;
+        this.$nextTick(() => this.mobileMenuTrigger?.focus());
+    },
+}));
+
+Alpine.data('passengerNavigation', () => ({
+    sidebarExpanded: true,
+    mobileDrawerOpen: false,
+    mobileMenuTrigger: null,
 
     openMobileDrawer() {
         this.mobileMenuTrigger = document.activeElement;
