@@ -1,5 +1,7 @@
 @php
+
     $mainNavigation = [
+
         ['label' => 'Dashboard', 'icon' => 'layout-dashboard', 'href' => route('passenger.home'), 'active' => request()->routeIs('passenger.home')],
         ['label' => 'Find a Ride', 'icon' => 'search', 'href' => route('passenger.booking'), 'active' => request()->routeIs('passenger.booking', 'passenger.bookings.create')],
         ['label' => 'My Bookings', 'icon' => 'clipboard-list', 'href' => route('passenger.bookings.history'), 'active' => request()->routeIs('passenger.bookings.history')],
@@ -21,6 +23,7 @@
         ->implode('');
 @endphp
 
+
 <aside {{ $attributes->merge(['class' => 'flex h-full flex-col border-r border-slate-200 bg-white text-slate-800']) }} aria-label="Passenger navigation">
     <div class="flex h-[84px] shrink-0 items-center border-b border-slate-100 px-4">
         <a href="{{ route('passenger.home') }}" class="flex min-w-0 items-center rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2E7D32] focus-visible:ring-offset-2" aria-label="GreenPool dashboard">
@@ -41,6 +44,7 @@
 
     <nav class="min-h-0 flex-1 overflow-y-auto px-3 py-5" aria-label="Primary">
         <ul class="space-y-1.5">
+
             @foreach ($mainNavigation as $item)
                 <li>
                     <a href="{{ $item['href'] }}" @click="if (mobileDrawerOpen) closeMobileDrawer()" @if ($item['active']) aria-current="page" @endif title="{{ $item['label'] }}" class="group relative flex h-13 min-h-[52px] items-center rounded-xl px-3 text-[15px] font-medium transition duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2E7D32] focus-visible:ring-offset-2 {{ $item['active'] ? 'bg-green-50 text-[#2E7D32]' : 'text-slate-700 hover:bg-slate-100 hover:text-slate-950' }}">

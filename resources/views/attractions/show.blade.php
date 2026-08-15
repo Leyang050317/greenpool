@@ -48,15 +48,25 @@
                 </div>
             </section>
 
-            <section class="mt-7 flex flex-col justify-between gap-5 rounded-[14px] border border-green-200 bg-green-50 px-5 py-[18px] sm:flex-row sm:items-center">
+            <section class="mt-7 rounded-[14px] border border-slate-200 bg-white px-5 py-[18px]">
+                <div class="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+                    <div>
+                        <h2 class="inline-flex items-center gap-2 text-sm font-semibold text-slate-900"><x-icons.lucide name="map-pinned" /> Plan your route</h2>
+                        <p class="mt-1 text-[13px] text-slate-500">Open this attraction as your destination in Google Maps.</p>
+                    </div>
+                    <a href="{{ $googleDirectionsUrl }}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center gap-1.5 rounded-[9px] border border-slate-200 bg-white px-[18px] py-2.5 text-[13px] font-semibold text-slate-700 transition hover:border-green-200 hover:text-green-700">Get Directions <x-icons.lucide name="arrow-up-right" /></a>
+                </div>
+            </section>
+
+            <section class="mt-3 flex flex-col justify-between gap-5 rounded-[14px] border border-green-200 bg-green-50 px-5 py-[18px] sm:flex-row sm:items-center">
                 <div>
                     <h2 class="inline-flex items-center gap-2 text-sm font-semibold text-slate-900"><x-icons.lucide name="car" /> Find a Ride</h2>
                     <p class="mt-1 text-[13px] text-slate-500">See available GreenPool trips heading to this destination.</p>
                 </div>
                 @if (auth()->user()?->role === 'passenger')
-                    <a href="{{ route('passenger.booking') }}" class="inline-flex items-center justify-center gap-1.5 rounded-[9px] bg-green-600 px-[18px] py-2.5 text-[13px] font-semibold text-white transition hover:bg-green-700">Find a Ride <x-icons.lucide name="arrow-up-right" /></a>
+                    <a href="{{ route('passenger.booking', ['destination' => $rideDestination]) }}" class="inline-flex items-center justify-center gap-1.5 rounded-[9px] bg-green-600 px-[18px] py-2.5 text-[13px] font-semibold text-white transition hover:bg-green-700">Find a Ride <x-icons.lucide name="arrow-up-right" /></a>
                 @else
-                    <a href="{{ route('driver.trips.index') }}" class="inline-flex items-center justify-center gap-1.5 rounded-[9px] bg-green-600 px-[18px] py-2.5 text-[13px] font-semibold text-white transition hover:bg-green-700">View My Trips <x-icons.lucide name="arrow-up-right" /></a>
+                    <a href="{{ route('driver.trips.create', ['destination' => $rideDestination, 'destination_place_id' => $attraction->detail?->google_place_id]) }}" class="inline-flex items-center justify-center gap-1.5 rounded-[9px] bg-green-600 px-[18px] py-2.5 text-[13px] font-semibold text-white transition hover:bg-green-700">Create a Trip <x-icons.lucide name="arrow-up-right" /></a>
                 @endif
             </section>
             @if ($googlePlace)
