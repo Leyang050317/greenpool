@@ -20,9 +20,12 @@ class BookingStatusUpdated implements ShouldBroadcastNow
         $this->booking->loadMissing(['trip']);
     }
 
-    public function broadcastOn(): PrivateChannel
+    public function broadcastOn(): array
     {
-        return new PrivateChannel('passenger.'.$this->booking->passenger_id);
+        return [
+            new PrivateChannel('passenger.'.$this->booking->passenger_id),
+            new PrivateChannel('driver.'.$this->booking->trip->user_id),
+        ];
     }
 
     public function broadcastWith(): array
@@ -30,6 +33,7 @@ class BookingStatusUpdated implements ShouldBroadcastNow
         return [
             'booking_id' => $this->booking->id,
             'status' => $this->booking->booking_status,
+            'trip_status' => $this->booking->trip->status,
             'driver_id' => $this->booking->trip->user_id,
             'trip_id' => $this->booking->trip_id,
             'updated_at' => $this->booking->updated_at?->toIso8601String(),

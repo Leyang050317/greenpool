@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Passenger;
 
 use App\Events\BookingCreated;
+use App\Events\BookingStatusUpdated;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Passenger\StoreBookingRequest;
 use App\Models\Booking;
@@ -18,6 +19,8 @@ use Illuminate\View\View;
 
 class PassengerBookingController extends Controller
 {
+    private const DESTINATION_RADIUS_KM = 10;
+
     public function __construct(private readonly TripLocationService $tripLocationService) {}
 
     public function autocomplete(Request $request): JsonResponse
@@ -44,8 +47,7 @@ class PassengerBookingController extends Controller
             ->where('user_id', '!=', $request->user()->id);
 
         if ($request->filled('destination')) {
-            $destination = $request->string('destination')->trim();
-            $query->where('destination', 'like', "%{$destination}%");
+            $this->applyDestinationSearch($query, $request);
         }
 
         if ($request->filled('travel_date')) {
@@ -153,6 +155,7 @@ class PassengerBookingController extends Controller
         }
 
         $booking->update(['booking_status' => 'Cancelled']);
+        BookingStatusUpdated::dispatch($booking);
 
         return redirect()->route('passenger.bookings.history')->with('success', 'Booking request cancelled successfully.');
     }
@@ -160,5 +163,72 @@ class PassengerBookingController extends Controller
     private function ensurePassenger(Request $request): void
     {
         abort_unless($request->user()?->role === 'passenger', 403);
+    }
+
+    private function applyDestinationSearch($query, Request $request): void
+    {
+        $destination = $request->string('destination')->trim()->toString();
+        $keywords = $this->destinationKeywords($destination);
+        $selectedLocation = null;
+
+        if ($request->filled('destination_place_id')) {
+            try {
+                $selectedLocation = $this->tripLocationService->resolve(
+                    $request->string('destination_place_id')->toString(),
+                    'destination_place_id'
+                );
+            } catch (TripRoutingException) {
+                $selectedLocation = null;
+            }
+        }
+
+        $query->where(function ($query) use ($destination, $keywords, $selectedLocation) {
+            $query->where('destination', 'like', "%{$destination}%");
+
+            foreach ($keywords as $keyword) {
+                $query->orWhere('destination', 'like', "%{$keyword}%");
+            }
+
+            if ($selectedLocation) {
+                $query->orWhere(function ($query) use ($selectedLocation) {
+                    $query->whereNotNull('destination_latitude')
+                        ->whereNotNull('destination_longitude')
+                        ->whereRaw(
+                            '(6371 * acos(
+                                cos(radians(?)) * cos(radians(destination_latitude)) *
+                                cos(radians(destination_longitude) - radians(?)) +
+                                sin(radians(?)) * sin(radians(destination_latitude))
+                            )) <= ?',
+                            [
+                                $selectedLocation['latitude'],
+                                $selectedLocation['longitude'],
+                                $selectedLocation['latitude'],
+                                self::DESTINATION_RADIUS_KM,
+                            ]
+                        );
+                });
+            }
+        });
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function destinationKeywords(string $destination): array
+    {
+        $stopWords = [
+            'malaysia', 'jalan', 'jln', 'lorong', 'persiaran', 'taman', 'kampung',
+            'kg', 'near', 'and', 'the', 'of', 'to', 'in',
+        ];
+
+        return collect(preg_split('/[\s,;()\-]+/', $destination) ?: [])
+            ->map(fn (string $word) => trim($word))
+            ->filter(fn (string $word) => strlen($word) >= 3)
+            ->reject(fn (string $word) => is_numeric($word))
+            ->reject(fn (string $word) => in_array(strtolower($word), $stopWords, true))
+            ->unique(fn (string $word) => strtolower($word))
+            ->take(8)
+            ->values()
+            ->all();
     }
 }
