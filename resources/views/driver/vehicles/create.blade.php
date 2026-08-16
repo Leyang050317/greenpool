@@ -1,29 +1,33 @@
 <x-app-layout>
-    <div class="px-4 py-8 sm:px-6 lg:px-8">
-        <div class="mx-auto max-w-3xl">
-            <a href="{{ route('driver.vehicles.index') }}" class="text-sm font-semibold text-[#2E7D32] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2E7D32]">← Back to vehicles</a>
+<div class="px-4 py-8 sm:px-6"><form method="POST" action="{{ route('driver.vehicles.store') }}" enctype="multipart/form-data" class="mx-auto max-w-5xl rounded-2xl border bg-white p-6" x-data="{
+step:1, submitting:false, uploadNotice:{{ $errors->any() ? 'true' : 'false' }}, clientError:'',
+fieldsForStep(){return this.step===1?['front_image','rear_image','side_image','plate_number','brand','model','colour','seat_capacity']:['vehicle_geran','driving_licence','registered_owner_name','owner_identity_no','licence_name','licence_identity_no']},
+advance(){const invalid=this.fieldsForStep().map(n=>this.$root.elements[n]).find(el=>el && !el.checkValidity());if(invalid){invalid.reportValidity();return}if(this.step===2 && !this.identityReady())return;this.uploadNotice=false;this.clientError='';this.step++},
+filesReady(){const vehicle=['front_image','rear_image','side_image'];const documents=['vehicle_geran','driving_licence'];if(vehicle.some(n=>!this.$root.elements[n]?.files.length)){this.step=1;this.uploadNotice=true;return false}if(documents.some(n=>!this.$root.elements[n]?.files.length)){this.step=2;this.uploadNotice=true;return false}return true},
+identityReady(){const value=n=>this.$root.elements[n].value.trim();const name=n=>value(n).toUpperCase().replace(/\s+/g,' ');const errors=[];if(name('registered_owner_name')!==name('licence_name'))errors.push('Registered owner name does not match the driving licence holder name.');if(value('owner_identity_no')!==value('licence_identity_no'))errors.push('Registered owner identity number does not match the driving licence identity number.');this.clientError=errors.join(' ');if(errors.length){this.step=2;return false}return true}
+}" @submit="if(!filesReady() || !identityReady()){$event.preventDefault()}else{submitting=true}">
+@csrf
+<a href="{{ route('driver.vehicles.index') }}" class="text-sm font-semibold text-[#2E7D32]">← Back to vehicles</a>
+<header class="my-6"><p class="text-xs font-bold uppercase tracking-widest text-[#2E7D32]">Step <span x-text="step"></span> of 3</p><h1 class="mt-2 text-2xl font-bold" x-text="step===1?'Vehicle photos':(step===2?'Vehicle documents':'Check details')"></h1><p class="mt-2 text-sm text-gray-600">No OCR is used yet. Enter document details exactly as printed and review them before adding.</p></header>
+@if($errors->any())<div class="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"><b>Please correct these details.</b><ul class="mt-2 list-disc pl-5">@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div>@endif
+<div x-cloak x-show="uploadNotice" class="mb-6 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900" role="alert"><b>Please upload the five images again.</b><p class="mt-1">Browsers clear selected files after a server validation error for security. Your typed details are preserved.</p></div>
 
-            <div class="mt-5 rounded-2xl border border-gray-200 bg-white p-6 sm:p-8">
-                <div class="mb-8">
-                    <h2 class="text-xl font-bold text-gray-900">Add a vehicle</h2>
-                    <p class="mt-1 text-sm text-gray-600">Enter the details exactly as shown on the vehicle registration.</p>
-                </div>
+<section x-show="step===1" class="space-y-6">
+<div class="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">Use landscape photos in good lighting. The whole car must be visible; front and rear plates must be sharp and unobstructed. Minimum 800 × 450, maximum 8 MB.</div>
+<div class="grid gap-5 md:grid-cols-3">@foreach(['front_image'=>'Front car image','rear_image'=>'Rear car image','side_image'=>'Side car image'] as $name=>$label)<label class="block text-sm font-semibold">{{ $label }} *<span class="mt-2 flex aspect-[4/3] cursor-pointer items-center justify-center rounded-xl border-2 border-dashed bg-gray-50 p-4 text-center text-gray-600"><input name="{{ $name }}" type="file" accept="image/jpeg,image/png,image/webp" required class="sr-only" onchange="this.nextElementSibling.textContent=this.files[0]?.name"><span>Choose clear photo</span></span>@error($name)<span class="text-red-600">{{ $message }}</span>@enderror</label>@endforeach</div>
+<div class="grid gap-5 md:grid-cols-2">@foreach(['plate_number'=>'Plate number','brand'=>'Brand','model'=>'Model','colour'=>'Colour'] as $name=>$label)<label class="text-sm font-semibold">{{ $label }}<input name="{{ $name }}" value="{{ old($name) }}" required maxlength="50" class="mt-2 block w-full rounded-xl border-gray-300"></label>@endforeach<label class="text-sm font-semibold">Passenger seats<select name="seat_capacity" class="mt-2 block w-full rounded-xl border-gray-300">@foreach(range(1,4) as $n)<option value="{{ $n }}" @selected(old('seat_capacity',4)==$n)>{{ $n }}</option>@endforeach</select></label></div>
+</section>
 
-                <form method="POST" action="{{ route('driver.vehicles.store') }}" enctype="multipart/form-data" x-data="{ submitting: false }" @submit="submitting = true">
-                    @csrf
-                    @include('driver.vehicles._form', ['vehicle' => null])
+<section x-cloak x-show="step===2" class="space-y-7">
+<div x-cloak x-show="clientError" x-text="clientError" class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-700" role="alert"></div>
+<div class="grid gap-5 md:grid-cols-2">@foreach(['vehicle_geran'=>'Vehicle Geran / VOC','driving_licence'=>'Driving Licence'] as $name=>$label)<label class="text-sm font-semibold">{{ $label }} *<span class="mt-2 flex min-h-36 cursor-pointer items-center justify-center rounded-xl border-2 border-dashed bg-gray-50 p-4 text-gray-600"><input name="{{ $name }}" type="file" accept="image/jpeg,image/png,image/webp" required class="sr-only" onchange="this.nextElementSibling.textContent=this.files[0]?.name"><span>Choose clear, full document image (minimum 500 × 300)</span></span></label>@endforeach</div>
+<fieldset class="rounded-xl border p-5"><legend class="px-2 font-bold">Identity match (required)</legend><div class="grid gap-5 md:grid-cols-2">@foreach(['registered_owner_name'=>'Geran registered owner name','owner_identity_no'=>'Geran owner IC','licence_name'=>'Driving licence name','licence_identity_no'=>'Driving licence IC'] as $name=>$label)<label class="text-sm font-semibold">{{ $label }}<input name="{{ $name }}" value="{{ old($name) }}" required @if(str_contains($name,'identity')) inputmode="numeric" pattern="[0-9]{12}" maxlength="12" @endif class="mt-2 block w-full rounded-xl border-gray-300 uppercase">@error($name)<span class="mt-1 block text-red-600">{{ $message }}</span>@enderror</label>@endforeach</div></fieldset>
+<fieldset class="rounded-xl border p-5"><legend class="px-2 font-bold">Geran details</legend><div class="grid gap-5 md:grid-cols-3">@foreach(['voc_reference_no'=>'VOC reference no.','chassis_no'=>'Chassis no.','engine_no'=>'Engine no.','manufacturer'=>'Manufacturer','model_name'=>'Model name','engine_capacity'=>'Engine capacity (cc)','fuel_type'=>'Fuel type','manufacturing_year'=>'Manufacturing year','registration_date'=>'Registration date'] as $name=>$label)<label class="text-sm font-semibold">{{ $label }}<input name="{{ $name }}" value="{{ old($name) }}" @if(str_contains($name,'date')) type="date" @endif class="mt-2 block w-full rounded-xl border-gray-300"></label>@endforeach</div><label class="mt-5 block text-sm font-semibold">Owner address<textarea name="owner_address" rows="3" class="mt-2 block w-full rounded-xl border-gray-300">{{ old('owner_address') }}</textarea></label></fieldset>
+<fieldset class="rounded-xl border p-5"><legend class="px-2 font-bold">Driving licence details</legend><div class="grid gap-5 md:grid-cols-3">@foreach(['date_of_birth'=>'Date of birth','nationality'=>'Nationality','licence_class'=>'Licence class','licence_valid_from'=>'Valid from','licence_valid_until'=>'Valid until'] as $name=>$label)<label class="text-sm font-semibold">{{ $label }}<input name="{{ $name }}" value="{{ old($name) }}" @if(str_contains($name,'date') || str_contains($name,'valid_')) type="date" @endif class="mt-2 block w-full rounded-xl border-gray-300"></label>@endforeach</div><label class="mt-5 block text-sm font-semibold">Licence address<textarea name="licence_address" rows="3" class="mt-2 block w-full rounded-xl border-gray-300">{{ old('licence_address') }}</textarea></label></fieldset>
+</section>
 
-                    <div class="mt-8 flex flex-col-reverse gap-3 border-t border-gray-100 pt-6 sm:flex-row sm:justify-end">
-                        <a href="{{ route('driver.vehicles.index') }}" class="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-gray-300 px-5 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2E7D32]">
-                            Cancel
-                        </a>
-                        <button type="submit" :disabled="submitting" class="inline-flex min-h-[44px] items-center justify-center rounded-xl bg-[#2E7D32] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#256b29] disabled:cursor-wait disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2E7D32] focus-visible:ring-offset-2">
-                            <span x-show="!submitting">Add vehicle</span>
-                            <span x-cloak x-show="submitting">Adding vehicle…</span>
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
+<section x-cloak x-show="step===3" class="space-y-5"><div class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">Review every field. The server rejects the submission unless both normalized names and both 12-digit IC numbers match exactly.</div><div class="grid gap-4 rounded-xl border p-5 md:grid-cols-2"><template x-for="field in ['plate_number','brand','model','registered_owner_name','owner_identity_no','licence_name','licence_identity_no']"><div><p class="text-xs uppercase text-gray-500" x-text="field.replaceAll('_',' ')"></p><p class="font-semibold" x-text="document.querySelector('[name='+field+']')?.value||'—'"></p></div></template></div></section>
+
+<footer class="mt-8 flex flex-wrap justify-end gap-3 border-t pt-6"><a href="{{ route('driver.vehicles.index') }}" class="inline-flex min-h-11 items-center rounded-xl border px-5 text-sm font-semibold">Cancel</a><button x-cloak x-show="step>1" type="button" @click="step--" class="min-h-11 rounded-xl border px-5 font-semibold">Back</button><button x-show="step<3" type="button" @click="advance()" class="min-h-11 rounded-xl bg-[#2E7D32] px-5 font-semibold text-white">Continue</button><button x-cloak x-show="step===3" type="submit" :disabled="submitting" class="min-h-11 rounded-xl bg-[#2E7D32] px-5 font-semibold text-white disabled:opacity-60">Add vehicle</button></footer>
+</form></div>
 </x-app-layout>

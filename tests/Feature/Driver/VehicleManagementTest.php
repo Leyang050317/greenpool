@@ -431,7 +431,9 @@ class VehicleManagementTest extends TestCase
             'status' => 'Scheduled',
         ]);
 
-        $this->actingAs($driver)->delete(route('driver.vehicles.destroy', $vehicle))->assertStatus(422);
+        $this->actingAs($driver)->delete(route('driver.vehicles.destroy', $vehicle))
+            ->assertRedirect()
+            ->assertSessionHas('error');
         $this->assertDatabaseHas('vehicles', ['vehicle_id' => $vehicle->vehicle_id]);
     }
 
