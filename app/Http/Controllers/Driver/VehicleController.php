@@ -38,17 +38,28 @@ class VehicleController extends Controller
 
     public function store(StoreVehicleRequest $request): RedirectResponse|JsonResponse
     {
-        $imagePath = $this->storeVehicleImage($request->file('vehicle_image'));
+        $files = collect([
+            'front_image_path' => 'front_image',
+            'rear_image_path' => 'rear_image',
+            'side_image_path' => 'side_image',
+            'vehicle_geran_path' => 'vehicle_geran',
+            'driving_licence_path' => 'driving_licence',
+        ])->mapWithKeys(fn (string $input, string $column) => [
+            $column => $request->file($input)->store('vehicle-documents', 'public'),
+        ])->all();
 
         try {
             $vehicle = $request->user()->vehicles()->create([
-                ...$request->safe()->except('vehicle_image'),
-                'vehicle_image_path' => $imagePath,
+                ...$request->safe()->except(['front_image', 'rear_image', 'side_image', 'vehicle_geran', 'driving_licence']),
+                ...$files,
+                'vehicle_image_path' => $files['front_image_path'],
                 'verification_status' => 'Pending',
                 'verified_at' => null,
             ]);
         } catch (Throwable $exception) {
-            $this->deleteVehicleImage($imagePath);
+            foreach ($files as $path) {
+                $this->deleteVehicleImage($path);
+            }
 
             throw $exception;
         }
@@ -69,11 +80,15 @@ class VehicleController extends Controller
     {
         $this->ensureOwnership($request, $vehicle);
 
+        $hasBlockingTrips = $vehicle->trips()
+            ->whereIn('status', ['Scheduled', 'In Progress'])
+            ->exists();
+
         if ($request->expectsJson()) {
             return response()->json(['data' => $vehicle]);
         }
 
-        return view('driver.vehicles.show', compact('vehicle'));
+        return view('driver.vehicles.show', compact('vehicle', 'hasBlockingTrips'));
     }
 
     public function edit(Request $request, Vehicle $vehicle): View
@@ -116,15 +131,20 @@ class VehicleController extends Controller
     public function destroy(Request $request, Vehicle $vehicle): RedirectResponse|JsonResponse
     {
         $this->ensureOwnership($request, $vehicle);
-        abort_if(
-            $vehicle->trips()->whereIn('status', ['Scheduled', 'In Progress'])->exists(),
-            422,
-            'This vehicle cannot be deleted while it is assigned to an active or upcoming trip.'
-        );
+        if ($vehicle->trips()->whereIn('status', ['Scheduled', 'In Progress'])->exists()) {
+            $message = 'This vehicle cannot be deleted while it is assigned to an active or upcoming trip. Cancel or complete the trip first.';
 
-        $imagePath = $vehicle->vehicle_image_path;
+            if ($request->expectsJson()) {
+                return response()->json(['message' => $message], 422);
+            }
+
+            return back()->with('error', $message);
+        }
+
+        $imagePaths = collect(['vehicle_image_path', 'front_image_path', 'rear_image_path', 'side_image_path', 'vehicle_geran_path', 'driving_licence_path'])
+            ->map(fn (string $field) => $vehicle->{$field})->filter()->unique();
         DB::transaction(fn () => $vehicle->delete());
-        $this->deleteVehicleImage($imagePath);
+        $imagePaths->each(fn (string $path) => $this->deleteVehicleImage($path));
 
         if ($request->expectsJson()) {
             return response()->json(['message' => 'Vehicle deleted successfully.']);

@@ -36,4 +36,9 @@ class UpdateVehicleRequest extends StoreVehicleRequest
             'vehicle_image' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
         ];
     }
+
+    public function after(): array
+    {
+        return [];
+    }
 }

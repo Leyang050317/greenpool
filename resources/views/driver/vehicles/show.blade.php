@@ -6,6 +6,11 @@
                     {{ session('success') }}
                 </div>
             @endif
+            @if (session('error'))
+                <div class="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-800" role="alert">
+                    {{ session('error') }}
+                </div>
+            @endif
 
             <div class="mb-5">
                 <a href="{{ route('driver.vehicles.index') }}" class="text-sm font-semibold text-[#2E7D32] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2E7D32]">← Back to vehicles</a>
@@ -59,9 +64,18 @@
                         Edit vehicle
                     </a>
 
-                    <button type="button" @click="confirmDelete = true" class="ml-auto inline-flex min-h-[44px] items-center justify-center rounded-xl px-4 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600">
-                        Delete vehicle
-                    </button>
+                    @if ($hasBlockingTrips)
+                        <div class="ml-auto text-right">
+                            <button type="button" disabled class="inline-flex min-h-[44px] cursor-not-allowed items-center justify-center rounded-xl px-4 py-2.5 text-sm font-semibold text-gray-400">
+                                Delete vehicle
+                            </button>
+                            <p class="max-w-xs text-xs text-gray-500">Cancel or complete the assigned trip before deleting this vehicle.</p>
+                        </div>
+                    @else
+                        <button type="button" @click="confirmDelete = true" class="ml-auto inline-flex min-h-[44px] items-center justify-center rounded-xl px-4 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600">
+                            Delete vehicle
+                        </button>
+                    @endif
                 </div>
             </article>
         </div>
