@@ -78,16 +78,31 @@
                         @endif
                     </section>
 
-                    <form method="POST" action="{{ route('passenger.bookings.store') }}" class="rounded-xl border border-gray-100 bg-white p-5">
+                    <form
+                        method="POST"
+                        action="{{ route('passenger.bookings.store') }}"
+                        class="rounded-xl border border-gray-100 bg-white p-5"
+                        x-data="pickupPointForm({{ Js::from(route('passenger.bookings.locations.autocomplete')) }}, {{ Js::from(old('pickup_point', '')) }}, {{ Js::from(old('pickup_place_id', '')) }})"
+                        @submit.prevent="submitForm($event)"
+                    >
                         @csrf
                         <input type="hidden" name="trip_id" value="{{ $trip->trip_id }}" />
 
                         <h2 class="mb-4 text-sm font-semibold text-gray-900">Booking Request</h2>
 
                         <div class="space-y-4">
-                            <div>
+                            <div x-cloak x-show="pickup.error" class="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-800" x-text="pickup.error"></div>
+
+                            <div class="relative">
                                 <label for="pickup_point" class="mb-1.5 block text-xs font-semibold text-gray-500">Pickup Point</label>
-                                <input id="pickup_point" name="pickup_point" value="{{ old('pickup_point') }}" required maxlength="255" class="block w-full rounded-xl border-gray-200 text-sm focus:border-[#16A34A] focus:ring-[#16A34A]" placeholder="e.g. Main Gate" />
+                                <input id="pickup_point" name="pickup_point" x-model="pickup.text" @input="search()" @focus="pickup.open = true" autocomplete="off" required maxlength="255" class="block w-full rounded-xl border-gray-200 text-sm focus:border-[#16A34A] focus:ring-[#16A34A]" placeholder="Search a Malaysian address or place" />
+                                <input type="hidden" name="pickup_place_id" :value="pickup.placeId" />
+                                <div x-cloak x-show="pickup.open && pickup.suggestions.length" class="absolute z-20 mt-1 w-full overflow-hidden rounded-xl border border-gray-200 bg-white py-1 shadow-lg">
+                                    <template x-for="suggestion in pickup.suggestions" :key="suggestion.place_id">
+                                        <button type="button" @click="select(suggestion)" class="block w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50" x-text="suggestion.text"></button>
+                                    </template>
+                                </div>
+                                <p class="mt-1 text-xs text-gray-400">Select a suggestion in Malaysia to use it.</p>
                             </div>
 
                             <div>
@@ -105,4 +120,46 @@
             @endif
         </div>
     </div>
+
+    <script>
+        window.pickupPointForm = (endpoint, pickupText, pickupPlaceId) => ({
+            timer: null,
+            pickup: { text: pickupText, placeId: pickupPlaceId, suggestions: [], open: false, error: '' },
+            submitForm(event) {
+                if (!this.pickup.placeId) {
+                    this.pickup.error = 'Please select your pickup point from the location suggestions.';
+                    return;
+                }
+
+                this.pickup.error = '';
+                event.target.submit();
+            },
+            async search() {
+                this.pickup.placeId = '';
+                this.pickup.suggestions = [];
+                this.pickup.error = '';
+                this.pickup.open = true;
+
+                clearTimeout(this.timer);
+                if (this.pickup.text.trim().length < 2) {
+                    return;
+                }
+
+                this.timer = setTimeout(async () => {
+                    try {
+                        const response = await window.axios.get(endpoint, { params: { input: this.pickup.text.trim() } });
+                        this.pickup.suggestions = response.data.data || [];
+                    } catch (_) {
+                        this.pickup.suggestions = [];
+                    }
+                }, 250);
+            },
+            select(suggestion) {
+                this.pickup.text = suggestion.text;
+                this.pickup.placeId = suggestion.place_id;
+                this.pickup.suggestions = [];
+                this.pickup.open = false;
+            },
+        });
+    </script>
 @endsection

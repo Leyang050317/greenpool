@@ -2,21 +2,36 @@
 
 namespace App\Http\Controllers\Driver;
 
+use App\Events\BookingStatusUpdated;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Driver\StoreTripRequest;
 use App\Http\Requests\Driver\UpdateTripRequest;
+use App\Models\Booking;
 use App\Models\Trip;
 use App\Services\Routing\TripDistanceService;
+use App\Services\Routing\TripLocationService;
 use App\Services\Routing\TripRoutingException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\View\View;
 
 class TripController extends Controller
 {
-    public function __construct(private readonly TripDistanceService $tripDistanceService) {}
+    public function __construct(private readonly TripDistanceService $tripDistanceService, private readonly TripLocationService $tripLocationService) {}
+
+    public function autocomplete(Request $request): JsonResponse
+    {
+        $request->validate(['input' => ['required', 'string', 'min:2', 'max:255']]);
+
+        try {
+            return response()->json(['data' => $this->tripLocationService->autocomplete($request->string('input')->trim()->toString())]);
+        } catch (TripRoutingException $exception) {
+            return response()->json(['message' => $exception->getMessage(), 'errors' => [$exception->errorField => [$exception->getMessage()]]], 422);
+        }
+    }
 
     public function index(Request $request): View|JsonResponse
     {
@@ -29,7 +44,10 @@ class TripController extends Controller
             $query->where('status', $request->input('status'));
         }
         $query->orderBy($request->input('sort') === 'distance' ? 'estimated_distance_km' : 'departure_at');
-        $trips = $query->paginate(4)->withQueryString();
+        $trips = $query
+            ->withSum(['bookings as accepted_passengers_count' => fn ($booking) => $booking->where('booking_status', 'Accepted')], 'number_of_seats')
+            ->paginate(4)
+            ->withQueryString();
         $stats = $this->stats($request);
         if ($request->expectsJson()) {
             return response()->json(['data' => $trips, 'stats' => $stats]);
@@ -48,12 +66,13 @@ class TripController extends Controller
     public function store(StoreTripRequest $request): RedirectResponse|JsonResponse
     {
         try {
-            $routingData = $this->tripDistanceService->calculate($request->string('departure_location')->trim()->toString(), $request->string('destination')->trim()->toString());
+            $locations = $this->selectedLocations($request);
         } catch (TripRoutingException $exception) {
             return $this->routingError($request, $exception);
         }
 
-        $trip = $request->user()->trips()->create([...$request->tripData(), ...$routingData]);
+        $routingData = $this->routingDataOrEmpty($locations);
+        $trip = $request->user()->trips()->create([...$request->tripData(), ...$locations['attributes'], ...$routingData]);
 
         return $this->response($request, $trip, 'Trip published successfully.', 201, 'driver.trips.index');
     }
@@ -61,7 +80,14 @@ class TripController extends Controller
     public function show(Request $request, Trip $trip): View|JsonResponse
     {
         $this->ensureOwnership($request, $trip);
-        $trip->load('vehicle');
+        $trip->load([
+            'vehicle',
+            'bookings' => fn ($booking) => $booking
+                ->where('booking_status', 'Accepted')
+                ->with('passenger')
+                ->oldest(),
+        ]);
+        $trip->loadSum(['bookings as accepted_passengers_count' => fn ($booking) => $booking->where('booking_status', 'Accepted')], 'number_of_seats');
 
         $returnTo = $this->returnRoute($request);
         $hasInProgressTrip = $request->user()->trips()->where('status', 'In Progress')->whereKeyNot($trip->getKey())->exists();
@@ -81,13 +107,15 @@ class TripController extends Controller
     public function update(UpdateTripRequest $request, Trip $trip): RedirectResponse|JsonResponse
     {
         $data = $request->tripData();
-        $locationsChanged = $data['departure_location'] !== $trip->departure_location || $data['destination'] !== $trip->destination;
+        $locationsChanged = $request->filled('departure_place_id') || $request->filled('destination_place_id');
         if ($locationsChanged) {
             try {
-                $data = [...$data, ...$this->tripDistanceService->calculate($data['departure_location'], $data['destination'])];
+                $locations = $this->selectedLocations($request, $trip);
             } catch (TripRoutingException $exception) {
                 return $this->routingError($request, $exception);
             }
+
+            $data = [...$data, ...$locations['attributes'], ...$this->routingDataOrEmpty($locations)];
         }
 
         $trip->update($data);
@@ -98,10 +126,13 @@ class TripController extends Controller
     public function start(Request $request, Trip $trip): RedirectResponse|JsonResponse
     {
         $this->ensureStatus($request, $trip, ['Scheduled']);
-        DB::transaction(function () use ($request, $trip) {
+        $bookingsToNotify = DB::transaction(function () use ($request, $trip) {
             abort_if($request->user()->trips()->where('status', 'In Progress')->exists(), 422, 'Complete your current trip before starting another.');
             $trip->update(['status' => 'In Progress', 'started_at' => now()]);
+
+            return $this->acceptedBookingsFor($trip);
         });
+        $this->broadcastBookingUpdates($bookingsToNotify);
 
         return $this->response($request, $trip->refresh(), 'Journey started successfully.', 200, 'driver.trips.journey');
     }
@@ -109,7 +140,25 @@ class TripController extends Controller
     public function complete(Request $request, Trip $trip): RedirectResponse|JsonResponse
     {
         $this->ensureStatus($request, $trip, ['In Progress']);
-        $trip->update(['status' => 'Completed', 'completed_at' => now()]);
+        $bookingsToNotify = DB::transaction(function () use ($trip) {
+            $trip->update(['status' => 'Completed', 'completed_at' => now()]);
+
+            return $this->acceptedBookingsFor($trip);
+        });
+        $this->broadcastBookingUpdates($bookingsToNotify);
+
+        if (! $request->expectsJson()) {
+            $bookingToRate = $trip->bookings()
+                ->where('booking_status', 'Accepted')
+                ->whereDoesntHave('ratings', fn ($rating) => $rating->where('reviewer_id', $request->user()->id))
+                ->oldest()
+                ->first();
+
+            if ($bookingToRate) {
+                return redirect()->route('ratings.create', $bookingToRate)
+                    ->with('success', 'Journey completed. Please rate your passenger.');
+            }
+        }
 
         return $this->response($request, $trip->refresh(), 'Journey completed successfully.', 200, 'driver.trips.journey');
     }
@@ -117,7 +166,12 @@ class TripController extends Controller
     public function cancel(Request $request, Trip $trip): RedirectResponse|JsonResponse
     {
         $this->ensureStatus($request, $trip, ['Scheduled']);
-        $trip->update(['status' => 'Cancelled', 'cancelled_at' => now()]);
+        $bookingsToNotify = DB::transaction(function () use ($trip) {
+            $trip->update(['status' => 'Cancelled', 'cancelled_at' => now()]);
+
+            return $this->acceptedBookingsFor($trip);
+        });
+        $this->broadcastBookingUpdates($bookingsToNotify);
 
         return $this->response($request, $trip->refresh(), 'Trip cancelled successfully.', 200, 'driver.trips.index');
     }
@@ -137,7 +191,11 @@ class TripController extends Controller
 
     public function journey(Request $request): View|JsonResponse
     {
-        $trips = $this->driverTrips($request)->whereIn('status', ['Scheduled', 'In Progress'])->orderBy('departure_at')->get();
+        $trips = $this->driverTrips($request)
+            ->whereIn('status', ['Scheduled', 'In Progress'])
+            ->withSum(['bookings as accepted_passengers_count' => fn ($booking) => $booking->where('booking_status', 'Accepted')], 'number_of_seats')
+            ->orderBy('departure_at')
+            ->get();
 
         return $request->expectsJson() ? response()->json(['data' => $trips]) : view('driver.trips.journey', compact('trips'));
     }
@@ -213,5 +271,79 @@ class TripController extends Controller
         }
 
         return back()->withInput()->withErrors([$exception->errorField => $exception->getMessage()]);
+    }
+
+    private function routingDataOrEmpty(array $locations): array
+    {
+        try {
+            return $this->tripDistanceService->calculate($locations['departure'], $locations['destination']);
+        } catch (TripRoutingException $exception) {
+            Log::warning('Trip distance calculation failed.', [
+                'message' => $exception->getMessage(),
+                'departure' => $locations['departure']['display'] ?? null,
+                'destination' => $locations['destination']['display'] ?? null,
+            ]);
+
+            return [
+                'estimated_distance_km' => null,
+                'estimated_duration_seconds' => null,
+            ];
+        }
+    }
+
+    private function acceptedBookingsFor(Trip $trip)
+    {
+        return Booking::query()
+            ->with('trip')
+            ->where('trip_id', $trip->getKey())
+            ->where('booking_status', 'Accepted')
+            ->get();
+    }
+
+    private function broadcastBookingUpdates($bookings): void
+    {
+        foreach ($bookings as $booking) {
+            BookingStatusUpdated::dispatch($booking);
+        }
+    }
+
+    private function selectedLocations(Request $request, ?Trip $trip = null): array
+    {
+        $departure = $request->filled('departure_place_id')
+            ? $this->tripLocationService->resolve($request->string('departure_place_id')->toString(), 'departure_place_id')
+            : $this->storedLocation($trip, 'departure');
+        $destination = $request->filled('destination_place_id')
+            ? $this->tripLocationService->resolve($request->string('destination_place_id')->toString(), 'destination_place_id')
+            : $this->storedLocation($trip, 'destination');
+
+        if ($departure['latitude'] === $destination['latitude'] && $departure['longitude'] === $destination['longitude']) {
+            throw new TripRoutingException('destination_place_id', 'Departure location and destination cannot be the same.');
+        }
+
+        return [
+            'departure' => $departure,
+            'destination' => $destination,
+            'attributes' => [
+                'departure_location' => $departure['display'],
+                'departure_latitude' => $departure['latitude'],
+                'departure_longitude' => $departure['longitude'],
+                'destination' => $destination['display'],
+                'destination_latitude' => $destination['latitude'],
+                'destination_longitude' => $destination['longitude'],
+            ],
+        ];
+    }
+
+    private function storedLocation(?Trip $trip, string $prefix): array
+    {
+        if (! $trip || $trip->{"{$prefix}_latitude"} === null || $trip->{"{$prefix}_longitude"} === null) {
+            throw new TripRoutingException("{$prefix}_place_id", 'Please select a location from the suggestions.');
+        }
+
+        return [
+            'display' => $prefix === 'departure' ? $trip->departure_location : $trip->destination,
+            'latitude' => (float) $trip->{"{$prefix}_latitude"},
+            'longitude' => (float) $trip->{"{$prefix}_longitude"},
+        ];
     }
 }

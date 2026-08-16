@@ -2,10 +2,10 @@
     @php
         $target = ucfirst($targetRole);
         $cards = [
-            ['title' => $target.' Profile', 'description' => 'View '.$targetRole.' profiles and ratings', 'icon' => $targetRole === 'driver' ? 'car-front' : 'user-circle', 'iconClass' => 'bg-green-600', 'href' => route('ratings.people')],
             ['title' => 'Rate a '.$target, 'description' => 'Submit a '.$targetRole.' rating', 'icon' => 'star', 'iconClass' => 'bg-[#22C55E]', 'href' => route('ratings.pending')],
-            ['title' => $target.' Reviews', 'description' => 'Browse reviews for '.$targetRole.'s', 'icon' => 'message-square', 'iconClass' => 'bg-violet-500', 'href' => route('ratings.people')],
             ['title' => 'Rating History', 'description' => 'All ratings you submitted', 'icon' => 'clock', 'iconClass' => 'bg-slate-500', 'href' => route('ratings.history')],
+            ['title' => $target.' Reviews', 'description' => 'Browse reviews for '.$targetRole.'s', 'icon' => 'message-square', 'iconClass' => 'bg-violet-500', 'href' => route('ratings.reviews')],
+            ['title' => $target.' Profile', 'description' => 'View '.$targetRole.' profiles and ratings', 'icon' => $targetRole === 'driver' ? 'car-front' : 'user-circle', 'iconClass' => 'bg-green-600', 'href' => route('ratings.people')],
         ];
     @endphp
     <div class="min-h-[calc(100vh-4rem)] bg-[#F8FAFC] px-5 py-8 sm:px-8">

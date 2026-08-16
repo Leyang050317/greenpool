@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Driver;
 
+use App\Models\Trip;
 use App\Models\Vehicle;
 use Carbon\Carbon;
 use Illuminate\Foundation\Http\FormRequest;
@@ -18,8 +19,8 @@ class StoreTripRequest extends FormRequest
     {
         return [
             'vehicle_id' => ['required', 'integer', 'exists:vehicles,vehicle_id'],
-            'departure_location' => ['required', 'string', 'max:255'],
-            'destination' => ['required', 'string', 'max:255'],
+            'departure_place_id' => ['required', 'string', 'max:255'],
+            'destination_place_id' => ['required', 'string', 'max:255'],
             'departure_date' => ['required', 'date', 'after_or_equal:today'],
             'departure_time' => ['required', 'date_format:H:i'],
             'available_seats' => ['required', 'integer', 'between:1,4'],
@@ -41,12 +42,23 @@ class StoreTripRequest extends FormRequest
                 $validator->errors()->add('available_seats', 'Available seats cannot exceed the vehicle capacity.');
             }
 
-            if (mb_strtolower(trim((string) $this->input('departure_location'))) === mb_strtolower(trim((string) $this->input('destination')))) {
-                $validator->errors()->add('destination', 'Departure location and destination cannot be the same.');
-            }
-
             if ($this->filled('departure_date') && $this->filled('departure_time') && now()->greaterThan(Carbon::parse($this->input('departure_date').' '.$this->input('departure_time')))) {
                 $validator->errors()->add('departure_time', 'Departure date and time cannot be in the past.');
+            }
+
+            if ($this->filled('departure_date') && $this->filled('departure_time') && ! $validator->errors()->has('departure_time')) {
+                $departureAt = Carbon::parse($this->input('departure_date').' '.$this->input('departure_time'));
+                $trip = $this->route('trip');
+                $conflicts = Trip::query()
+                    ->where('user_id', $this->user()->id)
+                    ->where('status', 'Scheduled')
+                    ->where('departure_at', $departureAt)
+                    ->when($trip instanceof Trip, fn ($query) => $query->whereKeyNot($trip->getKey()))
+                    ->exists();
+
+                if ($conflicts) {
+                    $validator->errors()->add('departure_time', 'You already have a scheduled trip at this departure date and time.');
+                }
             }
         }];
     }
@@ -54,7 +66,7 @@ class StoreTripRequest extends FormRequest
     public function tripData(): array
     {
         return [
-            ...$this->safe()->except(['departure_date', 'departure_time']),
+            ...$this->safe()->except(['departure_date', 'departure_time', 'departure_place_id', 'destination_place_id']),
             'departure_at' => Carbon::parse($this->input('departure_date').' '.$this->input('departure_time')),
         ];
     }

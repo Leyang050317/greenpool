@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" role="img" aria-label="Nature and scenic illustration">
+  <rect width="800" height="600" fill="#d1fae5"/><circle cx="650" cy="110" r="52" fill="#fef3c7"/>
+  <path d="M0 410 165 270l135 105 145-175 160 180 95-85 100 115v190H0Z" fill="#86efac"/>
+  <path d="M0 465 195 330l145 110 165-135 130 105 80-62 85 117v135H0Z" fill="#22c55e"/>
+  <path d="M0 510c135-45 225-20 330 5s200 48 470-5v90H0Z" fill="#0ea5e9"/><text x="400" y="565" text-anchor="middle" font-family="Arial,sans-serif" font-size="30" font-weight="700" fill="white">Nature &amp; Scenic</text>
+</svg>

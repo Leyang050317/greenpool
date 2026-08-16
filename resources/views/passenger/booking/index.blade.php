@@ -24,11 +24,22 @@
                 <div class="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-800">{{ session('error') }}</div>
             @endif
 
-            <form method="GET" action="{{ route('passenger.booking') }}" class="mb-6 rounded-xl border border-gray-100 bg-white p-5">
+            <form
+                method="GET"
+                action="{{ route('passenger.booking') }}"
+                class="mb-6 rounded-xl border border-gray-100 bg-white p-5"
+                x-data="rideSearchForm({{ Js::from(route('passenger.bookings.locations.autocomplete')) }}, {{ Js::from(request('destination', '')) }}, {{ Js::from(request('destination_place_id', '')) }})"
+            >
                 <div class="grid gap-4 md:grid-cols-3">
-                    <div>
+                    <div class="relative">
                         <label for="destination" class="mb-1.5 block text-xs font-semibold text-gray-500">Destination</label>
-                        <input id="destination" name="destination" value="{{ request('destination') }}" class="block w-full rounded-xl border-gray-200 text-sm focus:border-[#16A34A] focus:ring-[#16A34A]" placeholder="e.g. Kuala Lumpur" />
+                        <input id="destination" name="destination" x-model="destination.text" @input="search()" @focus="destination.open = true" autocomplete="off" class="block w-full rounded-xl border-gray-200 text-sm focus:border-[#16A34A] focus:ring-[#16A34A]" placeholder="Search a Malaysian address or place" />
+                        <input type="hidden" name="destination_place_id" :value="destination.placeId" />
+                        <div x-cloak x-show="destination.open && destination.suggestions.length" class="absolute z-20 mt-1 w-full overflow-hidden rounded-xl border border-gray-200 bg-white py-1 shadow-lg">
+                            <template x-for="suggestion in destination.suggestions" :key="suggestion.place_id">
+                                <button type="button" @click="select(suggestion)" class="block w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50" x-text="suggestion.text"></button>
+                            </template>
+                        </div>
                     </div>
                     <div>
                         <label for="travel_date" class="mb-1.5 block text-xs font-semibold text-gray-500">Travel Date</label>
@@ -105,4 +116,36 @@
             @endif
         </div>
     </div>
+
+    <script>
+        window.rideSearchForm = (endpoint, destinationText, destinationPlaceId) => ({
+            timer: null,
+            destination: { text: destinationText, placeId: destinationPlaceId, suggestions: [], open: false },
+            async search() {
+                this.destination.placeId = '';
+                this.destination.suggestions = [];
+                this.destination.open = true;
+
+                clearTimeout(this.timer);
+                if (this.destination.text.trim().length < 2) {
+                    return;
+                }
+
+                this.timer = setTimeout(async () => {
+                    try {
+                        const response = await window.axios.get(endpoint, { params: { input: this.destination.text.trim() } });
+                        this.destination.suggestions = response.data.data || [];
+                    } catch (_) {
+                        this.destination.suggestions = [];
+                    }
+                }, 250);
+            },
+            select(suggestion) {
+                this.destination.text = suggestion.text;
+                this.destination.placeId = suggestion.place_id;
+                this.destination.suggestions = [];
+                this.destination.open = false;
+            },
+        });
+    </script>
 @endsection

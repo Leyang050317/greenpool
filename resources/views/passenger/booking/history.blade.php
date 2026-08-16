@@ -7,6 +7,8 @@
         $badge = [
             'Pending' => 'bg-amber-50 text-amber-700',
             'Accepted' => 'bg-green-50 text-green-700',
+            'In Progress' => 'bg-orange-50 text-orange-700',
+            'Completed' => 'bg-gray-100 text-gray-700',
             'Rejected' => 'bg-red-50 text-red-700',
             'Cancelled' => 'bg-gray-100 text-gray-600',
         ];
@@ -51,6 +53,11 @@
                             </thead>
                             <tbody class="divide-y divide-gray-50">
                                 @foreach($bookings as $booking)
+                                    @php
+                                        $displayStatus = $booking->booking_status === 'Accepted' && $booking->trip->status !== 'Scheduled'
+                                            ? $booking->trip->status
+                                            : $booking->booking_status; 
+                                    @endphp
                                     <tr>
                                         <td class="px-4 py-3 text-sm">
                                             <div class="font-semibold text-gray-900">{{ $booking->trip->departure_location }} to {{ $booking->trip->destination }}</div>
@@ -60,7 +67,7 @@
                                         <td class="whitespace-nowrap px-4 py-3 text-sm text-gray-700">{{ $booking->number_of_seats }}</td>
                                         <td class="px-4 py-3 text-sm text-gray-700">{{ $booking->pickup_point }}</td>
                                         <td class="whitespace-nowrap px-4 py-3">
-                                            <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-medium {{ $badge[$booking->booking_status] }}">{{ $booking->booking_status }}</span>
+                                            <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-medium {{ $badge[$displayStatus] }}">{{ $displayStatus }}</span>
                                         </td>
                                         <td class="whitespace-nowrap px-4 py-3">
                                             @if($booking->booking_status === 'Pending')

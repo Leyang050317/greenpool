@@ -2,11 +2,26 @@
     $isEditing = isset($trip);
     $returnTo = $returnTo ?? 'driver.trips.index';
     $value = fn (string $key, mixed $default = null) => old($key, $default);
+    $prefilledDestination = $isEditing ? ($trip->destination ?? '') : request('destination', '');
+    $prefilledDestinationPlaceId = $isEditing ? '' : request('destination_place_id', '');
 @endphp
 
-<form method="POST" action="{{ $isEditing ? route('driver.trips.update', ['trip' => $trip, 'return_to' => $returnTo]) : route('driver.trips.store') }}" class="max-w-2xl space-y-6" x-data="{ confirmOpen: false, discardOpen: false }" x-ref="tripForm" @submit.prevent="confirmOpen = true">
+<form method="POST" action="{{ $isEditing ? route('driver.trips.update', ['trip' => $trip, 'return_to' => $returnTo]) : route('driver.trips.store') }}" class="max-w-2xl space-y-6" x-data="tripLocationForm({{ Js::from(route('driver.trips.locations.autocomplete')) }}, {{ Js::from($isEditing) }}, {{ Js::from($value('departure_location', $trip->departure_location ?? '')) }}, {{ Js::from($value('destination', $prefilledDestination)) }}, {{ Js::from(old('departure_place_id', '')) }}, {{ Js::from(old('destination_place_id', $prefilledDestinationPlaceId)) }})" x-ref="tripForm" @submit.prevent="submitForm()">
     @csrf
     @if ($isEditing) @method('PATCH') @endif
+
+    @if($errors->any())
+        <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+            <p class="font-semibold">Please fix the following:</p>
+            <ul class="mt-2 list-disc space-y-1 pl-5">
+                @foreach($errors->all() as $error)
+                    <li>{{ $error }}</li>
+                @endforeach
+            </ul>
+        </div>
+    @endif
+
+    <div x-cloak x-show="locationError" class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-800" x-text="locationError"></div>
 
     <div class="rounded-2xl border border-gray-100 bg-white p-5 sm:p-6">
         <div class="space-y-5">
@@ -23,15 +38,19 @@
                 <x-input-error :messages="$errors->get('vehicle_id')" class="mt-1.5" />
             </div>
             <div class="grid gap-5 sm:grid-cols-2">
-                <div>
+                <div class="relative">
                     <label for="departure_location" class="mb-1.5 flex items-center gap-1.5 text-sm font-medium text-gray-700"><x-icons.lucide name="map-pin" class="h-4 w-4 text-gray-400" />Departure location</label>
-                    <input id="departure_location" name="departure_location" value="{{ $value('departure_location', $trip->departure_location ?? '') }}" maxlength="255" required class="block w-full rounded-xl border-gray-200 text-sm focus:border-[#16A34A] focus:ring-[#16A34A]" placeholder="e.g. Petaling Jaya" />
-                    <p class="mt-1 text-xs text-gray-400">Malaysia locations only.</p><x-input-error :messages="$errors->get('departure_location')" class="mt-1.5" />
+                    <input id="departure_location" name="departure_location" x-model="departure.text" @input="search('departure')" @focus="departure.open = true" autocomplete="off" maxlength="255" required class="block w-full rounded-xl border-gray-200 text-sm focus:border-[#16A34A] focus:ring-[#16A34A]" placeholder="Search a Malaysian address or place" />
+                    <input type="hidden" name="departure_place_id" :value="departure.placeId" />
+                    <div x-cloak x-show="departure.open && departure.suggestions.length" class="absolute z-20 mt-1 w-full overflow-hidden rounded-xl border border-gray-200 bg-white py-1 shadow-lg"><template x-for="suggestion in departure.suggestions" :key="suggestion.place_id"><button type="button" @click="select('departure', suggestion)" class="block w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50" x-text="suggestion.text"></button></template></div>
+                    <p class="mt-1 text-xs text-gray-400">Select a suggestion in Malaysia to use it.</p><x-input-error :messages="$errors->get('departure_place_id')" class="mt-1.5" />
                 </div>
-                <div>
+                <div class="relative">
                     <label for="destination" class="mb-1.5 flex items-center gap-1.5 text-sm font-medium text-gray-700"><x-icons.lucide name="map-pin" class="h-4 w-4 text-gray-400" />Destination</label>
-                    <input id="destination" name="destination" value="{{ $value('destination', $trip->destination ?? '') }}" maxlength="255" required class="block w-full rounded-xl border-gray-200 text-sm focus:border-[#16A34A] focus:ring-[#16A34A]" placeholder="e.g. KLCC" />
-                    <p class="mt-1 text-xs text-gray-400">Malaysia locations only.</p><x-input-error :messages="$errors->get('destination')" class="mt-1.5" />
+                    <input id="destination" name="destination" x-model="destination.text" @input="search('destination')" @focus="destination.open = true" autocomplete="off" maxlength="255" required class="block w-full rounded-xl border-gray-200 text-sm focus:border-[#16A34A] focus:ring-[#16A34A]" placeholder="Search a Malaysian address or place" />
+                    <input type="hidden" name="destination_place_id" :value="destination.placeId" />
+                    <div x-cloak x-show="destination.open && destination.suggestions.length" class="absolute z-20 mt-1 w-full overflow-hidden rounded-xl border border-gray-200 bg-white py-1 shadow-lg"><template x-for="suggestion in destination.suggestions" :key="suggestion.place_id"><button type="button" @click="select('destination', suggestion)" class="block w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50" x-text="suggestion.text"></button></template></div>
+                    <p class="mt-1 text-xs text-gray-400">Select a suggestion in Malaysia to use it.</p>@if (! $isEditing && filled($prefilledDestinationPlaceId))<p class="mt-1 text-xs font-medium text-green-700">Destination was added from Tourist Attractions.</p>@endif<x-input-error :messages="$errors->get('destination_place_id')" class="mt-1.5" />
                 </div>
             </div>
             <div class="grid gap-5 sm:grid-cols-2">
@@ -72,3 +91,32 @@
     <div x-cloak x-show="confirmOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4"><div class="absolute inset-0 bg-slate-900/40" @click="confirmOpen = false"></div><div class="relative w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl"><h2 class="text-lg font-semibold text-gray-900">{{ $isEditing ? 'Save Changes?' : 'Publish Trip?' }}</h2><p class="mt-2 text-sm leading-6 text-gray-500">{{ $isEditing ? 'Passengers with confirmed bookings will receive updated trip information.' : 'Your trip will become available for passengers after publishing.' }}</p><div class="mt-6 flex justify-end gap-3"><button type="button" @click="confirmOpen = false" class="rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700">Cancel</button><button type="button" @click="$refs.tripForm.submit()" class="rounded-xl bg-[#16A34A] px-4 py-2 text-sm font-medium text-white">{{ $isEditing ? 'Save' : 'Publish' }}</button></div></div></div>
     <div x-cloak x-show="discardOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4"><div class="absolute inset-0 bg-slate-900/40" @click="discardOpen = false"></div><div class="relative w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl"><h2 class="text-lg font-semibold text-gray-900">{{ $isEditing ? 'Discard Changes?' : 'Discard Trip?' }}</h2><p class="mt-2 text-sm leading-6 text-gray-500">{{ $isEditing ? 'Unsaved changes will be lost.' : 'Your entered information will not be saved.' }}</p><div class="mt-6 flex justify-end gap-3"><button type="button" @click="discardOpen = false" class="rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700">{{ $isEditing ? 'Continue Editing' : 'Keep Editing' }}</button><a href="{{ route($returnTo) }}" class="rounded-xl bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700">Discard</a></div></div></div>
 </form>
+<script>
+    window.tripLocationForm = (endpoint, isEditing, departureText, destinationText, departurePlaceId, destinationPlaceId) => ({
+        confirmOpen: false, discardOpen: false, timer: null, locationError: '',
+        departure: { text: departureText, initialText: departureText, placeId: departurePlaceId, suggestions: [], open: false },
+        destination: { text: destinationText, initialText: destinationText, placeId: destinationPlaceId, suggestions: [], open: false },
+        locationsValid() {
+            return [this.departure, this.destination].every((location) => location.placeId || (isEditing && location.text === location.initialText));
+        },
+        submitForm() {
+            if (!this.locationsValid()) {
+                this.locationError = 'Please select both departure and destination from the location suggestions.';
+                return;
+            }
+
+            this.locationError = '';
+            this.confirmOpen = true;
+        },
+        async search(field) {
+            this.locationError = '';
+            const location = this[field]; location.placeId = ''; location.suggestions = []; location.open = true;
+            clearTimeout(this.timer); if (location.text.trim().length < 2) return;
+            this.timer = setTimeout(async () => { try {
+                const response = await window.axios.get(endpoint, { params: { input: location.text.trim() } });
+                location.suggestions = response.data.data || [];
+            } catch (_) { location.suggestions = []; } }, 250);
+        },
+        select(field, suggestion) { this[field].text = suggestion.text; this[field].placeId = suggestion.place_id; this[field].suggestions = []; this[field].open = false; },
+    });
+</script>

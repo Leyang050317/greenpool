@@ -3,12 +3,12 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use Laravel\Socialite\Facades\Socialite;
 use App\Models\User;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
-use Laravel\Socialite\Facades\Socialite;
+use Illuminate\Http\Request;
 
 class GoogleLoginController extends Controller
 {
@@ -21,11 +21,11 @@ class GoogleLoginController extends Controller
     {
         try {
             $googleUser = Socialite::driver('google')->user();
-
+            
             $user = User::where('email', $googleUser->getEmail())->first();
 
             if ($user) {
-                if (! $user->hasVerifiedEmail()) {
+                if (!$user->hasVerifiedEmail()) {
                     $user->markEmailAsVerified();
                 }
                 Auth::login($user);
@@ -47,7 +47,7 @@ class GoogleLoginController extends Controller
 
     public function showRoleSelection()
     {
-        if (! session()->has('google_new_user')) {
+        if (!session()->has('google_new_user')) {
             return redirect()->route('login');
         }
 
@@ -56,7 +56,7 @@ class GoogleLoginController extends Controller
 
     public function storeRole(Request $request)
     {
-        if (! session()->has('google_new_user')) {
+        if (!session()->has('google_new_user')) {
             return redirect()->route('login');
         }
 

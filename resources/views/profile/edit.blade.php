@@ -161,7 +161,7 @@
 
                     <div class="mb-6">
                         <label for="email" class="block text-xs font-bold text-gray-400 mb-1">Email Address</label>
-                        <input id="email" name="email" type="email" class="block w-full border border-gray-100 bg-gray-50 text-gray-500 rounded-md sm:text-sm p-2.5 cursor-not-allowed shadow-inner" value="{{ Auth::user()->email ?? 'email@example.com' }}" readonly />
+                        <input id="email" name="email" type="email" class="border-gray-300 bg-gray-100 text-gray-500 cursor-not-allowed rounded-md shadow-sm mt-1 block w-full" value="{{ old('email', Auth::user()->email) }}" readonly />
                         <p class="mt-1.5 text-xs text-gray-400">Email address cannot be changed.</p>
                         @error('email')
                             <p class="text-sm text-red-600 mt-2">{{ $message }}</p>
