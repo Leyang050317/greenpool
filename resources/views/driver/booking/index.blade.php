@@ -60,10 +60,15 @@
                                     </span>
                                     <div class="min-w-0">
                                         <p class="truncate text-sm font-semibold text-gray-900">{{ $booking->passenger->name }}</p>
-                                        <p class="mt-0.5 flex items-center gap-1 text-xs text-amber-500">
-                                            <x-icons.lucide name="star" class="h-3 w-3 fill-current" />
-                                            4.7
-                                        </p>
+                                        @if($booking->passenger->ratings_received_count > 0)
+                                            <p class="mt-0.5 flex items-center gap-1 text-xs text-amber-500">
+                                                <x-icons.lucide name="star" class="h-3 w-3 fill-current" />
+                                                {{ number_format((float) $booking->passenger->ratings_received_avg_score, 1) }}
+                                                <span class="text-gray-400">({{ $booking->passenger->ratings_received_count }})</span>
+                                            </p>
+                                        @else
+                                            <p class="mt-0.5 text-xs text-gray-400">No ratings yet</p>
+                                        @endif
                                     </div>
                                 </div>
                                 <span class="inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium {{ $badge[$booking->booking_status] }}">

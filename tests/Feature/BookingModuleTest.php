@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Events\BookingStatusUpdated;
 use App\Models\Booking;
+use App\Models\Rating;
 use App\Models\Trip;
 use App\Models\User;
 use App\Models\Vehicle;
@@ -190,6 +191,35 @@ class BookingModuleTest extends TestCase
             ->assertSee($passenger->name)
             ->assertSee($booking->pickup_point)
             ->assertSee($trip->destination);
+    }
+
+    public function test_booking_requests_show_the_passengers_real_database_rating(): void
+    {
+        $driver = User::factory()->create(['role' => 'driver']);
+        $passenger = User::factory()->create(['role' => 'passenger']);
+        $trip = $this->createTrip(['user_id' => $driver->id]);
+        $booking = $this->createBooking($passenger, $trip, 1);
+        Rating::create([
+            'booking_id' => $booking->id,
+            'reviewer_id' => $driver->id,
+            'reviewee_id' => $passenger->id,
+            'score' => 4,
+            'comment' => 'Good passenger.',
+        ]);
+
+        $this->actingAs($driver)
+            ->get(route('driver.booking-requests.index'))
+            ->assertOk()
+            ->assertSee('4.0')
+            ->assertSee('(1)')
+            ->assertDontSee('4.7');
+
+        $this->actingAs($driver)
+            ->get(route('driver.booking-requests.show', $booking))
+            ->assertOk()
+            ->assertSee('4.0')
+            ->assertSee('(1 review)')
+            ->assertDontSee('4.7');
     }
 
     public function test_driver_can_reject_booking_without_changing_available_seats(): void

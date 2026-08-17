@@ -39,6 +39,11 @@
                             <div>
                                 <dt class="text-xs font-medium text-gray-500">Driver</dt>
                                 <dd class="mt-1 text-sm font-semibold text-gray-900">{{ $trip->user->name }}</dd>
+                                @if($trip->user->ratings_received_count > 0)
+                                    <dd class="mt-1 flex items-center gap-1 text-xs text-amber-500"><x-icons.lucide name="star" class="h-3 w-3 fill-current" />{{ number_format((float) $trip->user->ratings_received_avg_score, 1) }} <span class="text-gray-400">({{ $trip->user->ratings_received_count }} {{ Str::plural('review', $trip->user->ratings_received_count) }})</span></dd>
+                                @else
+                                    <dd class="mt-1 text-xs text-gray-400">No ratings yet</dd>
+                                @endif
                             </div>
                             <div>
                                 <dt class="text-xs font-medium text-gray-500">Vehicle</dt>

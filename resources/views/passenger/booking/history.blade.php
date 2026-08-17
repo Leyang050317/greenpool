@@ -61,7 +61,14 @@
                                     <tr>
                                         <td class="px-4 py-3 text-sm">
                                             <div class="font-semibold text-gray-900">{{ $booking->trip->departure_location }} to {{ $booking->trip->destination }}</div>
-                                            <div class="text-xs text-gray-500">{{ $booking->trip->user->name }}</div>
+                                            <div class="flex flex-wrap items-center gap-2 text-xs text-gray-500">
+                                                <span>{{ $booking->trip->user->name }}</span>
+                                                @if($booking->trip->user->ratings_received_count > 0)
+                                                    <span class="inline-flex items-center gap-1 text-amber-500"><x-icons.lucide name="star" class="h-3 w-3 fill-current" />{{ number_format((float) $booking->trip->user->ratings_received_avg_score, 1) }}</span>
+                                                @else
+                                                    <span class="text-gray-400">No ratings yet</span>
+                                                @endif
+                                            </div>
                                         </td>
                                         <td class="whitespace-nowrap px-4 py-3 text-sm text-gray-700">{{ $booking->trip->departure_at->format('d M Y, g:i A') }}</td>
                                         <td class="whitespace-nowrap px-4 py-3 text-sm text-gray-700">{{ $booking->number_of_seats }}</td>
@@ -77,7 +84,11 @@
                                                     <button type="submit" class="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100">Cancel</button>
                                                 </form>
                                             @elseif($booking->booking_status === 'Accepted' && $booking->trip->status === 'Completed' && ! $booking->ratings->contains('reviewer_id', Auth::id()))
-                                                <a href="{{ route('ratings.create', $booking) }}" class="rounded-lg bg-green-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-green-700">Rate Driver</a>
+                                                @if($booking->trip->completed_at?->addDays(7)->isPast())
+                                                    <span class="inline-flex items-center gap-1 text-xs font-medium text-gray-400"><x-icons.lucide name="lock" class="h-3.5 w-3.5" /> Rating expired</span>
+                                                @else
+                                                    <a href="{{ route('ratings.create', $booking) }}" class="rounded-lg bg-green-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-green-700">Rate Driver</a>
+                                                @endif
                                             @elseif($booking->ratings->contains('reviewer_id', Auth::id()))
                                                 <span class="text-xs font-medium text-green-600">Rated</span>
                                             @else

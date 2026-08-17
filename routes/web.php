@@ -7,6 +7,7 @@ use App\Http\Controllers\Driver\TripController;
 use App\Http\Controllers\Driver\VehicleController;
 use App\Http\Controllers\Passenger\HomeController as PassengerHomeController;
 use App\Http\Controllers\Passenger\PassengerBookingController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RatingController;
 use Illuminate\Support\Facades\Auth;
@@ -27,6 +28,9 @@ Route::middleware('auth')->group(function () {
 });
 
 Route::middleware(['auth', 'verified'])->group(function () {
+    Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
+    Route::get('/notifications/{notification}/open', [NotificationController::class, 'open'])->name('notifications.open');
+    Route::patch('/notifications/read-all', [NotificationController::class, 'markAllRead'])->name('notifications.read-all');
     Route::get('/ratings', [RatingController::class, 'hub'])->name('ratings.index');
     Route::get('/ratings/history', [RatingController::class, 'index'])->name('ratings.history');
     Route::get('/ratings/people', [RatingController::class, 'people'])->name('ratings.people');

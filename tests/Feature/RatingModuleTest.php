@@ -20,7 +20,7 @@ class RatingModuleTest extends TestCase
 
         $response = $this->actingAs($passenger)->get(route('passenger.home'));
         $response->assertOk()->assertSee('href="'.route('ratings.index').'"', false);
-        $this->assertSame(1, substr_count($response->getContent(), 'href="'.route('ratings.index').'"'));
+        $this->assertSame(2, substr_count($response->getContent(), 'href="'.route('ratings.index').'"'));
         $this->assertLessThan(strpos($response->getContent(), 'href="'.route('profile.edit').'"'), strpos($response->getContent(), 'href="'.route('ratings.index').'"'));
     }
 
@@ -30,7 +30,7 @@ class RatingModuleTest extends TestCase
 
         $response = $this->actingAs($passenger)->get(route('passenger.bookings.history'));
         $response->assertOk()->assertSee('href="'.route('ratings.index').'"', false);
-        $this->assertSame(1, substr_count($response->getContent(), 'href="'.route('ratings.index').'"'));
+        $this->assertSame(2, substr_count($response->getContent(), 'href="'.route('ratings.index').'"'));
     }
 
     public function test_ratings_sidebar_opens_the_rating_module_hub(): void
@@ -60,6 +60,21 @@ class RatingModuleTest extends TestCase
             ->assertSeeInOrder(['Rate a Driver', 'Rating History', 'Driver Reviews', 'Driver Profile']);
     }
 
+    public function test_rating_history_only_shows_filters_relevant_to_the_users_role(): void
+    {
+        [, $passenger] = $this->completedBooking();
+
+        $this->actingAs($passenger)
+            ->get(route('ratings.history'))
+            ->assertOk()
+            ->assertSee('Drivers Rated')
+            ->assertSee('Newest first')
+            ->assertSee('Oldest first')
+            ->assertDontSee('All roles')
+            ->assertDontSee('Passengers Rated')
+            ->assertDontSee('name="role"', false);
+    }
+
     public function test_reviews_and_profiles_are_separate_rating_features(): void
     {
         [$driver, $passenger, $booking] = $this->completedBooking();
@@ -83,6 +98,36 @@ class RatingModuleTest extends TestCase
         $this->actingAs($passenger)->get(route('ratings.people'))
             ->assertOk()->assertSee('Driver Profiles')->assertSee($driver->name)
             ->assertDontSee('A very safe and punctual driver.');
+    }
+
+    public function test_reviews_show_average_and_star_breakdown(): void
+    {
+        [$driver, $passenger, $booking] = $this->completedBooking();
+        $this->actingAs($passenger)->post(route('ratings.store', $booking), ['score' => 5]);
+
+        $otherPassenger = User::factory()->create(['role' => 'passenger', 'email_verified_at' => now()]);
+        $otherBooking = Booking::create([
+            'trip_id' => $booking->trip_id,
+            'passenger_id' => $otherPassenger->id,
+            'booking_status' => 'Accepted',
+            'number_of_seats' => 1,
+            'pickup_point' => 'Putrajaya Sentral',
+        ]);
+        Rating::create([
+            'booking_id' => $otherBooking->id,
+            'reviewer_id' => $otherPassenger->id,
+            'reviewee_id' => $driver->id,
+            'score' => 3,
+        ]);
+
+        $this->actingAs($passenger)
+            ->get(route('ratings.reviews'))
+            ->assertOk()
+            ->assertSee('Rating breakdown', false)
+            ->assertSee('4.0')
+            ->assertSee('2 reviews')
+            ->assertSee('5 star')
+            ->assertSee('3 star');
     }
 
     public function test_connected_people_can_be_opened_from_the_rating_hub(): void
@@ -181,6 +226,56 @@ class RatingModuleTest extends TestCase
         $this->actingAs($passenger)->post(route('ratings.store', $booking), ['score' => 3])->assertStatus(409);
     }
 
+    public function test_rating_submission_expires_seven_days_after_trip_completion(): void
+    {
+        [, $passenger, $booking] = $this->completedBooking();
+        $booking->trip->update(['completed_at' => now()->subDays(8)]);
+
+        $this->actingAs($passenger)->get(route('ratings.create', $booking))->assertStatus(410);
+        $this->actingAs($passenger)->post(route('ratings.store', $booking), ['score' => 5])->assertStatus(410);
+
+        $this->actingAs($passenger)
+            ->get(route('ratings.pending'))
+            ->assertOk()
+            ->assertSee('Expired')
+            ->assertDontSee('href="'.route('ratings.create', $booking).'"', false);
+
+        $this->actingAs($passenger)
+            ->get(route('passenger.home'))
+            ->assertOk()
+            ->assertDontSee('How was your ride?');
+
+        $this->assertDatabaseMissing('ratings', [
+            'booking_id' => $booking->id,
+            'reviewer_id' => $passenger->id,
+        ]);
+    }
+
+    public function test_rating_submission_notifies_the_reviewee_and_notification_can_be_opened(): void
+    {
+        [$driver, $passenger, $booking] = $this->completedBooking();
+
+        $this->actingAs($passenger)->post(route('ratings.store', $booking), ['score' => 5]);
+
+        $notification = $driver->notifications()->firstOrFail();
+        $this->assertSame(5, $notification->data['score']);
+        $this->assertSame($passenger->name, $notification->data['reviewer_name']);
+        $this->assertNull($notification->read_at);
+
+        $this->actingAs($driver)
+            ->get(route('notifications.index'))
+            ->assertOk()
+            ->assertSee('New rating received')
+            ->assertSee($passenger->name.' gave you a 5-star rating.')
+            ->assertSee('Notifications, 1 unread');
+
+        $this->actingAs($driver)
+            ->get(route('notifications.open', $notification->id))
+            ->assertRedirect(route('ratings.received', $driver));
+
+        $this->assertNotNull($notification->fresh()->read_at);
+    }
+
     public function test_submission_confirmation_page_shows_success_message_and_stars(): void
     {
         [, $passenger, $booking] = $this->completedBooking();
@@ -234,6 +329,48 @@ class RatingModuleTest extends TestCase
             'reviewee_id' => $driver->id,
             'score' => 5,
             'comment' => 'Updated feedback.',
+        ]);
+    }
+
+    public function test_rating_is_editable_for_seven_days_and_locked_afterwards(): void
+    {
+        [, $passenger, $booking] = $this->completedBooking();
+        $this->actingAs($passenger)->post(route('ratings.store', $booking), [
+            'score' => 4,
+            'comment' => 'Original feedback.',
+        ]);
+        $rating = $passenger->ratingsGiven()->firstOrFail();
+        $rating->forceFill(['created_at' => now()->subDays(6)])->saveQuietly();
+
+        $this->actingAs($passenger)
+            ->get(route('ratings.edit', $rating))
+            ->assertOk()
+            ->assertSee('Update Rating');
+
+        $rating->forceFill(['created_at' => now()->subDays(8)])->saveQuietly();
+
+        $this->actingAs($passenger)
+            ->get(route('ratings.history'))
+            ->assertOk()
+            ->assertSee('Locked')
+            ->assertSee('7-day edit period ended')
+            ->assertDontSee('href="'.route('ratings.edit', $rating).'"', false);
+
+        $this->actingAs($passenger)
+            ->get(route('ratings.edit', $rating))
+            ->assertStatus(423);
+
+        $this->actingAs($passenger)
+            ->patch(route('ratings.update', $rating), [
+                'score' => 1,
+                'comment' => 'This must not be saved.',
+            ])
+            ->assertStatus(423);
+
+        $this->assertDatabaseHas('ratings', [
+            'id' => $rating->id,
+            'score' => 4,
+            'comment' => 'Original feedback.',
         ]);
     }
 
@@ -305,6 +442,49 @@ class RatingModuleTest extends TestCase
             ->assertOk()
             ->assertDontSee('How was your ride?')
             ->assertDontSee('Rate Now');
+    }
+
+    public function test_completed_trip_ratings_are_reflected_in_booking_and_profile_average_ratings(): void
+    {
+        [$driver, $passenger, $booking] = $this->completedBooking();
+
+        $this->actingAs($passenger)->post(route('ratings.store', $booking), [
+            'score' => 5,
+            'comment' => 'Excellent driver.',
+        ]);
+        $this->actingAs($driver)->post(route('ratings.store', $booking), [
+            'score' => 3,
+            'comment' => 'Good passenger.',
+        ]);
+
+        $driver->trips()->create([
+            'vehicle_id' => $booking->trip->vehicle_id,
+            'departure_location' => 'Cyberjaya',
+            'destination' => 'Kuala Lumpur',
+            'departure_at' => now()->addDay(),
+            'available_seats' => 3,
+            'price_per_passenger' => 12,
+            'status' => 'Scheduled',
+        ]);
+
+        $this->actingAs($passenger)
+            ->get(route('passenger.booking'))
+            ->assertOk()
+            ->assertSee($driver->name)
+            ->assertSee('5.0')
+            ->assertSee('(1)');
+
+        $this->actingAs($driver)
+            ->get(route('profile.edit'))
+            ->assertOk()
+            ->assertSee('5.0')
+            ->assertSee('(1 review)');
+
+        $this->actingAs($passenger)
+            ->get(route('profile.edit'))
+            ->assertOk()
+            ->assertSee('3.0')
+            ->assertSee('(1 review)');
     }
 
     public function test_driver_is_redirected_to_rate_passenger_after_completing_trip(): void

@@ -78,6 +78,11 @@
                                     </div>
                                     <div class="min-w-0">
                                         <p class="truncate text-sm font-semibold text-gray-900">{{ $trip->user->name }}</p>
+                                        @if($trip->user->ratings_received_count > 0)
+                                            <p class="mt-0.5 flex items-center gap-1 text-xs text-amber-500"><x-icons.lucide name="star" class="h-3 w-3 fill-current" />{{ number_format((float) $trip->user->ratings_received_avg_score, 1) }} <span class="text-gray-400">({{ $trip->user->ratings_received_count }})</span></p>
+                                        @else
+                                            <p class="mt-0.5 text-xs text-gray-400">No ratings yet</p>
+                                        @endif
                                         <p class="truncate text-xs text-gray-500">{{ $trip->vehicle?->brand }} {{ $trip->vehicle?->model }} {{ $trip->vehicle?->plate_number ? '('.$trip->vehicle->plate_number.')' : '' }}</p>
                                     </div>
                                 </div>
