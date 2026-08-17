@@ -16,7 +16,7 @@ class Trip extends Model
 
     protected $fillable = [
         'vehicle_id', 'departure_location', 'destination', 'departure_at',
-        'available_seats', 'price_per_passenger', 'description', 'estimated_distance_km', 'estimated_duration_seconds', 'status',
+        'available_seats', 'price_per_passenger', 'description', 'estimated_distance_km', 'estimated_duration_seconds', 'estimated_arrival_at', 'status',
         'departure_latitude', 'departure_longitude', 'destination_latitude', 'destination_longitude',
         'started_at', 'completed_at', 'cancelled_at',
     ];
@@ -32,6 +32,7 @@ class Trip extends Model
             'price_per_passenger' => 'decimal:2',
             'estimated_distance_km' => 'decimal:2',
             'estimated_duration_seconds' => 'integer',
+            'estimated_arrival_at' => 'datetime',
             'departure_latitude' => 'decimal:7',
             'departure_longitude' => 'decimal:7',
             'destination_latitude' => 'decimal:7',

@@ -17,12 +17,21 @@ class Booking extends Model
         'booking_status',
         'number_of_seats',
         'pickup_point',
+        'pickup_place_id',
+        'pickup_latitude',
+        'pickup_longitude',
+        'pickup_sequence',
+        'picked_up_at',
     ];
 
     protected function casts(): array
     {
         return [
             'number_of_seats' => 'integer',
+            'picked_up_at' => 'datetime',
+            'pickup_latitude' => 'decimal:7',
+            'pickup_longitude' => 'decimal:7',
+            'pickup_sequence' => 'integer',
         ];
     }
 
