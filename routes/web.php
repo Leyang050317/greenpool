@@ -88,6 +88,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('trips/history', [TripController::class, 'history'])->name('trips.history');
         Route::patch('trips/{trip}/start', [TripController::class, 'start'])->name('trips.start');
         Route::patch('trips/{trip}/complete', [TripController::class, 'complete'])->name('trips.complete');
+        Route::patch('trips/{trip}/bookings/{booking}/pickup', [TripController::class, 'pickup'])->name('trips.bookings.pickup');
         Route::patch('trips/{trip}/cancel', [TripController::class, 'cancel'])->name('trips.cancel');
         Route::get('trips/locations/autocomplete', [TripController::class, 'autocomplete'])->name('trips.locations.autocomplete');
         Route::resource('trips', TripController::class);

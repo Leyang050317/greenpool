@@ -126,12 +126,34 @@ class TripController extends Controller
     public function start(Request $request, Trip $trip): RedirectResponse|JsonResponse
     {
         $this->ensureStatus($request, $trip, ['Scheduled']);
-        $bookingsToNotify = DB::transaction(function () use ($request, $trip) {
-            abort_if($request->user()->trips()->where('status', 'In Progress')->exists(), 422, 'Complete your current trip before starting another.');
-            $trip->update(['status' => 'In Progress', 'started_at' => now()]);
+        try {
+            $bookingsToNotify = DB::transaction(function () use ($request, $trip) {
+                abort_if($request->user()->trips()->where('status', 'In Progress')->exists(), 422, 'Complete your current trip before starting another.');
+                $lockedTrip = Trip::query()->whereKey($trip->getKey())->lockForUpdate()->firstOrFail();
+                $bookings = $this->acceptedBookingsFor($lockedTrip, true);
+                $this->assertRouteCoordinates($lockedTrip, $bookings);
 
-            return $this->acceptedBookingsFor($trip);
-        });
+                $route = $this->tripDistanceService->calculate(
+                    $this->tripDeparture($lockedTrip),
+                    $this->tripDestination($lockedTrip),
+                    $bookings->map(fn (Booking $booking) => $this->bookingPickup($booking))->all(),
+                    true,
+                );
+                $this->persistPickupSequence($bookings, $route['optimized_intermediate_waypoint_index']);
+                $startedAt = now();
+                $lockedTrip->update([
+                    'status' => 'In Progress',
+                    'started_at' => $startedAt,
+                    'estimated_distance_km' => $route['estimated_distance_km'],
+                    'estimated_duration_seconds' => $route['estimated_duration_seconds'],
+                    'estimated_arrival_at' => $startedAt->copy()->addSeconds($route['estimated_duration_seconds']),
+                ]);
+
+                return $bookings;
+            });
+        } catch (TripRoutingException $exception) {
+            return $this->routingError($request, $exception);
+        }
         $this->broadcastBookingUpdates($bookingsToNotify);
 
         return $this->response($request, $trip->refresh(), 'Journey started successfully.', 200, 'driver.trips.journey');
@@ -161,6 +183,50 @@ class TripController extends Controller
         }
 
         return $this->response($request, $trip->refresh(), 'Journey completed successfully.', 200, 'driver.trips.journey');
+    }
+
+    public function pickup(Request $request, Trip $trip, Booking $booking): RedirectResponse|JsonResponse
+    {
+        $this->ensureOwnership($request, $trip);
+
+        try {
+            $booking = DB::transaction(function () use ($trip, $booking) {
+                $lockedTrip = Trip::query()->whereKey($trip->getKey())->lockForUpdate()->firstOrFail();
+                $lockedBooking = Booking::query()->whereKey($booking->getKey())->lockForUpdate()->firstOrFail();
+
+                abort_unless($lockedBooking->trip_id === $lockedTrip->getKey(), 404);
+                abort_unless($lockedTrip->status === 'In Progress', 422, 'Passengers can only be picked up during an active journey.');
+                abort_unless($lockedBooking->booking_status === 'Accepted', 422, 'Only accepted bookings can be marked as picked up.');
+                abort_if($lockedBooking->picked_up_at !== null, 422, 'This passenger has already been picked up.');
+
+                $lockedBooking->update(['picked_up_at' => now()]);
+                $remainingBookings = $this->acceptedBookingsFor($lockedTrip, true)
+                    ->whereNull('picked_up_at')
+                    ->values();
+                $this->assertRouteCoordinates($lockedTrip, $remainingBookings);
+                $route = $this->tripDistanceService->calculate(
+                    $this->bookingPickup($lockedBooking),
+                    $this->tripDestination($lockedTrip),
+                    $remainingBookings->map(fn (Booking $remaining) => $this->bookingPickup($remaining))->all(),
+                );
+                $calculatedAt = now();
+                $lockedTrip->update([
+                    'estimated_distance_km' => $route['estimated_distance_km'],
+                    'estimated_duration_seconds' => $route['estimated_duration_seconds'],
+                    'estimated_arrival_at' => $calculatedAt->copy()->addSeconds($route['estimated_duration_seconds']),
+                ]);
+
+                return $lockedBooking;
+            });
+        } catch (TripRoutingException $exception) {
+            return $this->routingError($request, $exception);
+        }
+
+        if ($request->expectsJson()) {
+            return response()->json(['message' => 'Passenger marked as picked up.', 'data' => $booking]);
+        }
+
+        return redirect()->route('driver.trips.journey')->with('success', 'Passenger marked as picked up.');
     }
 
     public function cancel(Request $request, Trip $trip): RedirectResponse|JsonResponse
@@ -193,6 +259,14 @@ class TripController extends Controller
     {
         $trips = $this->driverTrips($request)
             ->whereIn('status', ['Scheduled', 'In Progress'])
+            ->with([
+                'bookings' => fn ($booking) => $booking
+                    ->where('booking_status', 'Accepted')
+                    ->with('passenger')
+                    ->orderByRaw('case when pickup_sequence is null then 1 else 0 end')
+                    ->orderBy('pickup_sequence')
+                    ->oldest(),
+            ])
             ->withSum(['bookings as accepted_passengers_count' => fn ($booking) => $booking->where('booking_status', 'Accepted')], 'number_of_seats')
             ->orderBy('departure_at')
             ->get();
@@ -217,7 +291,11 @@ class TripController extends Controller
         if ($request->filled('date')) {
             $query->whereDate('departure_at', $request->input('date'));
         }
-        $trips = $query->latest('departure_at')->paginate(8)->withQueryString();
+        $trips = $query
+            ->withSum(['bookings as accepted_passengers_count' => fn ($booking) => $booking->where('booking_status', 'Accepted')], 'number_of_seats')
+            ->latest('departure_at')
+            ->paginate(8)
+            ->withQueryString();
 
         return $request->expectsJson() ? response()->json(['data' => $trips]) : view('driver.trips.history', compact('trips'));
     }
@@ -291,18 +369,65 @@ class TripController extends Controller
         }
     }
 
-    private function acceptedBookingsFor(Trip $trip)
+    private function acceptedBookingsFor(Trip $trip, bool $lock = false)
     {
         return Booking::query()
             ->with('trip')
             ->where('trip_id', $trip->getKey())
             ->where('booking_status', 'Accepted')
+            ->when($lock, fn ($query) => $query->lockForUpdate())
+            ->orderByRaw('case when pickup_sequence is null then 1 else 0 end')
+            ->orderBy('pickup_sequence')
+            ->oldest()
             ->get();
     }
 
+    private function assertRouteCoordinates(Trip $trip, $bookings): void
+    {
+        foreach ([$this->tripDeparture($trip), $this->tripDestination($trip)] as $location) {
+            if (! $this->hasCoordinates($location)) {
+                throw new TripRoutingException('destination', 'Trip locations must have valid coordinates before routing.');
+            }
+        }
+        foreach ($bookings as $booking) {
+            if (! $this->hasCoordinates($this->bookingPickup($booking))) {
+                throw new TripRoutingException('booking', 'Every accepted booking must have valid pickup coordinates before starting the journey.');
+            }
+        }
+    }
+
+    private function tripDeparture(Trip $trip): array
+    {
+        return ['latitude' => $trip->departure_latitude, 'longitude' => $trip->departure_longitude];
+    }
+
+    private function tripDestination(Trip $trip): array
+    {
+        return ['latitude' => $trip->destination_latitude, 'longitude' => $trip->destination_longitude];
+    }
+
+    private function bookingPickup(Booking $booking): array
+    {
+        return ['latitude' => $booking->pickup_latitude, 'longitude' => $booking->pickup_longitude];
+    }
+
+    private function hasCoordinates(array $location): bool
+    {
+        return is_numeric($location['latitude'] ?? null) && is_numeric($location['longitude'] ?? null)
+            && (float) $location['latitude'] >= -90 && (float) $location['latitude'] <= 90
+            && (float) $location['longitude'] >= -180 && (float) $location['longitude'] <= 180;
+    }
+
+    private function persistPickupSequence($bookings, array $optimizedIndexes): void
+    {
+        foreach ($optimizedIndexes as $sequence => $index) {
+            $bookings->get($index)?->update(['pickup_sequence' => $sequence + 1]);
+        }
+    }
     private function broadcastBookingUpdates($bookings): void
     {
         foreach ($bookings as $booking) {
+            $booking->unsetRelation('trip')->load('trip');
             BookingStatusUpdated::dispatch($booking);
         }
     }

@@ -84,6 +84,7 @@ class TripLifecycleRulesTest extends TestCase
 
     public function test_start_trip_lifecycle_remains_unchanged(): void
     {
+        $this->fakeGoogle();
         $driver = $this->driver();
         $inProgress = $this->trip($driver, ['status' => 'In Progress', 'started_at' => now()]);
         $next = $this->trip($driver);
@@ -106,8 +107,9 @@ class TripLifecycleRulesTest extends TestCase
         $trip = $this->trip($driver);
         $acceptedPassenger = $this->passenger();
         $pendingPassenger = $this->passenger();
-        $acceptedBooking = Booking::create(['trip_id' => $trip->trip_id, 'passenger_id' => $acceptedPassenger->id, 'booking_status' => 'Accepted', 'number_of_seats' => 1, 'pickup_point' => 'Main Gate']);
+        $acceptedBooking = Booking::create(['trip_id' => $trip->trip_id, 'passenger_id' => $acceptedPassenger->id, 'booking_status' => 'Accepted', 'number_of_seats' => 1, 'pickup_point' => 'Main Gate', 'pickup_place_id' => 'main-gate', 'pickup_latitude' => 3.1390, 'pickup_longitude' => 101.6869]);
         Booking::create(['trip_id' => $trip->trip_id, 'passenger_id' => $pendingPassenger->id, 'booking_status' => 'Pending', 'number_of_seats' => 1, 'pickup_point' => 'Library']);
+        $this->fakeGoogle([0]);
 
         $this->actingAs($driver)
             ->patch(route('driver.trips.start', $trip))
@@ -123,12 +125,17 @@ class TripLifecycleRulesTest extends TestCase
         Event::assertDispatchedTimes(BookingStatusUpdated::class, 1);
     }
 
-    private function fakeGoogle(): void
+    private function fakeGoogle(array $optimizedIndexes = []): void
     {
+        $route = ['distanceMeters' => 1000, 'duration' => '60s'];
+        if ($optimizedIndexes !== []) {
+            $route['optimizedIntermediateWaypointIndex'] = $optimizedIndexes;
+        }
+
         Http::fake([
             'https://places.googleapis.com/v1/places/departure' => Http::response($this->place('departure', 3.139, 101.6869)),
             'https://places.googleapis.com/v1/places/destination' => Http::response($this->place('destination', 3.1578, 101.7123)),
-            'https://routes.googleapis.com/directions/v2:computeRoutes' => Http::response(['routes' => [['distanceMeters' => 1000, 'duration' => '60s']]]),
+            'https://routes.googleapis.com/directions/v2:computeRoutes' => Http::response(['routes' => [$route]]),
         ]);
     }
 

@@ -133,7 +133,13 @@ class PassengerBookingController extends Controller
                 ]);
             }
 
-            return Booking::create([...$request->bookingData(), 'pickup_point' => $pickup['display']]);
+            return Booking::create([
+                ...$request->bookingData(),
+                'pickup_point' => $pickup['display'],
+                'pickup_place_id' => $request->string('pickup_place_id')->toString(),
+                'pickup_latitude' => $pickup['latitude'],
+                'pickup_longitude' => $pickup['longitude'],
+            ]);
         });
 
         BookingCreated::dispatch($booking);
