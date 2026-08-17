@@ -11,6 +11,7 @@
                 @forelse($bookings as $booking)
                     @php
                         $reviewee = Auth::user()->role === 'passenger' ? $booking->trip->user : $booking->passenger;
+                        $ratingExpired = $booking->trip->completed_at?->addDays(7)->isPast() ?? false;
                     @endphp
                     <article class="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:flex-row sm:items-center">
                         <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-green-600 text-sm font-bold text-white">
@@ -21,9 +22,11 @@
                             <div class="mt-1 text-sm text-slate-500">{{ $booking->trip->departure_location }} to {{ $booking->trip->destination }}</div>
                             <div class="mt-1 text-xs text-slate-400">Completed {{ $booking->trip->completed_at->format('j M Y') }}</div>
                         </div>
-                        <a href="{{ route('ratings.create', $booking) }}" class="rounded-xl bg-[#22C55E] px-5 py-2.5 text-center text-sm font-semibold text-white hover:bg-green-600">
-                            Rate {{ ucfirst($reviewee->role) }}
-                        </a>
+                        @if($ratingExpired)
+                            <span class="inline-flex items-center gap-1 rounded-xl bg-slate-100 px-5 py-2.5 text-sm font-semibold text-slate-500"><x-icons.lucide name="lock" class="h-4 w-4" /> Expired</span>
+                        @else
+                            <a href="{{ route('ratings.create', $booking) }}" class="rounded-xl bg-[#22C55E] px-5 py-2.5 text-center text-sm font-semibold text-white hover:bg-green-600">Rate {{ ucfirst($reviewee->role) }}</a>
+                        @endif
                     </article>
                 @empty
                     <div class="rounded-2xl border border-slate-200 bg-white px-6 py-16 text-center">

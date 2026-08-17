@@ -2,11 +2,14 @@
 
 namespace Tests\Feature;
 
+use App\Events\BookingStatusUpdated;
 use App\Models\Booking;
+use App\Models\Rating;
 use App\Models\Trip;
 use App\Models\User;
 use App\Models\Vehicle;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Event;
 use Tests\TestCase;
 
 class BookingModuleTest extends TestCase
@@ -22,6 +25,32 @@ class BookingModuleTest extends TestCase
             ->get(route('passenger.booking'))
             ->assertOk()
             ->assertSee($trip->destination);
+    }
+
+    public function test_passenger_destination_search_matches_related_keywords(): void
+    {
+        $passenger = User::factory()->create(['role' => 'passenger']);
+        $matchingTrip = $this->createTrip(['destination' => 'Kuala Lumpur City Centre']);
+        $otherTrip = $this->createTrip(['destination' => 'Penang Hill']);
+
+        $this->actingAs($passenger)
+            ->get(route('passenger.booking', ['destination' => 'Kuala Lumpur, Malaysia']))
+            ->assertOk()
+            ->assertSee($matchingTrip->destination)
+            ->assertDontSee($otherTrip->destination);
+    }
+
+    public function test_passenger_history_shows_trip_lifecycle_status_for_accepted_booking(): void
+    {
+        $passenger = User::factory()->create(['role' => 'passenger']);
+        $trip = $this->createTrip(['status' => 'In Progress', 'started_at' => now()]);
+        $this->createBooking($passenger, $trip, bookingStatus: 'Accepted');
+
+        $this->actingAs($passenger)
+            ->get(route('passenger.bookings.history'))
+            ->assertOk()
+            ->assertSee('In Progress')
+            ->assertDontSee('Accepted</span>', false);
     }
 
     public function test_passenger_can_submit_booking_request(): void
@@ -94,6 +123,8 @@ class BookingModuleTest extends TestCase
 
     public function test_passenger_can_cancel_only_pending_booking(): void
     {
+        Event::fake([BookingStatusUpdated::class]);
+
         $passenger = User::factory()->create(['role' => 'passenger']);
         $pendingBooking = $this->createBooking($passenger, bookingStatus: 'Pending');
         $acceptedBooking = $this->createBooking($passenger, bookingStatus: 'Accepted');
@@ -107,6 +138,12 @@ class BookingModuleTest extends TestCase
             'id' => $pendingBooking->id,
             'booking_status' => 'Cancelled',
         ]);
+        Event::assertDispatched(
+            BookingStatusUpdated::class,
+            fn (BookingStatusUpdated $event) => $event->booking->is($pendingBooking)
+                && $event->booking->booking_status === 'Cancelled'
+                && collect($event->broadcastOn())->contains(fn ($channel) => (string) $channel === 'private-driver.'.$pendingBooking->trip->user_id)
+        );
 
         $this->actingAs($passenger)
             ->patch(route('passenger.bookings.cancel', $acceptedBooking))
@@ -154,6 +191,35 @@ class BookingModuleTest extends TestCase
             ->assertSee($passenger->name)
             ->assertSee($booking->pickup_point)
             ->assertSee($trip->destination);
+    }
+
+    public function test_booking_requests_show_the_passengers_real_database_rating(): void
+    {
+        $driver = User::factory()->create(['role' => 'driver']);
+        $passenger = User::factory()->create(['role' => 'passenger']);
+        $trip = $this->createTrip(['user_id' => $driver->id]);
+        $booking = $this->createBooking($passenger, $trip, 1);
+        Rating::create([
+            'booking_id' => $booking->id,
+            'reviewer_id' => $driver->id,
+            'reviewee_id' => $passenger->id,
+            'score' => 4,
+            'comment' => 'Good passenger.',
+        ]);
+
+        $this->actingAs($driver)
+            ->get(route('driver.booking-requests.index'))
+            ->assertOk()
+            ->assertSee('4.0')
+            ->assertSee('(1)')
+            ->assertDontSee('4.7');
+
+        $this->actingAs($driver)
+            ->get(route('driver.booking-requests.show', $booking))
+            ->assertOk()
+            ->assertSee('4.0')
+            ->assertSee('(1 review)')
+            ->assertDontSee('4.7');
     }
 
     public function test_driver_can_reject_booking_without_changing_available_seats(): void

@@ -15,7 +15,9 @@ class HomeController extends Controller
             ->with(['trip.user'])
             ->where('passenger_id', $request->user()->id)
             ->where('booking_status', 'Accepted')
-            ->whereHas('trip', fn ($trip) => $trip->where('status', 'Completed'))
+            ->whereHas('trip', fn ($trip) => $trip
+                ->where('status', 'Completed')
+                ->where('completed_at', '>=', now()->subDays(7)))
             ->whereDoesntHave('ratings', fn ($rating) => $rating->where('reviewer_id', $request->user()->id))
             ->latest('updated_at')
             ->first();

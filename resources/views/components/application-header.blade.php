@@ -4,8 +4,9 @@
         request()->routeIs('driver.trips.*') => 'My Trips',
         request()->routeIs('driver.booking-requests.*') => 'Booking Requests',
         request()->routeIs('driver.vehicles.*') => 'My Vehicles',
-        request()->routeIs('passenger.find-ride.*') => 'Find a Ride',
-        request()->routeIs('passenger.booking', 'passenger.bookings.*') => 'My Bookings',
+        request()->routeIs('passenger.booking') => 'Find a Ride',
+        request()->routeIs('passenger.bookings.create') => 'Trip Details',
+        request()->routeIs('passenger.bookings.history') => 'My Bookings',
         request()->routeIs('attractions.show') => request()->route('attraction')->attraction_name,
         request()->routeIs('attractions.index') && request()->query('tab') === 'favourites' => 'Favourite Attractions',
         request()->routeIs('attractions.index', 'driver.attractions.*', 'passenger.attractions.*') => 'Tourist Attractions',
@@ -17,11 +18,8 @@
         default => 'Dashboard',
     };
 
-    $notificationRoute = match (Auth::user()->role) {
-        'driver' => Route::has('driver.notifications.index') ? route('driver.notifications.index') : '#',
-        'passenger' => Route::has('passenger.notifications.index') ? route('passenger.notifications.index') : '#',
-        default => '#',
-    };
+    $notificationRoute = route('notifications.index');
+    $unreadNotificationCount = Auth::user()->unreadNotifications()->count();
 
     $initials = collect(preg_split('/\s+/', trim(Auth::user()->name)))
         ->filter()
@@ -51,13 +49,13 @@
         <a
             href="{{ $notificationRoute }}"
             class="relative flex h-10 w-10 items-center justify-center rounded-lg text-gray-500 transition-colors duration-150 hover:bg-[#F3F4F6] hover:text-gray-700 active:bg-gray-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2E7D32] focus-visible:ring-offset-2"
-            aria-label="Notifications, 3 unread"
+            aria-label="Notifications, {{ $unreadNotificationCount }} unread"
             title="Notifications"
         >
             <x-icons.lucide name="bell" />
-            <span class="absolute -right-0.5 -top-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white ring-2 ring-white" aria-hidden="true">
-                3
-            </span>
+            @if($unreadNotificationCount > 0)
+                <span class="absolute -right-0.5 -top-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white ring-2 ring-white" aria-hidden="true">{{ min($unreadNotificationCount, 99) }}</span>
+            @endif
         </a>
 
         <a

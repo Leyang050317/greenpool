@@ -2,12 +2,12 @@
 
 namespace App\Http\Controllers\Driver;
 
+use App\Events\BookingStatusUpdated;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Driver\StoreTripRequest;
 use App\Http\Requests\Driver\UpdateTripRequest;
 use App\Models\Booking;
 use App\Models\Trip;
-use App\Events\BookingStatusUpdated;
 use App\Services\Routing\TripDistanceService;
 use App\Services\Routing\TripLocationService;
 use App\Services\Routing\TripRoutingException;
@@ -67,11 +67,11 @@ class TripController extends Controller
     {
         try {
             $locations = $this->selectedLocations($request);
-            $routingData = $this->tripDistanceService->calculate($locations['departure'], $locations['destination']);
         } catch (TripRoutingException $exception) {
             return $this->routingError($request, $exception);
         }
 
+        $routingData = $this->routingDataOrEmpty($locations);
         $trip = $request->user()->trips()->create([...$request->tripData(), ...$locations['attributes'], ...$routingData]);
 
         return $this->response($request, $trip, 'Trip published successfully.', 201, 'driver.trips.index');
@@ -111,10 +111,11 @@ class TripController extends Controller
         if ($locationsChanged) {
             try {
                 $locations = $this->selectedLocations($request, $trip);
-                $data = [...$data, ...$locations['attributes'], ...$this->tripDistanceService->calculate($locations['departure'], $locations['destination'])];
             } catch (TripRoutingException $exception) {
                 return $this->routingError($request, $exception);
             }
+
+            $data = [...$data, ...$locations['attributes'], ...$this->routingDataOrEmpty($locations)];
         }
 
         $trip->update($data);
@@ -371,6 +372,7 @@ class TripController extends Controller
     private function acceptedBookingsFor(Trip $trip, bool $lock = false)
     {
         return Booking::query()
+            ->with('trip')
             ->where('trip_id', $trip->getKey())
             ->where('booking_status', 'Accepted')
             ->when($lock, fn ($query) => $query->lockForUpdate())
@@ -422,10 +424,10 @@ class TripController extends Controller
             $bookings->get($index)?->update(['pickup_sequence' => $sequence + 1]);
         }
     }
-
     private function broadcastBookingUpdates($bookings): void
     {
         foreach ($bookings as $booking) {
+            $booking->unsetRelation('trip')->load('trip');
             BookingStatusUpdated::dispatch($booking);
         }
     }

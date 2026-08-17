@@ -2,11 +2,11 @@
 
 namespace Tests\Feature\Driver;
 
+use App\Events\BookingStatusUpdated;
 use App\Models\Booking;
 use App\Models\Trip;
 use App\Models\User;
 use App\Models\Vehicle;
-use App\Events\BookingStatusUpdated;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Artisan;

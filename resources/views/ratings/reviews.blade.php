@@ -3,6 +3,23 @@
         <div class="mx-auto max-w-4xl">
             <a href="{{ route('ratings.index') }}" class="text-sm font-medium text-slate-500 hover:text-slate-700">← Back to Ratings</a>
             <div class="mt-6"><h1 class="text-2xl font-bold text-slate-900">{{ ucfirst($targetRole) }} Reviews</h1><p class="mt-1 text-sm text-slate-400">Browse feedback received by {{ $targetRole }}s from your completed rides.</p></div>
+            <section class="mt-6 grid gap-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:grid-cols-[180px_1fr]" aria-label="Rating breakdown">
+                <div class="flex flex-col items-center justify-center text-center">
+                    <strong class="text-4xl text-slate-900">{{ number_format($average, 1) }}</strong>
+                    <div class="mt-2 text-lg text-amber-400">★★★★★</div>
+                    <p class="mt-1 text-xs text-slate-400">{{ $reviewCount }} {{ Str::plural('review', $reviewCount) }}</p>
+                </div>
+                <div class="space-y-2">
+                    @for($score = 5; $score >= 1; $score--)
+                        @php($count = (int) ($breakdown[$score] ?? 0))
+                        <div class="grid grid-cols-[52px_1fr_28px] items-center gap-3 text-xs">
+                            <span class="text-slate-500">{{ $score }} star</span>
+                            <div class="h-2.5 overflow-hidden rounded-full bg-slate-100"><div class="h-full rounded-full bg-amber-400" style="width: {{ $reviewCount > 0 ? ($count / $reviewCount) * 100 : 0 }}%"></div></div>
+                            <span class="text-right text-slate-400">{{ $count }}</span>
+                        </div>
+                    @endfor
+                </div>
+            </section>
             <form method="GET" class="mt-6 flex flex-col gap-3 sm:flex-row"><input name="search" value="{{ request('search') }}" placeholder="Search reviews or user names..." class="min-w-0 flex-1 rounded-xl border-slate-200 text-sm focus:border-green-500 focus:ring-green-500"><select name="sort" class="rounded-xl border-slate-200 text-sm"><option value="newest">Newest</option><option value="highest" @selected(request('sort')==='highest')>Highest</option><option value="lowest" @selected(request('sort')==='lowest')>Lowest</option></select><button class="rounded-xl bg-[#22C55E] px-5 py-2.5 text-sm font-semibold text-white">Apply</button></form>
             <div class="mt-5 space-y-3">
                 @forelse($ratings as $rating)

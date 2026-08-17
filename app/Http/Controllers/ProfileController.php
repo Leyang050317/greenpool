@@ -14,14 +14,18 @@ class ProfileController extends Controller
 {
     public function edit(Request $request): View
     {
+        $user = $request->user()
+            ->loadAvg('ratingsReceived', 'score')
+            ->loadCount('ratingsReceived');
+
         if ($request->user()->role === 'passenger') {
             return view('passenger.profile', [
-                'user' => $request->user(),
+                'user' => $user,
             ]);
         }
 
         return view('profile.edit', [
-            'user' => $request->user(),
+            'user' => $user,
         ]);
     }
 

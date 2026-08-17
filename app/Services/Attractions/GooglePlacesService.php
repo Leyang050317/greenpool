@@ -13,6 +13,29 @@ use Throwable;
 
 class GooglePlacesService
 {
+    /**
+     * Returns a non-persistent preview of Google tourist-attraction matches for
+     * a Malaysian state. Photo names are deliberately not stored because they
+     * expire and Google does not permit caching them.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function previewTouristAttractions(string $state, int $pageSize = 20): array
+    {
+        $response = $this->post('/places:searchText', [
+            'textQuery' => "tourist attractions in {$state}, Malaysia",
+            'includedType' => 'tourist_attraction',
+            'strictTypeFiltering' => true,
+            'pageSize' => min(max($pageSize, 1), 20),
+            'regionCode' => 'MY',
+        ], 'places.id,places.displayName,places.addressComponents,places.location,places.primaryType,places.photos');
+
+        return collect($response->json('places', []))
+            ->filter(fn (array $place) => $this->isMalaysian($place) && $this->isInState($place, $state))
+            ->values()
+            ->all();
+    }
+
     public function detailsFor(Attraction $attraction): array
     {
         $attraction->loadMissing('detail');
@@ -46,7 +69,7 @@ class GooglePlacesService
         if (! $detail) {
             return null;
         }
-        $payload = ['textQuery' => "{$attraction->attraction_name}, {$attraction->state}, Malaysia", 'maxResultCount' => 5];
+        $payload = ['textQuery' => "{$attraction->attraction_name}, {$attraction->state}, Malaysia", 'pageSize' => 5];
         if ($detail?->latitude !== null && $detail?->longitude !== null) {
             $payload['locationBias'] = ['circle' => ['center' => ['latitude' => $detail->latitude, 'longitude' => $detail->longitude], 'radius' => 5000.0]];
         }
@@ -71,6 +94,30 @@ class GooglePlacesService
     {
         return collect($place['addressComponents'] ?? [])
             ->contains(fn (array $component) => in_array('country', $component['types'] ?? [], true) && strtoupper((string) ($component['shortText'] ?? '')) === 'MY');
+    }
+
+    private function isInState(array $place, string $state): bool
+    {
+        $expected = $this->normalisePlaceText($state);
+        $aliases = match ($expected) {
+            'melaka' => ['melaka', 'malacca'],
+            'kuala lumpur' => ['kuala lumpur', 'wilayah persekutuan kuala lumpur', 'federal territory of kuala lumpur'],
+            'putrajaya' => ['putrajaya', 'wilayah persekutuan putrajaya', 'federal territory of putrajaya'],
+            'labuan' => ['labuan', 'wilayah persekutuan labuan', 'federal territory of labuan'],
+            default => [$expected],
+        };
+
+        return collect($place['addressComponents'] ?? [])
+            ->filter(fn (array $component) => in_array('administrative_area_level_1', $component['types'] ?? [], true))
+            ->flatMap(fn (array $component) => [$component['longText'] ?? '', $component['shortText'] ?? ''])
+            ->map(fn (mixed $value) => $this->normalisePlaceText((string) $value))
+            ->filter()
+            ->contains(fn (string $actual) => collect($aliases)->contains(fn (string $alias) => str_contains($actual, $alias) || str_contains($alias, $actual)));
+    }
+
+    private function normalisePlaceText(string $value): string
+    {
+        return trim((string) preg_replace('/\s+/', ' ', strtolower($value)));
     }
 
     private function get(string $path, array $parameters, ?string $fieldMask): Response

@@ -19,6 +19,7 @@ class StoreBookingRequest extends FormRequest
         return [
             'trip_id' => ['required', 'integer', 'exists:trips,trip_id'],
             'pickup_point' => ['required', 'string', 'max:255'],
+            'pickup_place_id' => ['required', 'string', 'max:255'],
             'number_of_seats' => ['required', 'integer', 'min:1'],
         ];
     }
