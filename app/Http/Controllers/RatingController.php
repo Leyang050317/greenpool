@@ -7,6 +7,7 @@ use App\Http\Requests\UpdateRatingRequest;
 use App\Models\Booking;
 use App\Models\Rating;
 use App\Models\User;
+use App\Notifications\RatingReceivedNotification;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -27,18 +28,18 @@ class RatingController extends Controller
             $search = $request->string('search')->trim();
             $query->whereHas('reviewee', fn ($q) => $q->where('name', 'like', "%{$search}%"));
         }
-        if (in_array($request->input('role'), ['driver', 'passenger'], true)) {
-            $query->whereHas('reviewee', fn ($q) => $q->where('role', $request->input('role')));
-        }
+
         $query->orderBy('created_at', $request->input('sort') === 'oldest' ? 'asc' : 'desc');
         $ratings = $query->paginate(8)->withQueryString();
+        $targetRole = $request->user()->role === 'passenger' ? 'driver' : 'passenger';
         $stats = [
             'total' => $request->user()->ratingsGiven()->count(),
-            'drivers' => $request->user()->ratingsGiven()->whereHas('reviewee', fn ($q) => $q->where('role', 'driver'))->count(),
-            'passengers' => $request->user()->ratingsGiven()->whereHas('reviewee', fn ($q) => $q->where('role', 'passenger'))->count(),
+            'rated' => $request->user()->ratingsGiven()
+                ->whereHas('reviewee', fn ($q) => $q->where('role', $targetRole))
+                ->count(),
         ];
 
-        return view('ratings.index', compact('ratings', 'stats'));
+        return view('ratings.index', compact('ratings', 'stats', 'targetRole'));
     }
 
     public function people(Request $request): View
@@ -92,13 +93,22 @@ class RatingController extends Controller
                 ->orWhereHas('reviewer', fn ($reviewer) => $reviewer->where('name', 'like', "%{$search}%")));
         }
 
+        $breakdown = (clone $query)
+            ->selectRaw('score, COUNT(*) as total')
+            ->groupBy('score')
+            ->pluck('total', 'score');
+        $reviewCount = (int) $breakdown->sum();
+        $average = $reviewCount > 0
+            ? round((float) $breakdown->map(fn ($total, $score) => $total * $score)->sum() / $reviewCount, 1)
+            : 0.0;
+
         if ($request->input('sort') === 'highest') $query->orderByDesc('score')->latest();
         elseif ($request->input('sort') === 'lowest') $query->orderBy('score')->latest();
         else $query->latest();
 
         $ratings = $query->paginate(8)->withQueryString();
 
-        return view('ratings.reviews', compact('ratings', 'targetRole'));
+        return view('ratings.reviews', compact('ratings', 'targetRole', 'breakdown', 'reviewCount', 'average'));
     }
 
     public function create(Request $request, Booking $booking): View
@@ -141,6 +151,7 @@ class RatingController extends Controller
             'reviewee_id' => $reviewee->id,
             ...$request->validated(),
         ]);
+        $reviewee->notify(new RatingReceivedNotification($rating->load('reviewer')));
 
         return redirect()->route('ratings.submitted', $rating);
     }
@@ -156,6 +167,7 @@ class RatingController extends Controller
     public function edit(Request $request, Rating $rating): View
     {
         $this->ensureRatingOwnership($request, $rating);
+        abort_unless($rating->isEditable(), 423, 'This rating is locked because the 7-day editing period has ended.');
         $rating->loadMissing(['booking.trip', 'reviewee']);
 
         return view('ratings.edit', compact('rating'));
@@ -163,6 +175,7 @@ class RatingController extends Controller
 
     public function update(UpdateRatingRequest $request, Rating $rating): RedirectResponse
     {
+        abort_unless($rating->isEditable(), 423, 'This rating is locked because the 7-day editing period has ended.');
         $rating->update($request->validated());
 
         return redirect()->route('ratings.history')->with('success', 'Your rating was updated successfully.');
@@ -190,6 +203,11 @@ class RatingController extends Controller
     {
         $booking->loadMissing(['trip.user', 'passenger']);
         abort_unless($booking->booking_status === 'Accepted' && $booking->trip->status === 'Completed', 422, 'Ratings are available after a completed trip.');
+        abort_if(
+            $booking->trip->completed_at?->addDays(7)->isPast(),
+            410,
+            'The 7-day rating period for this trip has expired.'
+        );
         $actor = $request->user();
         if ($actor->id === $booking->passenger_id) return [$booking->trip->user];
         if ($actor->id === $booking->trip->user_id) return [$booking->passenger];

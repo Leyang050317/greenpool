@@ -40,7 +40,12 @@ class PassengerBookingController extends Controller
         $this->ensurePassenger($request);
 
         $query = Trip::query()
-            ->with(['user', 'vehicle'])
+            ->with([
+                'user' => fn ($driver) => $driver
+                    ->withAvg('ratingsReceived', 'score')
+                    ->withCount('ratingsReceived'),
+                'vehicle',
+            ])
             ->where('status', 'Scheduled')
             ->where('available_seats', '>', 0)
             ->where('departure_at', '>=', now())
@@ -71,7 +76,12 @@ class PassengerBookingController extends Controller
 
         if ($request->filled('trip_id')) {
             $trip = Trip::query()
-                ->with(['user', 'vehicle'])
+                ->with([
+                    'user' => fn ($driver) => $driver
+                        ->withAvg('ratingsReceived', 'score')
+                        ->withCount('ratingsReceived'),
+                    'vehicle',
+                ])
                 ->where('status', 'Scheduled')
                 ->where('available_seats', '>', 0)
                 ->findOrFail($request->integer('trip_id'));
@@ -137,7 +147,13 @@ class PassengerBookingController extends Controller
 
         $bookings = $request->user()
             ->bookings()
-            ->with(['trip.user', 'trip.vehicle', 'ratings'])
+            ->with([
+                'trip.user' => fn ($driver) => $driver
+                    ->withAvg('ratingsReceived', 'score')
+                    ->withCount('ratingsReceived'),
+                'trip.vehicle',
+                'ratings',
+            ])
             ->latest()
             ->paginate(8);
 

@@ -17,7 +17,12 @@ class DriverBookingController extends Controller
     public function index(Request $request): View
     {
         $query = Booking::query()
-            ->with(['passenger', 'trip.vehicle'])
+            ->with([
+                'passenger' => fn ($passenger) => $passenger
+                    ->withAvg('ratingsReceived', 'score')
+                    ->withCount('ratingsReceived'),
+                'trip.vehicle',
+            ])
             ->whereHas('trip', fn ($trip) => $trip->where('user_id', $request->user()->id));
 
         if (in_array($request->input('status'), ['Pending', 'Accepted', 'Rejected', 'Cancelled'], true)) {
@@ -31,7 +36,12 @@ class DriverBookingController extends Controller
 
     public function show(Request $request, Booking $booking): View
     {
-        $booking->load(['passenger', 'trip.vehicle']);
+        $booking->load([
+            'passenger' => fn ($passenger) => $passenger
+                ->withAvg('ratingsReceived', 'score')
+                ->withCount('ratingsReceived'),
+            'trip.vehicle',
+        ]);
         $this->ensureDriverOwnsTrip($request, $booking->trip);
 
         return view('driver.booking.show', compact('booking'));

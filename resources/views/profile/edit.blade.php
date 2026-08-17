@@ -36,6 +36,11 @@
                         <h3 class="text-lg font-bold text-gray-900">{{ Auth::user()->name ?? 'Name' }}</h3>
                         <p class="text-sm text-gray-500 mb-1.5">{{ Auth::user()->email ?? 'email@example.com' }}</p>
                         <span class="text-xs font-bold text-[#2E7D32] bg-green-100 px-2 py-1 rounded-md">{{ ucfirst(Auth::user()->role) }}</span>
+                        <a href="{{ route('ratings.received', $user) }}" class="mt-2 flex w-fit items-center gap-1 text-sm font-semibold text-amber-500 hover:text-amber-600">
+                            <x-icons.lucide name="star" class="h-4 w-4 fill-current" />
+                            {{ $user->ratings_received_count > 0 ? number_format((float) $user->ratings_received_avg_score, 1) : 'No rating' }}
+                            <span class="font-normal text-gray-400">({{ $user->ratings_received_count }} {{ Str::plural('review', $user->ratings_received_count) }})</span>
+                        </a>
                     </div>
                 </div>
                 <button @click="currentView = 'edit'" class="flex items-center justify-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
