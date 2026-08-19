@@ -8,7 +8,7 @@
         ['label' => 'Tourist Attractions', 'icon' => 'map-pinned', 'href' => route('attractions.index'), 'active' => request()->routeIs('attractions.*')],
         ['label' => 'Notifications', 'icon' => 'bell', 'href' => route('notifications.index'), 'active' => request()->routeIs('notifications.*'), 'unread' => $unreadNotificationCount > 0],
         ['label' => 'Ratings', 'icon' => 'star', 'href' => route('ratings.index'), 'active' => request()->routeIs('ratings.*')],
-        ['label' => 'Profile', 'icon' => 'user-circle', 'href' => route('profile.edit'), 'active' => request()->routeIs('profile.edit')],
+        ['label' => 'Profile', 'icon' => 'user-circle', 'href' => route('driver.profile.edit'), 'active' => request()->routeIs('driver.profile.*')],
     ];
 
     $bottomNavigation = [
@@ -123,14 +123,18 @@
         </nav>
 
         <a
-            href="{{ route('profile.edit') }}"
+            href="{{ route('driver.profile.edit') }}"
             @click="if (mobileDrawerOpen) closeMobileDrawer()"
             class="mt-3 flex min-h-[64px] items-center rounded-xl border border-slate-200 bg-slate-50 p-2.5 transition duration-150 hover:border-green-200 hover:bg-green-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2E7D32] focus-visible:ring-offset-2"
             aria-label="View driver profile for {{ Auth::user()->name }}"
             title="{{ Auth::user()->name }} — Driver"
         >
-            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#2E7D32] text-sm font-semibold text-white">
-                {{ $initials ?: 'D' }}
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#2E7D32] text-sm font-semibold text-white">
+                @if (Auth::user()->photo)
+                    <img src="{{ asset('storage/'.Auth::user()->photo) }}" alt="Profile photo for {{ Auth::user()->name }}" class="h-full w-full object-cover">
+                @else
+                    {{ $initials ?: 'D' }}
+                @endif
             </span>
             <span x-show="sidebarExpanded || mobileDrawerOpen" x-transition.opacity.duration.150ms class="ml-3 min-w-0">
                 <span class="block truncate text-sm font-semibold text-[#1F2D3D]">{{ Auth::user()->name }}</span>

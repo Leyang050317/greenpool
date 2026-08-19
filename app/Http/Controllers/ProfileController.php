@@ -18,14 +18,30 @@ class ProfileController extends Controller
             ->loadAvg('ratingsReceived', 'score')
             ->loadCount('ratingsReceived');
 
+        $canManagePassword = ! $user->usesGoogleAuthentication()
+            && $request->session()->get('auth_provider') !== 'google';
+
+        $recentLogins = $user->loginHistories()
+            ->latest('login_at')
+            ->latest('id')
+            ->limit(5)
+            ->get();
+        $profileCompleteness = $user->profileCompleteness();
+
         if ($request->user()->role === 'passenger') {
             return view('passenger.profile', [
                 'user' => $user,
+                'canManagePassword' => $canManagePassword,
+                'recentLogins' => $recentLogins,
+                'profileCompleteness' => $profileCompleteness,
             ]);
         }
 
         return view('profile.edit', [
             'user' => $user,
+            'canManagePassword' => $canManagePassword,
+            'recentLogins' => $recentLogins,
+            'profileCompleteness' => $profileCompleteness,
         ]);
     }
 

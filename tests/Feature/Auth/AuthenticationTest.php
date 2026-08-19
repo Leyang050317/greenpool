@@ -27,7 +27,7 @@ class AuthenticationTest extends TestCase
         ]);
 
         $this->assertAuthenticated();
-        $response->assertRedirect(route('dashboard', absolute: false));
+        $response->assertRedirect(route('passenger.home', absolute: false));
     }
 
     public function test_users_can_not_authenticate_with_invalid_password(): void
@@ -40,6 +40,20 @@ class AuthenticationTest extends TestCase
         ]);
 
         $this->assertGuest();
+    }
+
+    public function test_unverified_user_is_sent_to_email_verification_after_login(): void
+    {
+        $user = User::factory()->unverified()->create([
+            'email' => 'unverified@example.com',
+        ]);
+
+        $this->post('/login', [
+            'email' => $user->email,
+            'password' => 'password',
+        ])->assertRedirect(route('verification.notice', absolute: false));
+
+        $this->assertAuthenticatedAs($user);
     }
 
     public function test_users_can_logout(): void

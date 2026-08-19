@@ -59,6 +59,31 @@
             <circle cx="12" cy="12" r="10" />
             <path d="m9 12 2 2 4-4" />
             @break
+        @case('chart-no-axes-combined')
+            <path d="M4 19V5" />
+            <path d="M4 19h16" />
+            <path d="m7 15 4-4 3 2 4-5" />
+            <circle cx="7" cy="15" r="1" />
+            <circle cx="11" cy="11" r="1" />
+            <circle cx="14" cy="13" r="1" />
+            <circle cx="18" cy="8" r="1" />
+            @break
+        @case('smartphone')
+            <rect width="12" height="20" x="6" y="2" rx="2" />
+            <path d="M10 18h4" />
+            @break
+        @case('monitor')
+            <rect width="18" height="12" x="3" y="3" rx="2" />
+            <path d="M8 21h8M12 15v6" />
+            @break
+        @case('shield-check')
+            <path d="M20 13c0 5-3.5 7.5-8 9-4.5-1.5-8-4-8-9V5l8-3 8 3Z" />
+            <path d="m9 12 2 2 4-4" />
+            @break
+        @case('badge-check')
+            <path d="M12 3a3 3 0 0 0 4.24 1.76A3 3 0 0 0 19.24 8 3 3 0 0 0 21 12a3 3 0 0 0-1.76 4.24A3 3 0 0 0 16 19.24 3 3 0 0 0 12 21a3 3 0 0 0-4.24-1.76A3 3 0 0 0 4.76 16 3 3 0 0 0 3 12a3 3 0 0 0 1.76-4.24A3 3 0 0 0 8 4.76 3 3 0 0 0 12 3Z" />
+            <path d="m9 12 2 2 4-4" />
+            @break
         @case('star')
             <path d="m12 2 3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z" />
             @break
@@ -70,6 +95,9 @@
             @break
         @case('arrow-up-right')
             <path d="M7 17 17 7M7 7h10v10" />
+            @break
+        @case('arrow-down-right')
+            <path d="m7 7 10 10M17 17V7M17 17H7" />
             @break
         @case('arrow-left')
             <path d="M19 12H5M11 18l-6-6 6-6" />
@@ -93,6 +121,50 @@
         @case('eye')
             <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12" />
             <circle cx="12" cy="12" r="3" />
+            @break
+        @case('check')
+            <path d="m5 12 4 4L19 6" />
+            @break
+        @case('circle-alert')
+            <circle cx="12" cy="12" r="10" />
+            <path d="M12 8v4M12 16h.01" />
+            @break
+        @case('circle-x')
+            <circle cx="12" cy="12" r="10" />
+            <path d="m15 9-6 6M9 9l6 6" />
+            @break
+        @case('clock-3')
+            <circle cx="12" cy="12" r="9" />
+            <path d="M12 7v5h4" />
+            @break
+        @case('filter')
+            <path d="M4 5h16M7 12h10M10 19h4" />
+            @break
+        @case('history')
+            <path d="M3 12a9 9 0 1 0 3-6.7" />
+            <path d="M3 4v5h5M12 7v5l3 2" />
+            @break
+        @case('image-up')
+            <rect width="18" height="18" x="3" y="3" rx="2" />
+            <circle cx="8.5" cy="8.5" r="1.5" />
+            <path d="m21 15-5-5L5 21M15 5v4M13 7h4" />
+            @break
+        @case('lock')
+            <rect width="14" height="11" x="5" y="11" rx="2" />
+            <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+            @break
+        @case('lock-keyhole')
+            <rect width="14" height="11" x="5" y="11" rx="2" />
+            <path d="M8 11V7a4 4 0 0 1 8 0v4M12 15v3" />
+            <circle cx="12" cy="15" r="1" />
+            @break
+        @case('mail')
+            <rect width="18" height="14" x="3" y="5" rx="2" />
+            <path d="m3 7 9 6 9-6" />
+            @break
+        @case('send')
+            <path d="m22 2-7 20-4-9-9-4Z" />
+            <path d="M22 2 11 13" />
             @break
         @case('pencil')
             <path d="M12 20h9" />

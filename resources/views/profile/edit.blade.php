@@ -67,6 +67,7 @@
 
             <h4 class="text-sm font-bold text-gray-700 mb-3">Account</h4>
             <div class="bg-white rounded-xl shadow-sm border border-gray-200 divide-y divide-gray-100">
+                @if ($canManagePassword)
                 <button type="button" @click="currentView = 'password'" class="w-full flex items-center justify-between px-6 py-4 hover:bg-gray-50 transition-colors rounded-t-xl group text-left">
                     <div class="flex items-center">
                         <svg class="w-5 h-5 text-gray-400 mr-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
@@ -77,6 +78,7 @@
                     </div>
                     <svg class="w-5 h-5 text-gray-300 group-hover:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
                 </button>
+                @endif
                 
                 <button type="button" @click="currentView = 'settings'" class="w-full flex items-center justify-between px-6 py-4 hover:bg-gray-50 transition-colors group text-left">
                     <div class="flex items-center">
@@ -193,6 +195,7 @@
             </div>
         </div>
 
+        @if ($canManagePassword)
         <!-- PASSWORD VIEW -->
         <div x-show="currentView === 'password'" x-cloak x-transition.opacity class="max-w-2xl mx-auto">
             <div class="flex items-center mb-6">
@@ -245,6 +248,7 @@
                 </form>
             </div>
         </div>
+        @endif
 
         <!-- SETTINGS VIEW -->
         <div x-show="currentView === 'settings'" x-cloak x-transition.opacity class="max-w-2xl mx-auto">
@@ -270,6 +274,7 @@
                 </div>
             </div>
 
+            @if ($canManagePassword)
             <h4 class="text-sm font-bold text-gray-700 mb-3">Security</h4>
             <div class="bg-white rounded-xl shadow-sm border border-gray-200 mb-8">
                 <button type="button" @click="currentView = 'password'" class="w-full flex items-center justify-between px-6 py-4 hover:bg-gray-50 transition-colors rounded-xl group text-left">
@@ -283,6 +288,7 @@
                     <svg class="w-5 h-5 text-gray-300 group-hover:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
                 </button>
             </div>
+            @endif
 
             <h4 class="text-sm font-bold text-red-500 mb-3">Danger Zone</h4>
             <div class="bg-white rounded-xl shadow-sm border border-red-200 divide-y divide-red-100">
