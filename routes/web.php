@@ -3,13 +3,16 @@
 use App\Http\Controllers\AttractionController;
 use App\Http\Controllers\Driver\DriverBookingController;
 use App\Http\Controllers\Driver\HomeController as DriverHomeController;
+use App\Http\Controllers\Driver\ProfileController as DriverProfileController;
 use App\Http\Controllers\Driver\TripController;
 use App\Http\Controllers\Driver\VehicleController;
 use App\Http\Controllers\Passenger\HomeController as PassengerHomeController;
 use App\Http\Controllers\Passenger\PassengerBookingController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\PhoneVerificationController;
 use App\Http\Controllers\RatingController;
+use App\Http\Controllers\Auth\LinkedAccountController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
@@ -25,6 +28,14 @@ Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+    Route::post('/phone-verification/send', [PhoneVerificationController::class, 'send'])
+        ->name('phone-verification.send');
+    Route::post('/phone-verification/verify', [PhoneVerificationController::class, 'verify'])
+        ->name('phone-verification.verify');
+    Route::get('/linked-accounts/google', [LinkedAccountController::class, 'redirectToGoogle'])
+        ->name('linked-accounts.google.redirect');
+    Route::delete('/linked-accounts/google', [LinkedAccountController::class, 'destroy'])
+        ->name('linked-accounts.google.destroy');
 });
 
 Route::middleware(['auth', 'verified'])->group(function () {
@@ -76,6 +87,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('passenger.bookings.cancel');
 
     Route::middleware('driver')->prefix('driver')->name('driver.')->group(function () {
+        Route::get('profile', [DriverProfileController::class, 'edit'])->name('profile.edit');
+        Route::patch('profile', [DriverProfileController::class, 'update'])->name('profile.update');
+        Route::put('profile/preferences', [DriverProfileController::class, 'updatePreferences'])
+            ->name('profile.preferences.update');
         Route::get('booking', [DriverBookingController::class, 'index'])
             ->name('booking-requests.index');
         Route::get('booking/{booking}', [DriverBookingController::class, 'show'])
@@ -101,15 +116,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
 });
 
-Route::view('/email-verified', 'auth.verification-success')
-    ->name('verification.success');
-
 require __DIR__.'/auth.php';
 
 use App\Http\Controllers\Auth\GoogleLoginController;
 
 Route::get('/auth/google', [GoogleLoginController::class, 'redirectToGoogle'])->name('auth.google');
-Route::get('/auth/google/callback', [GoogleLoginController::class, 'handleGoogleCallback']);
+Route::get('/auth/google/callback', [GoogleLoginController::class, 'handleGoogleCallback'])->name('auth.google.callback');
 
 Route::get('/auth/google/role', [App\Http\Controllers\Auth\GoogleLoginController::class, 'showRoleSelection'])->name('auth.google.role');
 Route::post('/auth/google/role', [App\Http\Controllers\Auth\GoogleLoginController::class, 'storeRole'])->name('auth.google.storeRole');

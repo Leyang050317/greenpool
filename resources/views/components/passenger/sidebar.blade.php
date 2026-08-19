@@ -83,7 +83,13 @@
         </nav>
 
         <a href="{{ route('profile.edit') }}" @click="if (mobileDrawerOpen) closeMobileDrawer()" class="mt-3 flex min-h-[64px] items-center rounded-xl border border-slate-200 bg-slate-50 p-2.5 transition duration-150 hover:border-green-200 hover:bg-green-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2E7D32] focus-visible:ring-offset-2" aria-label="View passenger profile for {{ Auth::user()->name }}" title="{{ Auth::user()->name }} - Passenger">
-            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#2E7D32] text-sm font-semibold text-white">{{ $initials ?: 'P' }}</span>
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#2E7D32] text-sm font-semibold text-white">
+                @if (Auth::user()->photo)
+                    <img src="{{ asset('storage/'.Auth::user()->photo) }}" alt="Profile photo for {{ Auth::user()->name }}" class="h-full w-full object-cover">
+                @else
+                    {{ $initials ?: 'P' }}
+                @endif
+            </span>
             <span x-show="sidebarExpanded || mobileDrawerOpen" x-transition.opacity.duration.150ms class="ml-3 min-w-0">
                 <span class="block truncate text-sm font-semibold text-[#1F2D3D]">{{ Auth::user()->name }}</span>
                 <span class="mt-0.5 inline-flex rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-semibold text-[#2E7D32]">Passenger</span>

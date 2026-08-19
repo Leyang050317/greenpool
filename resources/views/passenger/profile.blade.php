@@ -8,9 +8,10 @@
     </style>
 
     <div class="max-w-5xl mx-auto p-8 relative" x-data="{
-        currentView: '{{ $errors->updatePassword->isNotEmpty() ? 'password' : ($errors->userDeletion->isNotEmpty() ? 'settings' : ($errors->isNotEmpty() ? 'edit' : 'main')) }}',
-        showToast: {{ session('status') === 'password-updated' || session('status') === 'profile-updated' ? 'true' : 'false' }},
+        currentView: '{{ $errors->has('otp') || $errors->has('phone_number') ? 'main' : ($errors->updatePassword->isNotEmpty() ? 'password' : ($errors->userDeletion->isNotEmpty() ? 'settings' : ($errors->isNotEmpty() ? 'edit' : 'main'))) }}',
+        showToast: {{ in_array(session('status'), ['password-updated', 'profile-updated', 'google-account-linked', 'google-account-unlinked'], true) ? 'true' : 'false' }},
         showLogoutModal: false,
+        showDisconnectGoogleModal: false,
         showDeleteModal: {{ $errors->userDeletion->isNotEmpty() ? 'true' : 'false' }},
         init() {
             if (this.showToast) {
@@ -23,6 +24,8 @@
                 <h1 class="text-2xl font-bold text-gray-900">My Profile</h1>
                 <p class="text-sm text-gray-500 mt-1">View and manage your passenger account information.</p>
             </div>
+
+            <div class="mb-6"><x-profile-completeness-card :profile-completeness="$profileCompleteness" /></div>
 
             <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex items-center justify-between mb-6">
                 <div class="flex items-center">
@@ -66,8 +69,13 @@
                 </div>
             </div>
 
+            <div class="mb-8">
+                <x-phone-verification-card :user="$user" />
+            </div>
+
             <h4 class="text-sm font-bold text-gray-700 mb-3">Account</h4>
             <div class="bg-white rounded-xl shadow-sm border border-gray-200 divide-y divide-gray-100">
+                @if ($canManagePassword)
                 <button type="button" @click="currentView = 'password'" class="w-full flex items-center justify-between px-6 py-4 hover:bg-gray-50 transition-colors rounded-t-xl group text-left">
                     <div class="flex items-center">
                         <svg class="w-5 h-5 text-gray-400 mr-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
@@ -78,6 +86,7 @@
                     </div>
                     <svg class="w-5 h-5 text-gray-300 group-hover:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
                 </button>
+                @endif
 
                 <button type="button" @click="currentView = 'settings'" class="w-full flex items-center justify-between px-6 py-4 hover:bg-gray-50 transition-colors group text-left">
                     <div class="flex items-center">
@@ -183,6 +192,7 @@
             </div>
         </div>
 
+        @if ($canManagePassword)
         <div x-show="currentView === 'password'" x-cloak x-transition.opacity class="max-w-2xl mx-auto">
             <div class="flex items-center mb-6">
                 <button type="button" @click="currentView = 'main'" class="text-gray-400 hover:text-gray-600 mr-4">
@@ -234,6 +244,7 @@
                 </form>
             </div>
         </div>
+        @endif
 
         <div x-show="currentView === 'settings'" x-cloak x-transition.opacity class="max-w-2xl mx-auto">
             <div class="flex items-center mb-6">
@@ -258,6 +269,30 @@
                 </div>
             </div>
 
+            <h4 class="text-sm font-bold text-gray-700 mb-3">Linked Accounts</h4>
+            <div class="mb-8"><x-linked-accounts.google-card :user="$user" /></div>
+
+            <h4 class="text-sm font-bold text-gray-700 mb-3">Recent Login Activity</h4>
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 mb-8 px-6 py-2">
+                @forelse ($recentLogins as $login)
+                    <div class="flex items-center gap-4 border-b border-gray-100 py-4 last:border-b-0">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-green-50 text-[#2E7D32]">
+                            <x-icons.lucide :name="str_starts_with($login->user_agent, 'Mozilla/5.0 (iPhone') || str_contains($login->user_agent, 'Android') ? 'smartphone' : 'monitor'" class="h-5 w-5" />
+                        </span>
+                        <div class="min-w-0 flex-1">
+                            <p class="truncate text-sm font-semibold text-gray-900">{{ \App\Support\UserAgentParser::describe($login->user_agent) }}</p>
+                            <p class="mt-1 text-xs text-gray-500">{{ $login->ip_address }} · {{ $login->login_at->format('M d, Y - H:i') }}</p>
+                        </div>
+                    </div>
+                @empty
+                    <div class="py-6 text-center">
+                        <span class="mx-auto flex h-10 w-10 items-center justify-center rounded-lg bg-gray-100 text-gray-400"><x-icons.lucide name="shield-check" class="h-5 w-5" /></span>
+                        <p class="mt-3 text-sm font-semibold text-gray-700">No login activity yet</p>
+                        <p class="mt-1 text-xs text-gray-500">Your successful sign-ins will appear here.</p>
+                    </div>
+                @endforelse
+            </div>
+
             <h4 class="text-sm font-bold text-red-500 mb-3">Danger Zone</h4>
             <div class="bg-white rounded-xl shadow-sm border border-red-200 px-6 py-5">
                 <div class="flex items-start">
@@ -277,7 +312,7 @@
 
         <div x-show="showToast" x-cloak x-transition.opacity.duration.300ms class="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-40">
             <div class="flex items-center bg-gray-900 text-white px-5 py-3 rounded-xl shadow-lg">
-                <span class="text-sm font-medium whitespace-nowrap">{{ session('status') === 'password-updated' ? 'Password updated successfully.' : 'Profile updated successfully.' }}</span>
+                <span class="text-sm font-medium whitespace-nowrap">{{ match(session('status')) { 'password-updated' => 'Password updated successfully.', 'google-account-linked' => 'Google account connected successfully.', 'google-account-unlinked' => 'Google account disconnected successfully.', default => 'Profile updated successfully.' } }}</span>
                 <button @click="showToast = false" class="ml-6 text-gray-400 hover:text-white transition-colors focus:outline-none">X</button>
             </div>
         </div>

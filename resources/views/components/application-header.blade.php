@@ -59,12 +59,16 @@
         </a>
 
         <a
-            href="{{ route('profile.edit') }}"
-            class="flex h-10 w-10 items-center justify-center rounded-full bg-[#2E7D32] text-sm font-bold text-white transition-colors duration-150 hover:bg-[#256b29] active:bg-[#1f5b23] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2E7D32] focus-visible:ring-offset-2"
+            href="{{ Auth::user()->role === 'driver' ? route('driver.profile.edit') : route('profile.edit') }}"
+            class="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-[#2E7D32] text-sm font-bold text-white transition-colors duration-150 hover:bg-[#256b29] active:bg-[#1f5b23] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2E7D32] focus-visible:ring-offset-2"
             aria-label="Open profile for {{ Auth::user()->name }}"
             title="{{ Auth::user()->name }}"
         >
-            {{ $initials ?: 'U' }}
+            @if (Auth::user()->photo)
+                <img src="{{ asset('storage/'.Auth::user()->photo) }}" alt="Profile photo for {{ Auth::user()->name }}" class="h-full w-full object-cover">
+            @else
+                {{ $initials ?: 'U' }}
+            @endif
         </a>
     </div>
 </header>

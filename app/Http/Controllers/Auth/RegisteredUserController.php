@@ -48,10 +48,6 @@ class RegisteredUserController extends Controller
 
         \Illuminate\Support\Facades\Auth::login($user);
 
-        if ($user->role === 'driver') {
-            return redirect(route('driver.home'));
-        }
-
-        return redirect(route('passenger.home'));
+        return redirect()->route('verification.notice');
     }
 }

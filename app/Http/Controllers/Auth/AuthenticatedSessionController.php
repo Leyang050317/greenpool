@@ -27,8 +27,13 @@ class AuthenticatedSessionController extends Controller
             $request->authenticate();
 
             $request->session()->regenerate();
+            $request->session()->put('auth_provider', 'password');
 
             $user = $request->user();
+
+            if (! $user->hasVerifiedEmail()) {
+                return redirect()->route('verification.notice');
+            }
 
             if ($user->role === 'driver') {
                 return redirect()->route('driver.home');
