@@ -118,8 +118,10 @@ class GooglePlacesService
 
     private function isMalaysian(array $place): bool
     {
-        return collect($place['addressComponents'] ?? [])
+        $hasCountryComponent = collect($place['addressComponents'] ?? [])
             ->contains(fn (array $component) => in_array('country', $component['types'] ?? [], true) && strtoupper((string) ($component['shortText'] ?? '')) === 'MY');
+
+        return $hasCountryComponent || str_contains($this->normalisePlaceText((string) data_get($place, 'formattedAddress')), 'malaysia');
     }
 
     private function isInState(array $place, string $state): bool
@@ -133,12 +135,20 @@ class GooglePlacesService
             default => [$expected],
         };
 
-        return collect($place['addressComponents'] ?? [])
+        $componentMatches = collect($place['addressComponents'] ?? [])
             ->filter(fn (array $component) => in_array('administrative_area_level_1', $component['types'] ?? [], true))
             ->flatMap(fn (array $component) => [$component['longText'] ?? '', $component['shortText'] ?? ''])
             ->map(fn (mixed $value) => $this->normalisePlaceText((string) $value))
             ->filter()
             ->contains(fn (string $actual) => collect($aliases)->contains(fn (string $alias) => str_contains($actual, $alias) || str_contains($alias, $actual)));
+
+        if ($componentMatches) {
+            return true;
+        }
+
+        $address = $this->normalisePlaceText((string) data_get($place, 'formattedAddress'));
+
+        return collect($aliases)->contains(fn (string $alias) => str_contains($address, $alias));
     }
 
     private function normalisePlaceText(string $value): string
