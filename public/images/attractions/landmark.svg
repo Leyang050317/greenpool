@@ -1,6 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" role="img" aria-label="Landmark illustration">
-  <rect width="800" height="600" fill="#e0f2fe"/><circle cx="640" cy="110" r="55" fill="#fde68a"/>
-  <path d="M0 480 160 405l110 40 100-95 105 85 105-145 120 190v120H0Z" fill="#7dd3fc"/>
-  <path d="M305 470V190l50-105 50 105v280m-70-200h40m-40 85h40M470 470V125l42-90 42 90v345m-60-225h36m-36 90h36" fill="#2563eb"/>
-  <rect x="0" y="470" width="800" height="130" fill="#1e40af"/><text x="400" y="550" text-anchor="middle" font-family="Arial,sans-serif" font-size="30" font-weight="700" fill="white">Malaysian Landmark</text>
-</svg>

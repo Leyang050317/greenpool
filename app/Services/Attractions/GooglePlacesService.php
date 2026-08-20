@@ -13,13 +13,7 @@ use Throwable;
 
 class GooglePlacesService
 {
-    /**
-     * Returns a non-persistent preview of Google tourist-attraction matches for
-     * a Malaysian state. Photo names are deliberately not stored because they
-     * expire and Google does not permit caching them.
-     *
-     * @return array<int, array<string, mixed>>
-     */
+    /** @return array<int, array<string, mixed>> */
     public function previewTouristAttractions(string $state, int $pageSize = 20): array
     {
         $response = $this->post('/places:searchText', [
@@ -28,10 +22,12 @@ class GooglePlacesService
             'strictTypeFiltering' => true,
             'pageSize' => min(max($pageSize, 1), 20),
             'regionCode' => 'MY',
-        ], 'places.id,places.displayName,places.addressComponents,places.location,places.primaryType,places.photos');
+        ], $this->touristAttractionFieldMask());
 
         return collect($response->json('places', []))
             ->filter(fn (array $place) => $this->isMalaysian($place) && $this->isInState($place, $state))
+            ->filter(fn (array $place) => filled(data_get($place, 'photos.0.name')))
+            ->sortByDesc(fn (array $place) => $this->popularityScore($place))
             ->values()
             ->all();
     }
@@ -39,17 +35,74 @@ class GooglePlacesService
     public function detailsFor(Attraction $attraction): array
     {
         $attraction->loadMissing('detail');
-        $placeId = $attraction->detail?->google_place_id ?? $this->findAndSavePlaceId($attraction);
+        $placeId = $attraction->detail?->google_place_id;
         if (! $placeId) {
-            throw new RuntimeException('No verified Malaysian Google Place match was found for this attraction.');
+            throw new RuntimeException('This attraction does not have a verified Google Place ID. Run the Google attraction import again.');
         }
 
-        return $this->get('/places/'.$placeId, [], 'displayName,formattedAddress,photos,editorialSummary,regularOpeningHours,nationalPhoneNumber,internationalPhoneNumber,websiteUri,googleMapsUri')->json();
+        return $this->detailsByPlaceId($placeId);
+    }
+
+    /** @return array<int, array{place_id: string, text: string}> */
+    public function autocompleteTouristAttractions(string $input): array
+    {
+        $response = $this->post('/places:autocomplete', [
+            'input' => $input,
+            'includedRegionCodes' => ['my'],
+            'includedPrimaryTypes' => ['tourist_attraction'],
+            'includeQueryPredictions' => false,
+        ], 'suggestions.placePrediction.placeId,suggestions.placePrediction.text.text');
+
+        return collect($response->json('suggestions', []))
+            ->map(fn (array $suggestion) => [
+                'place_id' => (string) data_get($suggestion, 'placePrediction.placeId'),
+                'text' => (string) data_get($suggestion, 'placePrediction.text.text'),
+            ])
+            ->filter(fn (array $suggestion) => filled($suggestion['place_id']) && filled($suggestion['text']))
+            ->take(5)
+            ->values()
+            ->all();
+    }
+
+    /** @return array<string, mixed> */
+    public function detailsByPlaceId(string $placeId): array
+    {
+        $place = $this->get($this->placePath($placeId), [], 'id,displayName,formattedAddress,addressComponents,location,primaryType,photos,editorialSummary,regularOpeningHours,nationalPhoneNumber,internationalPhoneNumber,websiteUri,googleMapsUri')->json();
+
+        if (! $this->isMalaysian($place)) {
+            throw new RuntimeException('The selected attraction must be in Malaysia.');
+        }
+
+        return $place;
+    }
+
+    public function stateFor(array $place): ?string
+    {
+        $state = collect($place['addressComponents'] ?? [])
+            ->first(fn (array $component) => in_array('administrative_area_level_1', $component['types'] ?? [], true));
+        $raw = trim((string) ($state['longText'] ?? $state['shortText'] ?? ''));
+        $normalised = $this->normalisePlaceText($raw);
+
+        return match ($normalised) {
+            'malacca' => 'Melaka',
+            'wilayah persekutuan kuala lumpur', 'federal territory of kuala lumpur' => 'Kuala Lumpur',
+            'wilayah persekutuan putrajaya', 'federal territory of putrajaya' => 'Putrajaya',
+            'wilayah persekutuan labuan', 'federal territory of labuan' => 'Labuan',
+            '' => null,
+            default => $raw,
+        };
     }
 
     public function photo(string $photoName): Response
     {
         return $this->get('/'.$photoName.'/media', ['maxWidthPx' => 1200], null);
+    }
+
+    private function placePath(string $placeId): string
+    {
+        $placeId = ltrim(trim($placeId), '/');
+
+        return str_starts_with($placeId, 'places/') ? '/'.$placeId : '/places/'.$placeId;
     }
 
     public function photoFor(Attraction $attraction): Response
@@ -61,33 +114,6 @@ class GooglePlacesService
         }
 
         return $this->photo($photoName);
-    }
-
-    private function findAndSavePlaceId(Attraction $attraction): ?string
-    {
-        $detail = $attraction->detail;
-        if (! $detail) {
-            return null;
-        }
-        $payload = ['textQuery' => "{$attraction->attraction_name}, {$attraction->state}, Malaysia", 'pageSize' => 5];
-        if ($detail?->latitude !== null && $detail?->longitude !== null) {
-            $payload['locationBias'] = ['circle' => ['center' => ['latitude' => $detail->latitude, 'longitude' => $detail->longitude], 'radius' => 5000.0]];
-        }
-
-        $response = $this->post('/places:searchText', $payload, 'places.id,places.displayName,places.addressComponents,places.location');
-        $place = collect($response->json('places', []))
-            ->filter(fn (array $place) => $this->isMalaysian($place) && $this->nameScore($attraction->attraction_name, data_get($place, 'displayName.text', '')) >= 75)
-            ->sortByDesc(fn (array $place) => $this->nameScore($attraction->attraction_name, data_get($place, 'displayName.text', '')))
-            ->first();
-
-        if (! $place) {
-            return null;
-        }
-
-        $placeId = $place['id'];
-        $attraction->detail->update(['google_place_id' => $placeId]);
-
-        return $placeId;
     }
 
     private function isMalaysian(array $place): bool
@@ -175,18 +201,16 @@ class GooglePlacesService
         });
     }
 
-    private function nameScore(string $left, string $right): float
+    private function touristAttractionFieldMask(): string
     {
-        $left = preg_replace('/[^a-z0-9]+/', '', strtolower($left)) ?? '';
-        $right = preg_replace('/[^a-z0-9]+/', '', strtolower($right)) ?? '';
-        if ($left === '' || $right === '') {
-            return 0;
-        }
-        if (str_contains($left, $right) || str_contains($right, $left)) {
-            return 100;
-        }
-        similar_text($left, $right, $score);
+        return 'places.id,places.displayName,places.formattedAddress,places.addressComponents,places.location,places.primaryType,places.photos,places.rating,places.userRatingCount';
+    }
 
-        return $score;
+    private function popularityScore(array $place): float
+    {
+        $rating = (float) data_get($place, 'rating', 0);
+        $reviews = max(0, (int) data_get($place, 'userRatingCount', 0));
+
+        return ($rating * 100) + min(log10($reviews + 1) * 45, 200);
     }
 }

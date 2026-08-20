@@ -56,6 +56,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('/attractions', [AttractionController::class, 'index'])
         ->name('attractions.index');
+    Route::get('/attractions/autocomplete', [AttractionController::class, 'autocomplete'])
+        ->name('attractions.autocomplete');
+    Route::get('/attractions/google-place', [AttractionController::class, 'openGooglePlace'])
+        ->name('attractions.google-place');
     Route::get('/attractions/{attraction}/google-photo', [AttractionController::class, 'googlePhoto'])
         ->name('attractions.google-photo');
     Route::get('/attractions/{attraction}/google-card-photo', [AttractionController::class, 'googleCardPhoto'])
