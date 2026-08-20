@@ -19,7 +19,9 @@ use Illuminate\View\View;
 
 class PassengerBookingController extends Controller
 {
-    private const DESTINATION_RADIUS_KM = 10;
+    private const DESTINATION_FILTER_RADIUS_KM = 20;
+    private const DESTINATION_CLOSE_RADIUS_KM = 5;
+    private const DESTINATION_NEAR_RADIUS_KM = 10;
 
     public function __construct(private readonly TripLocationService $tripLocationService) {}
 
@@ -51,8 +53,11 @@ class PassengerBookingController extends Controller
             ->where('departure_at', '>=', now())
             ->where('user_id', '!=', $request->user()->id);
 
+        $rankBySearchScore = false;
+
         if ($request->filled('destination')) {
             $this->applyDestinationSearch($query, $request);
+            $rankBySearchScore = true;
         }
 
         if ($request->filled('travel_date')) {
@@ -61,6 +66,10 @@ class PassengerBookingController extends Controller
 
         if ($request->filled('passengers')) {
             $query->where('available_seats', '>=', $request->integer('passengers'));
+        }
+
+        if ($rankBySearchScore) {
+            $query->orderByDesc('search_score');
         }
 
         $trips = $query->orderBy('departure_at')->paginate(6)->withQueryString();
@@ -216,21 +225,89 @@ class PassengerBookingController extends Controller
                     $query->whereNotNull('destination_latitude')
                         ->whereNotNull('destination_longitude')
                         ->whereRaw(
-                            '(6371 * acos(
-                                cos(radians(?)) * cos(radians(destination_latitude)) *
-                                cos(radians(destination_longitude) - radians(?)) +
-                                sin(radians(?)) * sin(radians(destination_latitude))
-                            )) <= ?',
+                            $this->destinationDistanceSql().' <= ?',
                             [
                                 $selectedLocation['latitude'],
                                 $selectedLocation['longitude'],
                                 $selectedLocation['latitude'],
-                                self::DESTINATION_RADIUS_KM,
+                                self::DESTINATION_FILTER_RADIUS_KM,
                             ]
                         );
                 });
             }
         });
+
+        $this->addDestinationSearchScore($query, $request, $destination, $keywords, $selectedLocation);
+    }
+
+    /**
+     * @param list<string> $keywords
+     */
+    private function addDestinationSearchScore($query, Request $request, string $destination, array $keywords, ?array $selectedLocation): void
+    {
+        $scoreParts = ['CASE WHEN LOWER(destination) LIKE ? THEN 50 ELSE 0 END'];
+        $bindings = ['%'.strtolower($destination).'%'];
+
+        foreach ($keywords as $keyword) {
+            $scoreParts[] = 'CASE WHEN LOWER(destination) LIKE ? THEN 20 ELSE 0 END';
+            $bindings[] = '%'.strtolower($keyword).'%';
+        }
+
+        if ($selectedLocation) {
+            $distanceSql = $this->destinationDistanceSql();
+            $scoreParts[] = "CASE
+                WHEN destination_latitude IS NOT NULL AND destination_longitude IS NOT NULL AND {$distanceSql} <= ? THEN 40
+                WHEN destination_latitude IS NOT NULL AND destination_longitude IS NOT NULL AND {$distanceSql} <= ? THEN 30
+                WHEN destination_latitude IS NOT NULL AND destination_longitude IS NOT NULL AND {$distanceSql} <= ? THEN 15
+                ELSE 0
+            END";
+            $bindings = [
+                ...$bindings,
+                ...$this->destinationDistanceBindings($selectedLocation),
+                self::DESTINATION_CLOSE_RADIUS_KM,
+                ...$this->destinationDistanceBindings($selectedLocation),
+                self::DESTINATION_NEAR_RADIUS_KM,
+                ...$this->destinationDistanceBindings($selectedLocation),
+                self::DESTINATION_FILTER_RADIUS_KM,
+            ];
+        }
+
+        if ($request->filled('travel_date')) {
+            $scoreParts[] = 'CASE WHEN DATE(departure_at) = ? THEN 20 ELSE 0 END';
+            $bindings[] = $request->input('travel_date');
+        }
+
+        if ($request->filled('passengers')) {
+            $scoreParts[] = 'CASE WHEN available_seats >= ? THEN 10 ELSE 0 END';
+            $bindings[] = $request->integer('passengers');
+        }
+
+        $ratingAverageSql = '(SELECT AVG(score) FROM ratings WHERE ratings.reviewee_id = trips.user_id)';
+        $scoreParts[] = "CASE
+            WHEN COALESCE({$ratingAverageSql}, 0) >= 4.5 THEN 10
+            WHEN COALESCE({$ratingAverageSql}, 0) >= 4 THEN 5
+            ELSE 0
+        END";
+
+        $query->addSelect('trips.*')->selectRaw('('.implode(' + ', $scoreParts).') AS search_score', $bindings);
+    }
+
+    private function destinationDistanceSql(): string
+    {
+        return '(6371 * acos(
+            cos(radians(?)) * cos(radians(destination_latitude)) *
+            cos(radians(destination_longitude) - radians(?)) +
+            sin(radians(?)) * sin(radians(destination_latitude))
+        ))';
+    }
+
+    private function destinationDistanceBindings(array $location): array
+    {
+        return [
+            $location['latitude'],
+            $location['longitude'],
+            $location['latitude'],
+        ];
     }
 
     /**

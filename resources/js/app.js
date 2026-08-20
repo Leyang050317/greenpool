@@ -31,6 +31,11 @@ const subscribeToBookingUpdates = () => {
         window.Echo.private(`passenger.${userId}`)
             .listen('BookingStatusUpdated', refreshBookingPage);
     }
+
+    if (userRole === 'passenger' && path.startsWith('/passenger/booking')) {
+        window.Echo.channel('trips')
+            .listen('TripCreated', refreshBookingPage);
+    }
 };
 
 Alpine.data('driverNavigation', () => ({

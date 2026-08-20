@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Driver;
 
+use App\Events\TripCreated;
 use App\Models\Trip;
 use App\Models\User;
 use App\Models\Vehicle;
@@ -9,6 +10,7 @@ use App\Services\Routing\TripDistanceService;
 use App\Services\Routing\TripLocationService;
 use App\Services\Routing\TripRoutingException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
@@ -78,6 +80,8 @@ class TripGoogleMapsTest extends TestCase
 
     public function test_trip_creation_resolves_places_and_calculates_google_route(): void
     {
+        Event::fake([TripCreated::class]);
+
         $driver = User::factory()->create(['role' => 'driver']);
         $vehicle = $this->vehicle($driver);
         $this->fakeGooglePlacesAndRoute();
@@ -86,6 +90,7 @@ class TripGoogleMapsTest extends TestCase
             ->assertRedirect(route('driver.trips.index'));
 
         $this->assertDatabaseHas('trips', ['departure_location' => 'Departure Place', 'destination' => 'Destination Place', 'estimated_distance_km' => 12.35, 'estimated_duration_seconds' => 988]);
+        Event::assertDispatched(TripCreated::class);
     }
 
     public function test_trip_update_recalculates_only_when_a_selected_place_changes(): void

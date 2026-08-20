@@ -40,6 +40,58 @@ class BookingModuleTest extends TestCase
             ->assertDontSee($otherTrip->destination);
     }
 
+    public function test_passenger_destination_search_ranks_stronger_matches_first(): void
+    {
+        $passenger = User::factory()->create(['role' => 'passenger']);
+        $keywordMatch = $this->createTrip([
+            'destination' => 'Kuala Lumpur',
+            'departure_at' => now()->addHour(),
+        ]);
+        $strongerMatch = $this->createTrip([
+            'destination' => 'Kuala Lumpur City Centre',
+            'departure_at' => now()->addDay(),
+        ]);
+
+        $this->actingAs($passenger)
+            ->get(route('passenger.booking', ['destination' => 'Kuala Lumpur City']))
+            ->assertOk()
+            ->assertSeeInOrder([
+                $strongerMatch->destination,
+                $keywordMatch->destination,
+            ]);
+    }
+
+    public function test_passenger_destination_search_uses_driver_rating_as_tiebreaker(): void
+    {
+        $passenger = User::factory()->create(['role' => 'passenger']);
+        $reviewer = User::factory()->create(['role' => 'passenger']);
+        $unratedTrip = $this->createTrip([
+            'destination' => 'KL Sentral',
+            'departure_at' => now()->addHour(),
+        ]);
+        $ratedTrip = $this->createTrip([
+            'destination' => 'KL Sentral',
+            'departure_at' => now()->addDay(),
+        ]);
+        $booking = $this->createBooking($reviewer, $ratedTrip);
+
+        Rating::create([
+            'booking_id' => $booking->id,
+            'reviewer_id' => $reviewer->id,
+            'reviewee_id' => $ratedTrip->user_id,
+            'score' => 5,
+            'comment' => 'Excellent driver.',
+        ]);
+
+        $this->actingAs($passenger)
+            ->get(route('passenger.booking', ['destination' => 'KL Sentral']))
+            ->assertOk()
+            ->assertSeeInOrder([
+                $ratedTrip->user->name,
+                $unratedTrip->user->name,
+            ]);
+    }
+
     public function test_passenger_history_shows_trip_lifecycle_status_for_accepted_booking(): void
     {
         $passenger = User::factory()->create(['role' => 'passenger']);
