@@ -6,6 +6,7 @@ use App\Models\Attraction;
 use App\Models\User;
 use App\Models\Vehicle;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class AttractionDiscoveryTest extends TestCase
@@ -106,5 +107,41 @@ class AttractionDiscoveryTest extends TestCase
             ->assertOk()
             ->assertSee('Batu Caves')
             ->assertSee('Destination was added from Tourist Attractions.');
+    }
+
+    public function test_user_can_autocomplete_and_open_a_google_malaysian_attraction(): void
+    {
+        config()->set('services.google_places.key', 'test-google-key');
+        $user = User::factory()->create(['email_verified_at' => now()]);
+        Http::fake([
+            'https://places.googleapis.com/v1/places:autocomplete' => Http::response([
+                'suggestions' => [[
+                    'placePrediction' => ['placeId' => 'place-putra-mosque', 'text' => ['text' => 'Putra Mosque, Putrajaya, Malaysia']],
+                ]],
+            ]),
+            'https://places.googleapis.com/v1/places/place-putra-mosque' => Http::response([
+                'id' => 'place-putra-mosque',
+                'displayName' => ['text' => 'Putra Mosque'],
+                'formattedAddress' => 'Persiaran Persekutuan, Putrajaya, Malaysia',
+                'primaryType' => 'tourist_attraction',
+                'location' => ['latitude' => 2.935, 'longitude' => 101.691],
+                'addressComponents' => [
+                    ['types' => ['country'], 'shortText' => 'MY'],
+                    ['types' => ['administrative_area_level_1'], 'longText' => 'Putrajaya'],
+                ],
+            ]),
+        ]);
+
+        $this->actingAs($user)
+            ->getJson(route('attractions.autocomplete', ['input' => 'putra']))
+            ->assertOk()
+            ->assertJsonPath('data.0.place_id', 'place-putra-mosque');
+
+        $this->actingAs($user)
+            ->get(route('attractions.google-place', ['place_id' => 'place-putra-mosque']))
+            ->assertRedirect(route('attractions.show', 1));
+
+        $this->assertDatabaseHas('tourist_attractions', ['attraction_name' => 'Putra Mosque', 'state' => 'Putrajaya']);
+        $this->assertDatabaseHas('attraction_details', ['google_place_id' => 'place-putra-mosque', 'source_name' => 'Google Places']);
     }
 }

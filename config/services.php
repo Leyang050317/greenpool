@@ -44,8 +44,10 @@ return [
     'google_places' => [
         'key' => env('GOOGLE_MAPS_API_KEY'),
         'base_url' => env('GOOGLE_PLACES_URL', 'https://places.googleapis.com/v1'),
-        'max_calls_per_day' => (int) env('GOOGLE_PLACES_MAX_CALLS_PER_DAY', 50),
-        'max_calls_per_minute' => (int) env('GOOGLE_PLACES_MAX_CALLS_PER_MINUTE', 10),
+        // Generous for the final demonstration period, while still protecting
+        // the shared Google key from accidental request loops.
+        'max_calls_per_day' => (int) env('GOOGLE_PLACES_MAX_CALLS_PER_DAY', 500),
+        'max_calls_per_minute' => (int) env('GOOGLE_PLACES_MAX_CALLS_PER_MINUTE', 60),
         'auto_load_featured' => (bool) env('GOOGLE_PLACES_AUTO_LOAD_FEATURED', true),
         'auto_load_details' => (bool) env('GOOGLE_PLACES_AUTO_LOAD_DETAILS', true),
         'auto_load_cards' => (bool) env('GOOGLE_PLACES_AUTO_LOAD_CARDS', true),

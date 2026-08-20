@@ -23,16 +23,22 @@
             <div class="mb-5 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-medium text-green-800">{{ session('success') }}</div>
         @endif
 
-        <form method="GET" action="{{ route('attractions.index') }}" class="mb-5 max-w-[480px]">
+        <form method="GET" action="{{ route('attractions.index') }}" class="mb-5 max-w-[480px]" x-data="attractionSearch({{ Js::from(route('attractions.autocomplete')) }}, {{ Js::from(route('attractions.google-place')) }})">
             <input type="hidden" name="tab" value="{{ $tab }}">
             <label for="search" class="sr-only">Search attractions</label>
             <div class="relative">
                 <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-400"><x-icons.lucide name="search" /></span>
-                <input id="search" name="search" value="{{ $search }}" placeholder="Search attractions..." class="block w-full rounded-[10px] border-slate-200 py-2.5 pl-10 pr-10 text-sm text-slate-900 placeholder:text-slate-400 focus:border-green-600 focus:ring-2 focus:ring-green-100">
+                <input id="search" name="search" value="{{ $search }}" placeholder="Search Malaysian attractions..." @input="searchGoogle()" @focus="open = true" @keydown.escape="open = false" autocomplete="off" class="block w-full rounded-[10px] border-slate-200 py-2.5 pl-10 pr-10 text-sm text-slate-900 placeholder:text-slate-400 focus:border-green-600 focus:ring-2 focus:ring-green-100">
                 @if ($search !== '')
                     <a href="{{ route('attractions.index', ['tab' => $tab, 'state' => $state ?: null]) }}" class="absolute inset-y-0 right-0 flex items-center px-3 text-slate-400 hover:text-slate-700" aria-label="Clear search"><x-icons.lucide name="x" /></a>
                 @endif
+                <div x-cloak x-show="open && suggestions.length" class="absolute z-30 mt-1 w-full overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
+                    <template x-for="suggestion in suggestions" :key="suggestion.place_id">
+                        <button type="button" @click="openPlace(suggestion)" class="block w-full px-3.5 py-2.5 text-left text-sm text-slate-700 hover:bg-green-50 hover:text-green-800" x-text="suggestion.text"></button>
+                    </template>
+                </div>
             </div>
+            <p class="mt-1.5 text-xs text-slate-400">Search saved places or choose a Google suggestion to explore any Malaysian attraction.</p>
         </form>
 
         <section class="mb-8">
@@ -162,4 +168,30 @@
         </section>
         <p class="mt-8 text-xs text-slate-400">Explore Malaysian attractions and load live Google details when needed.</p>
     </main>
+
+    <script>
+        window.attractionSearch = (endpoint, placeEndpoint) => ({
+            timer: null,
+            open: false,
+            suggestions: [],
+            searchGoogle() {
+                const input = this.$root.querySelector('#search').value.trim();
+                this.suggestions = [];
+                this.open = true;
+                clearTimeout(this.timer);
+                if (input.length < 2) return;
+                this.timer = setTimeout(async () => {
+                    try {
+                        const response = await window.axios.get(endpoint, { params: { input } });
+                        this.suggestions = response.data.data || [];
+                    } catch (_) {
+                        this.suggestions = [];
+                    }
+                }, 350);
+            },
+            openPlace(suggestion) {
+                window.location.assign(`${placeEndpoint}?${new URLSearchParams({ place_id: suggestion.place_id })}`);
+            },
+        });
+    </script>
 </x-app-layout>
