@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Driver;
 
 use App\Events\BookingStatusUpdated;
+use App\Events\TripCreated;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Driver\StoreTripRequest;
 use App\Http\Requests\Driver\UpdateTripRequest;
@@ -73,6 +74,7 @@ class TripController extends Controller
 
         $routingData = $this->routingDataOrEmpty($locations);
         $trip = $request->user()->trips()->create([...$request->tripData(), ...$locations['attributes'], ...$routingData]);
+        TripCreated::dispatch($trip);
 
         return $this->response($request, $trip, 'Trip published successfully.', 201, 'driver.trips.index');
     }
@@ -235,7 +237,7 @@ class TripController extends Controller
         $bookingsToNotify = DB::transaction(function () use ($trip) {
             $trip->update(['status' => 'Cancelled', 'cancelled_at' => now()]);
 
-            return $this->acceptedBookingsFor($trip);
+            return $this->cancelOpenBookingsFor($trip);
         });
         $this->broadcastBookingUpdates($bookingsToNotify);
 
@@ -380,6 +382,18 @@ class TripController extends Controller
             ->orderBy('pickup_sequence')
             ->oldest()
             ->get();
+    }
+
+    private function cancelOpenBookingsFor(Trip $trip)
+    {
+        return Booking::query()
+            ->where('trip_id', $trip->getKey())
+            ->whereIn('booking_status', ['Pending', 'Accepted'])
+            ->lockForUpdate()
+            ->oldest()
+            ->get()
+            ->each
+            ->update(['booking_status' => 'Cancelled']);
     }
 
     private function assertRouteCoordinates(Trip $trip, $bookings): void

@@ -125,6 +125,40 @@ class TripLifecycleRulesTest extends TestCase
         Event::assertDispatchedTimes(BookingStatusUpdated::class, 1);
     }
 
+    public function test_cancel_trip_marks_open_bookings_cancelled_and_notifies_passengers(): void
+    {
+        Event::fake([BookingStatusUpdated::class]);
+
+        $driver = $this->driver();
+        $trip = $this->trip($driver);
+        $acceptedBooking = Booking::create(['trip_id' => $trip->trip_id, 'passenger_id' => $this->passenger()->id, 'booking_status' => 'Accepted', 'number_of_seats' => 1, 'pickup_point' => 'Main Gate']);
+        $pendingBooking = Booking::create(['trip_id' => $trip->trip_id, 'passenger_id' => $this->passenger()->id, 'booking_status' => 'Pending', 'number_of_seats' => 1, 'pickup_point' => 'Library']);
+        $rejectedBooking = Booking::create(['trip_id' => $trip->trip_id, 'passenger_id' => $this->passenger()->id, 'booking_status' => 'Rejected', 'number_of_seats' => 1, 'pickup_point' => 'Cafeteria']);
+
+        $this->actingAs($driver)
+            ->patch(route('driver.trips.cancel', $trip))
+            ->assertRedirect(route('driver.trips.index'));
+
+        $this->assertSame('Cancelled', $trip->refresh()->status);
+        $this->assertSame('Cancelled', $acceptedBooking->refresh()->booking_status);
+        $this->assertSame('Cancelled', $pendingBooking->refresh()->booking_status);
+        $this->assertSame('Rejected', $rejectedBooking->refresh()->booking_status);
+
+        Event::assertDispatched(
+            BookingStatusUpdated::class,
+            fn (BookingStatusUpdated $event) => $event->booking->is($acceptedBooking)
+                && $event->booking->booking_status === 'Cancelled'
+                && $event->booking->trip->status === 'Cancelled'
+        );
+        Event::assertDispatched(
+            BookingStatusUpdated::class,
+            fn (BookingStatusUpdated $event) => $event->booking->is($pendingBooking)
+                && $event->booking->booking_status === 'Cancelled'
+                && $event->booking->trip->status === 'Cancelled'
+        );
+        Event::assertDispatchedTimes(BookingStatusUpdated::class, 2);
+    }
+
     private function fakeGoogle(array $optimizedIndexes = []): void
     {
         $route = ['distanceMeters' => 1000, 'duration' => '60s'];
