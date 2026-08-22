@@ -30,6 +30,91 @@ class BookingModuleTest extends TestCase
             ->assertSee($trip->destination);
     }
 
+    public function test_passenger_dashboard_shows_ride_summary_sections(): void
+    {
+        $passenger = User::factory()->create(['role' => 'passenger']);
+        $driver = User::factory()->create(['role' => 'driver', 'name' => 'Dashboard Driver']);
+        $upcomingTrip = $this->createTrip([
+            'user_id' => $driver->id,
+            'destination' => 'Suria KLCC',
+            'departure_at' => now()->addHours(3),
+        ]);
+        $pendingTrip = $this->createTrip([
+            'destination' => 'Mid Valley Megamall',
+            'departure_at' => now()->addDay(),
+        ]);
+        $completedTrip = $this->createTrip(['status' => 'Completed', 'completed_at' => now()->subDay()]);
+        $rejectedTrip = $this->createTrip(['destination' => 'KL Sentral']);
+        $cancelledTrip = $this->createTrip(['destination' => 'Pavilion KL']);
+
+        $this->createBooking($passenger, $upcomingTrip, 2, 'Accepted');
+        $this->createBooking($passenger, $pendingTrip, 1, 'Pending');
+        $this->createBooking($passenger, $completedTrip, 1, 'Accepted');
+        $this->createBooking($passenger, $rejectedTrip, 1, 'Rejected');
+        $passenger->notify(new BookingStatusNotification($this->createBooking($passenger, $cancelledTrip, 1, 'Cancelled'), 'Cancelled'));
+
+        $this->actingAs($passenger)
+            ->get(route('passenger.home'))
+            ->assertOk()
+            ->assertSee('Upcoming Ride')
+            ->assertSee('Suria KLCC')
+            ->assertSee('Dashboard Driver')
+            ->assertSee('Pending Requests')
+            ->assertSee('Mid Valley Megamall')
+            ->assertSee('Recent updates')
+            ->assertSee('Trip cancelled')
+            ->assertSee('Total Bookings')
+            ->assertSee('Completed Rides')
+            ->assertSee('Cancelled / Rejected');
+    }
+
+    public function test_driver_dashboard_shows_trip_request_notification_and_schedule_sections(): void
+    {
+        $driver = User::factory()->create(['role' => 'driver']);
+        $activePassenger = User::factory()->create(['role' => 'passenger', 'name' => 'Active Passenger']);
+        $pendingPassenger = User::factory()->create(['role' => 'passenger', 'name' => 'Pending Passenger']);
+        $activeTrip = $this->createTrip([
+            'user_id' => $driver->id,
+            'destination' => 'Suria KLCC',
+            'departure_at' => now()->setTime(10, 0),
+            'status' => 'In Progress',
+            'started_at' => now()->subMinutes(10),
+            'estimated_distance_km' => 12.5,
+        ]);
+        $pendingTrip = $this->createTrip([
+            'user_id' => $driver->id,
+            'destination' => 'Mid Valley Megamall',
+            'departure_at' => now()->addHours(2),
+        ]);
+        $completedTrip = $this->createTrip([
+            'user_id' => $driver->id,
+            'status' => 'Completed',
+            'completed_at' => now()->subDay(),
+            'price_per_passenger' => 10,
+        ]);
+
+        $this->createBooking($activePassenger, $activeTrip, 2, 'Accepted');
+        $pendingBooking = $this->createBooking($pendingPassenger, $pendingTrip, 1, 'Pending');
+        $this->createBooking(User::factory()->create(['role' => 'passenger']), $completedTrip, 2, 'Accepted');
+        $driver->notify(new BookingRequestNotification($pendingBooking, 'submitted'));
+
+        $this->actingAs($driver)
+            ->get(route('driver.home'))
+            ->assertOk()
+            ->assertSee('Active Trip')
+            ->assertSee('Suria KLCC')
+            ->assertSee('Active Passenger')
+            ->assertSee('Pending passenger requests')
+            ->assertSee('Pending Passenger')
+            ->assertSee('Recent updates')
+            ->assertSee('New booking request')
+            ->assertSee('Total Trips')
+            ->assertSee('Completed Trips')
+            ->assertSee('Total Earnings')
+            ->assertSee('RM 20.00')
+            ->assertSee("Today's schedule", false);
+    }
+
     public function test_passenger_does_not_see_trips_they_already_requested(): void
     {
         $passenger = User::factory()->create(['role' => 'passenger']);
@@ -42,6 +127,25 @@ class BookingModuleTest extends TestCase
             ->get(route('passenger.booking'))
             ->assertOk()
             ->assertDontSee($requestedTrip->destination)
+            ->assertSee($availableTrip->destination);
+    }
+
+    public function test_passenger_does_not_see_expired_trips_in_find_a_ride(): void
+    {
+        $passenger = User::factory()->create(['role' => 'passenger']);
+        $expiredTrip = $this->createTrip([
+            'destination' => 'Expired Trip Destination',
+            'departure_at' => now()->subMinute(),
+        ]);
+        $availableTrip = $this->createTrip([
+            'destination' => 'Available Future Destination',
+            'departure_at' => now()->addHour(),
+        ]);
+
+        $this->actingAs($passenger)
+            ->get(route('passenger.booking'))
+            ->assertOk()
+            ->assertDontSee($expiredTrip->destination)
             ->assertSee($availableTrip->destination);
     }
 
