@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\HasProfileCompleteness;
+use App\Notifications\GreenPoolVerifyEmail;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Database\Factories\UserFactory;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
@@ -80,6 +81,11 @@ class User extends Authenticatable implements MustVerifyEmail
     public function usesGoogleAuthentication(): bool
     {
         return $this->auth_provider === 'google';
+    }
+
+    public function sendEmailVerificationNotification(): void
+    {
+        $this->notify(new GreenPoolVerifyEmail());
     }
 
     public function trips(): HasMany

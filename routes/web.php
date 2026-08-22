@@ -11,6 +11,7 @@ use App\Http\Controllers\Passenger\PassengerBookingController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PhoneVerificationController;
+use App\Http\Controllers\EmergencyContactController;
 use App\Http\Controllers\RatingController;
 use App\Http\Controllers\Auth\LinkedAccountController;
 use Illuminate\Support\Facades\Auth;
@@ -32,6 +33,12 @@ Route::middleware('auth')->group(function () {
         ->name('phone-verification.send');
     Route::post('/phone-verification/verify', [PhoneVerificationController::class, 'verify'])
         ->name('phone-verification.verify');
+    Route::post('/emergency-contacts', [EmergencyContactController::class, 'store'])
+        ->name('emergency-contacts.store');
+    Route::patch('/emergency-contacts/{emergencyContact}', [EmergencyContactController::class, 'update'])
+        ->name('emergency-contacts.update');
+    Route::delete('/emergency-contacts/{emergencyContact}', [EmergencyContactController::class, 'destroy'])
+        ->name('emergency-contacts.destroy');
     Route::get('/linked-accounts/google', [LinkedAccountController::class, 'redirectToGoogle'])
         ->name('linked-accounts.google.redirect');
     Route::delete('/linked-accounts/google', [LinkedAccountController::class, 'destroy'])

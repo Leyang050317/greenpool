@@ -172,6 +172,30 @@ class BookingModuleTest extends TestCase
             ->assertSee('Quiet');
     }
 
+    public function test_available_trip_card_shows_driver_photo_and_preferences(): void
+    {
+        $passenger = User::factory()->create(['role' => 'passenger']);
+        $driver = User::factory()->create([
+            'role' => 'driver',
+            'photo' => 'profile-photos/driver-photo.jpg',
+        ]);
+        $driver->driverPreference()->create([
+            'smoking_allowed' => false,
+            'pets_allowed' => true,
+            'conversation_preference' => 'Moderate',
+        ]);
+        $this->createTrip(['user_id' => $driver->id]);
+
+        $this->actingAs($passenger)
+            ->get(route('passenger.booking'))
+            ->assertOk()
+            ->assertSee('/storage/profile-photos/driver-photo.jpg')
+            ->assertSee('Driver Preferences')
+            ->assertSee('Smoking: Not allowed')
+            ->assertSee('Pets: Allowed')
+            ->assertSee('Moderate');
+    }
+
     public function test_passenger_sees_rejected_trips_again(): void
     {
         $passenger = User::factory()->create(['role' => 'passenger']);
