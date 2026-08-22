@@ -6,6 +6,7 @@ use App\Events\BookingStatusUpdated;
 use App\Http\Controllers\Controller;
 use App\Models\Booking;
 use App\Models\Trip;
+use App\Notifications\BookingStatusNotification;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -81,7 +82,8 @@ class DriverBookingController extends Controller
             return $booking;
         });
 
-        BookingStatusUpdated::dispatch($booking);
+        $booking->passenger->notify(new BookingStatusNotification($booking, 'Accepted'));
+        BookingStatusUpdated::dispatch($booking, null, 'booking_request_accepted');
 
         return redirect()->route('driver.booking-requests.index')->with('success', 'Booking request accepted successfully.');
     }
@@ -107,7 +109,8 @@ class DriverBookingController extends Controller
             return $booking;
         });
 
-        BookingStatusUpdated::dispatch($booking);
+        $booking->passenger->notify(new BookingStatusNotification($booking, 'Rejected'));
+        BookingStatusUpdated::dispatch($booking, null, 'booking_request_rejected');
 
         return redirect()->route('driver.booking-requests.index')->with('success', 'Booking request rejected successfully.');
     }

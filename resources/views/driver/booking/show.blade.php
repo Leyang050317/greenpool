@@ -99,6 +99,13 @@
                             </div>
                             <div>
                                 <dt class="flex items-center gap-2 text-xs font-semibold uppercase text-gray-400">
+                                    <x-icons.lucide name="briefcase" class="h-3.5 w-3.5" />
+                                    Luggage Count
+                                </dt>
+                                <dd class="mt-1 text-sm font-semibold text-gray-900">{{ $booking->number_of_luggage }} {{ Str::plural('luggage', $booking->number_of_luggage) }}</dd>
+                            </div>
+                            <div>
+                                <dt class="flex items-center gap-2 text-xs font-semibold uppercase text-gray-400">
                                     <x-icons.lucide name="clock" class="h-3.5 w-3.5" />
                                     Booking Time
                                 </dt>

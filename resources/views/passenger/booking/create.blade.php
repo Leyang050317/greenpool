@@ -107,12 +107,16 @@
                                         <button type="button" @click="select(suggestion)" class="block w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50" x-text="suggestion.text"></button>
                                     </template>
                                 </div>
-                                <p class="mt-1 text-xs text-gray-400">Select a suggestion in Malaysia to use it.</p>
                             </div>
 
                             <div>
                                 <label for="number_of_seats" class="mb-1.5 block text-xs font-semibold text-gray-500">Requested Seats</label>
                                 <input id="number_of_seats" type="number" name="number_of_seats" value="{{ old('number_of_seats', 1) }}" required min="1" max="{{ $trip->available_seats }}" class="block w-full rounded-xl border-gray-200 text-sm focus:border-[#16A34A] focus:ring-[#16A34A]" />
+                            </div>
+
+                            <div>
+                                <label for="number_of_luggage" class="mb-1.5 block text-xs font-semibold text-gray-500">Number of Luggage</label>
+                                <input id="number_of_luggage" type="number" name="number_of_luggage" value="{{ old('number_of_luggage', 0) }}" required min="0" class="block w-full rounded-xl border-gray-200 text-sm focus:border-[#16A34A] focus:ring-[#16A34A]" />
                             </div>
                         </div>
 

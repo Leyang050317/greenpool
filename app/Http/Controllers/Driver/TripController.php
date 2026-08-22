@@ -9,6 +9,7 @@ use App\Http\Requests\Driver\StoreTripRequest;
 use App\Http\Requests\Driver\UpdateTripRequest;
 use App\Models\Booking;
 use App\Models\Trip;
+use App\Notifications\BookingStatusNotification;
 use App\Services\Routing\TripDistanceService;
 use App\Services\Routing\TripLocationService;
 use App\Services\Routing\TripRoutingException;
@@ -239,7 +240,10 @@ class TripController extends Controller
 
             return $this->cancelOpenBookingsFor($trip);
         });
-        $this->broadcastBookingUpdates($bookingsToNotify);
+        $bookingsToNotify->each(
+            fn (Booking $booking) => $booking->passenger->notify(new BookingStatusNotification($booking, 'Cancelled'))
+        );
+        $this->broadcastBookingUpdates($bookingsToNotify, 'trip_cancelled');
 
         return $this->response($request, $trip->refresh(), 'Trip cancelled successfully.', 200, 'driver.trips.index');
     }
@@ -387,6 +391,7 @@ class TripController extends Controller
     private function cancelOpenBookingsFor(Trip $trip)
     {
         return Booking::query()
+            ->with(['passenger', 'trip.user'])
             ->where('trip_id', $trip->getKey())
             ->whereIn('booking_status', ['Pending', 'Accepted'])
             ->lockForUpdate()
@@ -438,11 +443,11 @@ class TripController extends Controller
             $bookings->get($index)?->update(['pickup_sequence' => $sequence + 1]);
         }
     }
-    private function broadcastBookingUpdates($bookings): void
+    private function broadcastBookingUpdates($bookings, ?string $passengerNotificationType = null): void
     {
         foreach ($bookings as $booking) {
             $booking->unsetRelation('trip')->load('trip');
-            BookingStatusUpdated::dispatch($booking);
+            BookingStatusUpdated::dispatch($booking, null, $passengerNotificationType);
         }
     }
 

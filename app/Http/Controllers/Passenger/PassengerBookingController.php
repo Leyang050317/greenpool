@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Passenger\StoreBookingRequest;
 use App\Models\Booking;
 use App\Models\Trip;
+use App\Notifications\BookingRequestNotification;
 use App\Services\Routing\TripLocationService;
 use App\Services\Routing\TripRoutingException;
 use Illuminate\Http\JsonResponse;
@@ -37,6 +38,32 @@ class PassengerBookingController extends Controller
         }
     }
 
+    public function currentLocation(Request $request): JsonResponse
+    {
+        $this->ensurePassenger($request);
+        $validated = $request->validate([
+            'latitude' => ['required', 'numeric', 'between:-90,90'],
+            'longitude' => ['required', 'numeric', 'between:-180,180'],
+        ]);
+
+        try {
+            $location = $this->tripLocationService->reverseGeocode(
+                (float) $validated['latitude'],
+                (float) $validated['longitude'],
+                'destination_place_id'
+            );
+        } catch (TripRoutingException $exception) {
+            return response()->json(['message' => $exception->getMessage()], 422);
+        }
+
+        return response()->json([
+            'data' => [
+                'text' => $location['display'],
+                'place_id' => $location['place_id'],
+            ],
+        ]);
+    }
+
     public function index(Request $request): View
     {
         $this->ensurePassenger($request);
@@ -51,7 +78,10 @@ class PassengerBookingController extends Controller
             ->where('status', 'Scheduled')
             ->where('available_seats', '>', 0)
             ->where('departure_at', '>=', now())
-            ->where('user_id', '!=', $request->user()->id);
+            ->where('user_id', '!=', $request->user()->id)
+            ->whereDoesntHave('bookings', fn ($booking) => $booking
+                ->where('passenger_id', $request->user()->id)
+                ->where('booking_status', '!=', 'Rejected'));
 
         $rankBySearchScore = false;
 
@@ -131,26 +161,36 @@ class PassengerBookingController extends Controller
                 ]);
             }
 
-            $alreadyBooked = Booking::query()
+            $existingBooking = Booking::query()
                 ->where('trip_id', $trip->trip_id)
                 ->where('passenger_id', $request->user()->id)
-                ->exists();
+                ->lockForUpdate()
+                ->first();
 
-            if ($alreadyBooked) {
+            if ($existingBooking && $existingBooking->booking_status !== 'Rejected') {
                 throw ValidationException::withMessages([
                     'trip_id' => 'You already submitted a booking request for this trip.',
                 ]);
             }
 
-            return Booking::create([
+            $bookingData = [
                 ...$request->bookingData(),
                 'pickup_point' => $pickup['display'],
                 'pickup_place_id' => $request->string('pickup_place_id')->toString(),
                 'pickup_latitude' => $pickup['latitude'],
                 'pickup_longitude' => $pickup['longitude'],
-            ]);
+            ];
+
+            if ($existingBooking) {
+                $existingBooking->update($bookingData);
+
+                return $existingBooking->refresh();
+            }
+
+            return Booking::create($bookingData);
         });
 
+        $booking->trip->user->notify(new BookingRequestNotification($booking, 'submitted'));
         BookingCreated::dispatch($booking);
 
         return redirect()->route('passenger.bookings.history')->with('success', 'Booking request submitted successfully.');
@@ -186,7 +226,8 @@ class PassengerBookingController extends Controller
         }
 
         $booking->update(['booking_status' => 'Cancelled']);
-        BookingStatusUpdated::dispatch($booking);
+        $booking->trip->user->notify(new BookingRequestNotification($booking, 'cancelled'));
+        BookingStatusUpdated::dispatch($booking, 'booking_request_cancelled');
 
         return redirect()->route('passenger.bookings.history')->with('success', 'Booking request cancelled successfully.');
     }

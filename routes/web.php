@@ -83,6 +83,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('passenger.bookings.create');
     Route::get('/passenger/booking/locations/autocomplete', [PassengerBookingController::class, 'autocomplete'])
         ->name('passenger.bookings.locations.autocomplete');
+    Route::get('/passenger/booking/locations/current', [PassengerBookingController::class, 'currentLocation'])
+        ->name('passenger.bookings.locations.current');
     Route::post('/passenger/booking', [PassengerBookingController::class, 'store'])
         ->name('passenger.bookings.store');
     Route::get('/passenger/booking/history', [PassengerBookingController::class, 'history'])
