@@ -73,6 +73,10 @@
                 <x-phone-verification-card :user="$user" />
             </div>
 
+            <div class="mb-8">
+                <x-emergency-contacts-card :user="$user" />
+            </div>
+
             <h4 class="text-sm font-bold text-gray-700 mb-3">Account</h4>
             <div class="bg-white rounded-xl shadow-sm border border-gray-200 divide-y divide-gray-100">
                 @if ($canManagePassword)

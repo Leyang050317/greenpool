@@ -71,6 +71,7 @@ class PassengerBookingController extends Controller
         $query = Trip::query()
             ->with([
                 'user' => fn ($driver) => $driver
+                    ->with('driverPreference')
                     ->withAvg('ratingsReceived', 'score')
                     ->withCount('ratingsReceived'),
                 'vehicle',

@@ -16,7 +16,8 @@ class ProfileController extends Controller
     {
         $user = $request->user()
             ->loadAvg('ratingsReceived', 'score')
-            ->loadCount('ratingsReceived');
+            ->loadCount('ratingsReceived')
+            ->load('emergencyContacts');
 
         $canManagePassword = ! $user->usesGoogleAuthentication()
             && $request->session()->get('auth_provider') !== 'google';

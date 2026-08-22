@@ -17,7 +17,8 @@ class ProfileController extends Controller
     {
         $driver = $request->user()
             ->loadAvg('ratingsReceived', 'score')
-            ->loadCount('ratingsReceived');
+            ->loadCount('ratingsReceived')
+            ->load('emergencyContacts');
 
         return view('driver.profile', [
             'user' => $driver,
