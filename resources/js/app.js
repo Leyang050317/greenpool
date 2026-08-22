@@ -44,7 +44,7 @@ const subscribeToBookingUpdates = () => {
         return;
     }
 
-    if (userRole === 'driver' && path.startsWith('/driver/booking')) {
+    if (userRole === 'driver' && (path.startsWith('/driver/booking') || path === '/driver/home')) {
         window.Echo.private(`driver.${userId}`)
             .listen('BookingCreated', refreshBookingPage)
             .listen('BookingStatusUpdated', refreshBookingPage);
