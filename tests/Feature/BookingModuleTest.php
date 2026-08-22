@@ -149,6 +149,29 @@ class BookingModuleTest extends TestCase
             ->assertSee($availableTrip->destination);
     }
 
+    public function test_passenger_trip_details_show_driver_preferences(): void
+    {
+        $passenger = User::factory()->create(['role' => 'passenger']);
+        $driver = User::factory()->create(['role' => 'driver']);
+        $driver->driverPreference()->create([
+            'smoking_allowed' => false,
+            'pets_allowed' => true,
+            'conversation_preference' => 'Quiet',
+        ]);
+        $trip = $this->createTrip(['user_id' => $driver->id]);
+
+        $this->actingAs($passenger)
+            ->get(route('passenger.bookings.create', ['trip_id' => $trip->trip_id]))
+            ->assertOk()
+            ->assertSee('Driver Preferences')
+            ->assertSee('Smoking')
+            ->assertSee('Not allowed')
+            ->assertSee('Pets')
+            ->assertSee('Allowed')
+            ->assertSee('Conversation')
+            ->assertSee('Quiet');
+    }
+
     public function test_passenger_sees_rejected_trips_again(): void
     {
         $passenger = User::factory()->create(['role' => 'passenger']);
