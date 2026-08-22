@@ -12,6 +12,29 @@ const refreshBookingPage = () => {
     window.location.reload();
 };
 
+const updateNotificationBadge = (count) => {
+    const notificationLink = document.querySelector('[data-notification-link]');
+    const notificationBadge = document.querySelector('[data-notification-badge]');
+
+    if (!notificationLink || !notificationBadge) {
+        return;
+    }
+
+    const unreadCount = Math.max(Number.parseInt(count, 10) || 0, 0);
+
+    notificationBadge.dataset.count = unreadCount;
+    notificationBadge.textContent = Math.min(unreadCount, 99).toString();
+    notificationBadge.classList.toggle('hidden', unreadCount === 0);
+    notificationLink.setAttribute('aria-label', `Notifications, ${unreadCount} unread`);
+};
+
+const incrementNotificationBadge = () => {
+    const notificationBadge = document.querySelector('[data-notification-badge]');
+    const currentCount = Number.parseInt(notificationBadge?.dataset.count ?? '0', 10) || 0;
+
+    updateNotificationBadge(currentCount + 1);
+};
+
 const subscribeToBookingUpdates = () => {
     const userId = document.body.dataset.authId;
     const userRole = document.body.dataset.authRole;
@@ -27,9 +50,28 @@ const subscribeToBookingUpdates = () => {
             .listen('BookingStatusUpdated', refreshBookingPage);
     }
 
+    if (userRole === 'driver') {
+        window.Echo.private(`driver.${userId}`)
+            .listen('BookingCreated', incrementNotificationBadge)
+            .listen('BookingStatusUpdated', (event) => {
+                if (event.driver_notification_type === 'booking_request_cancelled') {
+                    incrementNotificationBadge();
+                }
+            });
+    }
+
     if (userRole === 'passenger' && (path.startsWith('/passenger/booking') || path === '/passenger/home')) {
         window.Echo.private(`passenger.${userId}`)
             .listen('BookingStatusUpdated', refreshBookingPage);
+    }
+
+    if (userRole === 'passenger') {
+        window.Echo.private(`passenger.${userId}`)
+            .listen('BookingStatusUpdated', (event) => {
+                if (event.passenger_notification_type) {
+                    incrementNotificationBadge();
+                }
+            });
     }
 
     if (userRole === 'passenger' && path.startsWith('/passenger/booking')) {

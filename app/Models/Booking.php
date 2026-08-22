@@ -16,6 +16,7 @@ class Booking extends Model
         'passenger_id',
         'booking_status',
         'number_of_seats',
+        'number_of_luggage',
         'pickup_point',
         'pickup_place_id',
         'pickup_latitude',
@@ -28,6 +29,7 @@ class Booking extends Model
     {
         return [
             'number_of_seats' => 'integer',
+            'number_of_luggage' => 'integer',
             'picked_up_at' => 'datetime',
             'pickup_latitude' => 'decimal:7',
             'pickup_longitude' => 'decimal:7',

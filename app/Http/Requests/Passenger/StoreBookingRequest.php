@@ -21,6 +21,7 @@ class StoreBookingRequest extends FormRequest
             'pickup_point' => ['required', 'string', 'max:255'],
             'pickup_place_id' => ['required', 'string', 'max:255'],
             'number_of_seats' => ['required', 'integer', 'min:1'],
+            'number_of_luggage' => ['nullable', 'integer', 'min:0'],
         ];
     }
 
@@ -45,7 +46,10 @@ class StoreBookingRequest extends FormRequest
                 $validator->errors()->add('number_of_seats', 'Requested seats must not exceed the available seats.');
             }
 
-            if (Booking::where('trip_id', $trip->trip_id)->where('passenger_id', $this->user()->id)->exists()) {
+            if (Booking::where('trip_id', $trip->trip_id)
+                ->where('passenger_id', $this->user()->id)
+                ->where('booking_status', '!=', 'Rejected')
+                ->exists()) {
                 $validator->errors()->add('trip_id', 'You already submitted a booking request for this trip.');
             }
         }];
@@ -58,6 +62,7 @@ class StoreBookingRequest extends FormRequest
             'passenger_id' => $this->user()->id,
             'booking_status' => 'Pending',
             'number_of_seats' => $this->integer('number_of_seats'),
+            'number_of_luggage' => $this->integer('number_of_luggage'),
             'pickup_point' => $this->string('pickup_point')->trim()->toString(),
         ];
     }

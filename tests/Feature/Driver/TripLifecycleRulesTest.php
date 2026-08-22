@@ -7,6 +7,7 @@ use App\Models\Booking;
 use App\Models\Trip;
 use App\Models\User;
 use App\Models\Vehicle;
+use App\Notifications\BookingStatusNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Artisan;
@@ -129,11 +130,14 @@ class TripLifecycleRulesTest extends TestCase
     {
         Event::fake([BookingStatusUpdated::class]);
 
-        $driver = $this->driver();
-        $trip = $this->trip($driver);
-        $acceptedBooking = Booking::create(['trip_id' => $trip->trip_id, 'passenger_id' => $this->passenger()->id, 'booking_status' => 'Accepted', 'number_of_seats' => 1, 'pickup_point' => 'Main Gate']);
-        $pendingBooking = Booking::create(['trip_id' => $trip->trip_id, 'passenger_id' => $this->passenger()->id, 'booking_status' => 'Pending', 'number_of_seats' => 1, 'pickup_point' => 'Library']);
-        $rejectedBooking = Booking::create(['trip_id' => $trip->trip_id, 'passenger_id' => $this->passenger()->id, 'booking_status' => 'Rejected', 'number_of_seats' => 1, 'pickup_point' => 'Cafeteria']);
+        $driver = User::factory()->create(['role' => 'driver', 'name' => 'Driver Cancel']);
+        $trip = $this->trip($driver, ['destination' => 'Suria KLCC']);
+        $acceptedPassenger = $this->passenger();
+        $pendingPassenger = $this->passenger();
+        $rejectedPassenger = $this->passenger();
+        $acceptedBooking = Booking::create(['trip_id' => $trip->trip_id, 'passenger_id' => $acceptedPassenger->id, 'booking_status' => 'Accepted', 'number_of_seats' => 1, 'pickup_point' => 'Main Gate']);
+        $pendingBooking = Booking::create(['trip_id' => $trip->trip_id, 'passenger_id' => $pendingPassenger->id, 'booking_status' => 'Pending', 'number_of_seats' => 1, 'pickup_point' => 'Library']);
+        $rejectedBooking = Booking::create(['trip_id' => $trip->trip_id, 'passenger_id' => $rejectedPassenger->id, 'booking_status' => 'Rejected', 'number_of_seats' => 1, 'pickup_point' => 'Cafeteria']);
 
         $this->actingAs($driver)
             ->patch(route('driver.trips.cancel', $trip))
@@ -146,17 +150,25 @@ class TripLifecycleRulesTest extends TestCase
 
         Event::assertDispatched(
             BookingStatusUpdated::class,
-            fn (BookingStatusUpdated $event) => $event->booking->is($acceptedBooking)
-                && $event->booking->booking_status === 'Cancelled'
-                && $event->booking->trip->status === 'Cancelled'
+            fn (BookingStatusUpdated $event) => $event->booking->getKey() === $acceptedBooking->getKey()
+                && $event->passengerNotificationType === 'trip_cancelled'
         );
         Event::assertDispatched(
             BookingStatusUpdated::class,
-            fn (BookingStatusUpdated $event) => $event->booking->is($pendingBooking)
-                && $event->booking->booking_status === 'Cancelled'
-                && $event->booking->trip->status === 'Cancelled'
+            fn (BookingStatusUpdated $event) => $event->booking->getKey() === $pendingBooking->getKey()
+                && $event->passengerNotificationType === 'trip_cancelled'
         );
         Event::assertDispatchedTimes(BookingStatusUpdated::class, 2);
+
+        $acceptedNotification = $acceptedPassenger->unreadNotifications()->where('type', BookingStatusNotification::class)->firstOrFail();
+        $pendingNotification = $pendingPassenger->unreadNotifications()->where('type', BookingStatusNotification::class)->firstOrFail();
+
+        $this->assertSame('Trip cancelled', $acceptedNotification->data['title']);
+        $this->assertSame('Trip cancelled', $pendingNotification->data['title']);
+        $this->assertStringContainsString('Driver Cancel cancelled the trip to Suria KLCC.', $acceptedNotification->data['message']);
+        $this->assertStringContainsString('Driver Cancel cancelled the trip to Suria KLCC.', $pendingNotification->data['message']);
+        $this->assertSame(route('passenger.bookings.history'), $acceptedNotification->data['url']);
+        $this->assertSame(0, $rejectedPassenger->unreadNotifications()->count());
     }
 
     private function fakeGoogle(array $optimizedIndexes = []): void
