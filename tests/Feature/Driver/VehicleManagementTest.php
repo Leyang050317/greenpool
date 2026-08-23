@@ -38,6 +38,24 @@ class VehicleManagementTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_driver_can_check_for_a_duplicate_plate_before_continuing(): void
+    {
+        $driver = User::factory()->create(['role' => 'driver']);
+        Vehicle::factory()->create(['plate_number' => 'VNU 8601']);
+
+        $this->actingAs($driver)
+            ->postJson(route('driver.vehicles.plate-availability'), ['plate_number' => 'vnu-8601'])
+            ->assertOk()
+            ->assertJsonPath('available', false)
+            ->assertJsonPath('plate_number', 'VNU-8601');
+
+        $this->actingAs($driver)
+            ->postJson(route('driver.vehicles.plate-availability'), ['plate_number' => 'JQK1234'])
+            ->assertOk()
+            ->assertJsonPath('available', true)
+            ->assertJsonPath('plate_number', 'JQK1234');
+    }
+
     public function test_driver_can_add_a_vehicle(): void
     {
         Storage::fake('public');
@@ -65,6 +83,25 @@ class VehicleManagementTest extends TestCase
             'verification_status' => 'Pending',
         ]);
         Storage::disk('public')->assertExists($vehicle->vehicle_image_path);
+    }
+
+    public function test_ajax_vehicle_creation_flashes_success_and_returns_the_vehicle_list_redirect(): void
+    {
+        Storage::fake('public');
+        $driver = User::factory()->create(['role' => 'driver']);
+
+        $this->actingAs($driver)
+            ->postJson(route('driver.vehicles.store'), [
+                'plate_number' => 'JQK 8821',
+                'brand' => 'Perodua',
+                'model' => 'Myvi',
+                'colour' => 'Silver',
+                'seat_capacity' => 4,
+                'vehicle_image' => UploadedFile::fake()->image('myvi.jpg'),
+            ])
+            ->assertCreated()
+            ->assertJsonPath('redirect_url', route('driver.vehicles.index', ['created' => 1]))
+            ->assertSessionHas('success', 'Vehicle added successfully.');
     }
 
     public function test_vehicle_validation_is_enforced(): void

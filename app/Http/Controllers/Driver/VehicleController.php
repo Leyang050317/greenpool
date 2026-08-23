@@ -9,6 +9,7 @@ use App\Models\Vehicle;
 use App\Services\Ocr\DocumentOcrService;
 use App\Services\Ocr\OcrException;
 use App\Services\Vehicle\DocumentMatchingService;
+use App\Services\Vehicle\PlateNumberExtractionService;
 use App\Services\Vehicle\VehicleImageValidationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -25,6 +26,7 @@ class VehicleController extends Controller
         private readonly DocumentOcrService $documentOcr,
         private readonly DocumentMatchingService $documentMatcher,
         private readonly VehicleImageValidationService $vehicleImageValidator,
+        private readonly PlateNumberExtractionService $plateNumberExtractor,
     ) {}
 
     public function index(Request $request): View|JsonResponse
@@ -90,16 +92,21 @@ class VehicleController extends Controller
             throw $exception;
         }
 
+        $successMessage = 'Vehicle added successfully. '.$match['message'];
+
         if ($request->expectsJson()) {
+            $request->session()->flash('success', $successMessage);
+
             return response()->json([
-                'message' => 'Vehicle added successfully.',
+                'message' => $successMessage,
                 'data' => $vehicle,
+                'redirect_url' => route('driver.vehicles.index', ['created' => 1]),
             ], 201);
         }
 
         return redirect()
             ->route('driver.vehicles.index')
-            ->with('success', $match['message']);
+            ->with('success', $successMessage);
     }
 
     private function storeLegacyVehicle(StoreVehicleRequest $request): RedirectResponse|JsonResponse
@@ -119,7 +126,13 @@ class VehicleController extends Controller
         }
 
         if ($request->expectsJson()) {
-            return response()->json(['message' => 'Vehicle added successfully.', 'data' => $vehicle], 201);
+            $request->session()->flash('success', 'Vehicle added successfully.');
+
+            return response()->json([
+                'message' => 'Vehicle added successfully.',
+                'data' => $vehicle,
+                'redirect_url' => route('driver.vehicles.index', ['created' => 1]),
+            ], 201);
         }
 
         return redirect()->route('driver.vehicles.index')->with('success', 'Vehicle added successfully.');
@@ -153,13 +166,44 @@ class VehicleController extends Controller
         ]);
 
         try {
+            $imageResult = $this->vehicleImageValidator->validate($validated['image'], $validated['expected_view']);
+            $plateNumber = null;
+            if ($imageResult['accepted'] ?? false) {
+                try {
+                    $plateNumber = $this->plateNumberExtractor->extract($validated['image']);
+                } catch (OcrException) {
+                    // Photo validation still succeeds when the plate is not readable.
+                }
+            }
+
             return response()->json([
                 'success' => true,
-                ...$this->vehicleImageValidator->validate($validated['image'], $validated['expected_view']),
+                ...$imageResult,
+                'plate_number' => $plateNumber,
             ]);
         } catch (\RuntimeException $exception) {
             return response()->json(['success' => false, 'message' => $exception->getMessage()], 422);
         }
+    }
+
+    public function plateAvailability(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'plate_number' => ['required', 'string', 'max:20', 'regex:/^[A-Za-z0-9 -]+$/'],
+        ]);
+        $plateNumber = mb_strtoupper(trim($validated['plate_number']));
+        $canonicalPlate = preg_replace('/[^A-Z0-9]/', '', $plateNumber);
+        $exists = Vehicle::query()
+            ->whereRaw("REPLACE(REPLACE(UPPER(plate_number), ' ', ''), '-', '') = ?", [$canonicalPlate])
+            ->exists();
+
+        return response()->json([
+            'available' => ! $exists,
+            'plate_number' => $plateNumber,
+            'message' => $exists
+                ? "Plate number {$plateNumber} is already registered. Please use a different vehicle or check My Vehicles."
+                : 'Plate number is available.',
+        ]);
     }
 
     public function show(Request $request, Vehicle $vehicle): View|JsonResponse

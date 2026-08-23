@@ -41,6 +41,28 @@ try {
         'the car is heavily blocked by a person or object',
     ]);
     const framingScores = Object.fromEntries(framingPredictions.map(({ label, score }) => [label, score]));
+    // Analyse the centre/lower region where the vehicle sits, instead of allowing
+    // grass, trees, sky, and walls to dominate the colour classification.
+    const vehicleCrop = await image.crop([
+        Math.round(image.width * 0.08),
+        Math.round(image.height * 0.30),
+        Math.round(image.width * 0.92),
+        Math.round(image.height * 0.96),
+    ]);
+    const colourLabels = ['black', 'white', 'silver', 'grey', 'red', 'blue', 'green', 'yellow', 'brown or bronze'];
+    const colourPredictions = await classifier(vehicleCrop, colourLabels.map(colour => `a ${colour} car body`));
+    const rankedColours = colourPredictions
+        .map(({ label, score }) => ({
+            colour: label.replace(/^a | car body$/g, '').trim().toUpperCase().replace('BROWN OR BRONZE', 'BROWN'),
+            score,
+        }))
+        .sort((a, b) => b.score - a.score);
+    const detectedColour = rankedColours[0]?.colour ?? null;
+    const colourGroup = ['GREY', 'SILVER', 'BROWN'].includes(detectedColour)
+        ? 'NEUTRAL_METALLIC'
+        : detectedColour;
+    const colourConfidence = Number(rankedColours[0]?.score ?? 0);
+    const colourMargin = colourConfidence - Number(rankedColours[1]?.score ?? 0);
     const viewScores = Object.fromEntries(
         Object.entries(viewLabels).map(([view, label]) => [view, Number(scores[label] ?? 0)]),
     );
@@ -83,6 +105,10 @@ try {
         confidence: Number(expectedScore.toFixed(4)),
         vehicle_confidence: Number(vehicleConfidence.toFixed(4)),
         framing_confidence: Number((framingScores['a person is the main subject standing beside a car'] ?? 0).toFixed(4)),
+        detected_colour: detectedColour,
+        colour_group: colourGroup,
+        colour_confidence: Number(colourConfidence.toFixed(4)),
+        colour_reliable: colourConfidence >= 0.24 && colourMargin >= 0.055,
     })}\n`);
 } catch (error) {
     process.stderr.write(`${error?.stack ?? error}\n`);

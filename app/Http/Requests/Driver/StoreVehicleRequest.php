@@ -43,8 +43,8 @@ class StoreVehicleRequest extends FormRequest
             'owner_address' => ['nullable', 'string', 'max:1000'],
             'chassis_no' => ['nullable', 'string', 'max:40', 'regex:/^[A-HJ-NPR-Z0-9]+$/'],
             'engine_no' => ['nullable', 'string', 'max:40', 'regex:/^[A-Z0-9]+$/'],
-            'manufacturer' => ['nullable', 'string', 'max:50'],
-            'model_name' => ['nullable', 'string', 'max:100'],
+            'manufacturer' => [$requiredForDocuments, 'nullable', 'string', 'max:50'],
+            'model_name' => [$requiredForDocuments, 'nullable', 'string', 'max:100'],
             'engine_capacity' => ['nullable', 'integer', 'min:1'],
             'fuel_type' => ['nullable', 'string', 'max:30'],
             'origin_status' => ['nullable', 'string', 'max:100'],
@@ -89,6 +89,12 @@ class StoreVehicleRequest extends FormRequest
         if ($this->filled('plate_number')) {
             $this->merge(['plate_number' => mb_strtoupper(trim($this->string('plate_number')->toString()))]);
         }
+        if ($this->hasFile('vehicle_geran')) {
+            $this->merge([
+                'brand' => trim((string) $this->input('manufacturer')),
+                'model' => trim((string) $this->input('model_name')),
+            ]);
+        }
         $upper = ['voc_reference_no', 'chassis_no', 'engine_no', 'manufacturer', 'model_name', 'fuel_type', 'origin_status', 'usage_class', 'body_type'];
         $values = [];
         foreach ($upper as $field) {
@@ -108,9 +114,22 @@ class StoreVehicleRequest extends FormRequest
         return [function (Validator $validator): void {
             if (config('vehicle_vision.enabled')) {
                 $service = app(VehicleImageValidationService::class);
+                $photoContexts = [];
                 foreach (['front_image' => 'FRONT', 'rear_image' => 'REAR', 'side_image' => 'SIDE'] as $field => $view) {
-                    if ($this->hasFile($field) && ! $service->tokenMatches((string) $this->input($field.'_validation_token'), $this->file($field), $view)) {
+                    if (! $this->hasFile($field)) {
+                        continue;
+                    }
+                    $context = $service->tokenPayload((string) $this->input($field.'_validation_token'), $this->file($field), $view);
+                    if ($context === null) {
                         $validator->errors()->add($field, "Validate the {$view} vehicle photo again before continuing.");
+                    } else {
+                        $photoContexts[$field] = $context;
+                    }
+                }
+                $colours = collect($photoContexts)->pluck('colour')->filter()->unique()->values();
+                if ($colours->count() > 1) {
+                    foreach (array_keys($photoContexts) as $field) {
+                        $validator->errors()->add($field, 'The vehicle colour does not match across the front, rear, and side photos. Upload photos of the same vehicle.');
                     }
                 }
             }

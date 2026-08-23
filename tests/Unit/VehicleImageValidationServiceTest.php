@@ -16,6 +16,7 @@ class VehicleImageValidationServiceTest extends TestCase
             '*' => Process::result(output: json_encode([
                 'is_vehicle' => true, 'detected_view' => 'FRONT', 'view_matches' => true,
                 'quality' => 'ACCEPTABLE', 'requires_review' => false, 'accepted' => true,
+                'detected_colour' => 'RED', 'colour_group' => 'RED', 'colour_reliable' => true,
                 'message' => 'Front vehicle image accepted.',
             ])),
         ]);
@@ -26,6 +27,7 @@ class VehicleImageValidationServiceTest extends TestCase
 
         $this->assertTrue($result['accepted']);
         $this->assertTrue($service->tokenMatches($result['token'], $file, 'FRONT'));
+        $this->assertSame('RED', $service->tokenPayload($result['token'], $file, 'FRONT')['colour']);
         $this->assertFalse($service->tokenMatches($result['token'], $file, 'REAR'));
         Process::assertRan(fn ($process) => in_array('FRONT', $process->command, true));
     }
