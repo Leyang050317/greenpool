@@ -55,7 +55,7 @@ class VehicleManagementTest extends TestCase
         $vehicle = Vehicle::query()->firstOrFail();
 
         $response
-            ->assertRedirect(route('driver.vehicles.show', $vehicle))
+            ->assertRedirect(route('driver.vehicles.index'))
             ->assertSessionHas('success');
 
         $this->assertDatabaseHas('vehicles', [

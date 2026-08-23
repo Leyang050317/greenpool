@@ -17,19 +17,33 @@ class DrivingLicenceParser extends DocumentParser
             'address' => $this->field($lines, ['ALAMAT', 'ADDRESS']),
         ];
 
+        $identityValueIndex = $this->identityValueIndex($lines);
         $identityLabel = $this->lineIndex($lines, 'IDENTITY NO');
         if ($identityLabel !== null) {
             $fields['name'] = $this->unlabelledName($lines, $identityLabel, $fields['name']);
             $fields['identity_no'] = $this->lineValue($lines[$identityLabel + 1] ?? null);
             $fields['date_of_birth'] = $this->lineValue($lines[$identityLabel + 2] ?? null);
+        } elseif ($identityValueIndex !== null) {
+            $fields['name'] = $this->unlabelledName($lines, $identityValueIndex, $fields['name']);
+            $fields['identity_no'] = $this->lineValue($lines[$identityValueIndex]);
         }
 
         $nationalityLabel = $this->lineIndex($lines, 'NATIONALITY');
         if ($nationalityLabel !== null) {
             $classLabel = $this->lineIndex($lines, 'CLASS', $nationalityLabel);
-            $valueIndex = max($nationalityLabel, $classLabel ?? $nationalityLabel) + 1;
-            $fields['nationality'] = $this->lineValue($lines[$valueIndex] ?? null);
-            $fields['licence_class'] = $this->lineValue($lines[$valueIndex + 1] ?? null);
+            $nationalityValue = $this->firstValueBetween($lines, $nationalityLabel + 1, $classLabel ?? count($lines));
+            if ($nationalityValue !== null) {
+                $fields['nationality'] = $this->lineValue($lines[$nationalityValue]);
+                if ($classLabel !== null) {
+                    $classValue = $this->firstValueBetween($lines, $classLabel + 1, $this->lineIndex($lines, 'VALIDITY', $classLabel) ?? count($lines));
+                    if ($classValue !== null) {
+                        $fields['licence_class'] = $this->lineValue($lines[$classValue]);
+                    }
+                }
+            } elseif ($classLabel !== null) {
+                $fields['nationality'] = $this->lineValue($lines[$classLabel + 1] ?? null);
+                $fields['licence_class'] = $this->lineValue($lines[$classLabel + 2] ?? null);
+            }
         }
 
         $validityLabel = $this->lineIndex($lines, 'VALIDITY');
@@ -52,6 +66,10 @@ class DrivingLicenceParser extends DocumentParser
             }
         }
 
+        if ($fields['date_of_birth']['value'] === null) {
+            $fields['date_of_birth'] = $this->dateOfBirthFromIdentity($fields['identity_no']);
+        }
+
         return $fields;
     }
 
@@ -69,6 +87,54 @@ class DrivingLicenceParser extends DocumentParser
     private function lineValue(?array $line): array
     {
         return $this->value($line['text'] ?? null, $line['confidence'] ?? null);
+    }
+
+    private function identityValueIndex(array $lines): ?int
+    {
+        foreach ($lines as $index => $line) {
+            if (preg_match('/^\d{12}$/D', trim((string) ($line['text'] ?? ''))) === 1) {
+                return $index;
+            }
+        }
+
+        return null;
+    }
+
+    private function firstValueBetween(array $lines, int $start, int $end): ?int
+    {
+        for ($index = $start; $index < $end; $index++) {
+            $text = trim((string) ($lines[$index]['text'] ?? ''));
+            if ($text === '' || preg_match('/PENGENALA(?:N)?|IDENTITY|NATIONALITY|WARGANEGARA|KELAS|CLASS/iu', $text) === 1
+                || preg_match('/^\d{12}$/D', $text) === 1) {
+                continue;
+            }
+
+            return $index;
+        }
+
+        return null;
+    }
+
+    private function dateOfBirthFromIdentity(array $identity): array
+    {
+        $identityNumber = (string) ($identity['value'] ?? '');
+        if (preg_match('/^(\d{2})(\d{2})(\d{2})\d{6}$/D', $identityNumber, $matches) !== 1) {
+            return $this->value(null, null);
+        }
+
+        $shortYear = (int) $matches[1];
+        $month = (int) $matches[2];
+        $day = (int) $matches[3];
+        $currentYear = (int) date('Y');
+        $latestDriverBirthYear = $currentYear - 17;
+        $candidateYears = [2000 + $shortYear, 1900 + $shortYear];
+        $year = collect($candidateYears)->first(fn (int $candidate) => $candidate <= $latestDriverBirthYear && $candidate >= $currentYear - 100);
+
+        if (! is_int($year) || ! checkdate($month, $day, $year)) {
+            return $this->value(null, null);
+        }
+
+        return $this->value(sprintf('%02d/%02d/%04d', $day, $month, $year), $identity['confidence'] ?? null);
     }
 
     private function unlabelledName(array $lines, int $identityLabel, array $fallback): array

@@ -9,8 +9,8 @@ class VehicleGeranParser extends DocumentParser
         $map = [
             'voc_reference_no' => ['NO. RUJUKAN VOC', 'VOC REFERENCE NO.'],
             'registration_no' => ['NO. PENDAFTARAN', 'NO.PENDAFTARAN', 'REGISTRATION NO.'],
-            'owner_identity_no' => ['NO. PENGENALAN PEMUNYA', 'NO. ID', 'NO.ID', 'OWNER IDENTITY NO.'],
-            'registered_owner_name' => ['NAMA PEMUNYA BERDAFTAR', 'REGISTERED OWNER NAME'],
+            'owner_identity_no' => ['NO. PENGENALAN PEMUNYA', 'NO. ID', 'NO.ID', 'NO. 1D', 'NO.1D', 'OWNER IDENTITY NO.'],
+            'registered_owner_name' => ['NAMA PEMUNYA BERDAFTAR', 'NAMA PEAUNYA BERDAFTAR', 'REGISTERED OWNER NAME'],
             'owner_address' => ['ALAMAT', 'ADDRESS'],
             'chassis_no' => ['NO. CHASIS', 'CHASSIS NO.'],
             'engine_no' => ['NO. ENJIN', 'ENGINE NO.'],
@@ -32,9 +32,9 @@ class VehicleGeranParser extends DocumentParser
         $fields = array_map(fn (array $labels) => $this->field($lines, $labels), $map);
         $fields['voc_reference_no'] = $this->vocReference($lines, $fields['voc_reference_no']);
         $fields['owner_address'] = $this->multilineAddress($lines, $fields['owner_address']);
-        $this->splitCombinedField($fields, $lines, ['NO. CHASIS / NO. ENJIN'], 'chassis_no', 'engine_no');
-        $this->splitCombinedField($fields, $lines, ['BUATAN / NAMA MODEL'], 'manufacturer', 'model_name');
-        $this->splitCombinedField($fields, $lines, ['JENIS BADAN / TAHUN DIBUAT'], 'body_type', 'manufacturing_year');
+        $this->splitCombinedField($fields, $lines, ['NO. CHASIS / NO. ENJIN', 'NO. CHASIS/NO. ENJIN'], 'chassis_no', 'engine_no');
+        $this->splitCombinedField($fields, $lines, ['BUATAN / NAMA MODEL', 'BUATAN/NAMA MODEL'], 'manufacturer', 'model_name');
+        $this->splitCombinedField($fields, $lines, ['JENIS BADAN / TAHUN DIBUAT', 'JENIS BADAN/TAHUN DIBUAT'], 'body_type', 'manufacturing_year');
 
         return $fields;
     }
