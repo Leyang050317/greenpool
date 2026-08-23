@@ -9,6 +9,7 @@ use App\Models\Vehicle;
 use App\Services\Ocr\DocumentOcrService;
 use App\Services\Ocr\OcrException;
 use App\Services\Vehicle\DocumentMatchingService;
+use App\Services\Vehicle\VehicleImageValidationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -23,6 +24,7 @@ class VehicleController extends Controller
     public function __construct(
         private readonly DocumentOcrService $documentOcr,
         private readonly DocumentMatchingService $documentMatcher,
+        private readonly VehicleImageValidationService $vehicleImageValidator,
     ) {}
 
     public function index(Request $request): View|JsonResponse
@@ -71,7 +73,7 @@ class VehicleController extends Controller
 
         try {
             $vehicle = $request->user()->vehicles()->create([
-                ...$request->safe()->except(['front_image', 'rear_image', 'side_image', 'vehicle_geran', 'driving_licence']),
+                ...$request->safe()->except(['front_image', 'rear_image', 'side_image', 'vehicle_geran', 'driving_licence', 'front_image_validation_token', 'rear_image_validation_token', 'side_image_validation_token']),
                 ...$files,
                 'vehicle_image_path' => $files['front_image_path'],
                 'verification_status' => $match['status'],
@@ -96,7 +98,7 @@ class VehicleController extends Controller
         }
 
         return redirect()
-            ->route('driver.vehicles.show', $vehicle)
+            ->route('driver.vehicles.index')
             ->with('success', $match['message']);
     }
 
@@ -120,7 +122,7 @@ class VehicleController extends Controller
             return response()->json(['message' => 'Vehicle added successfully.', 'data' => $vehicle], 201);
         }
 
-        return redirect()->route('driver.vehicles.show', $vehicle)->with('success', 'Vehicle added successfully.');
+        return redirect()->route('driver.vehicles.index')->with('success', 'Vehicle added successfully.');
     }
 
     public function ocr(Request $request): JsonResponse
@@ -139,6 +141,23 @@ class VehicleController extends Controller
                 ...$this->documentOcr->process($validated['document'], $validated['expected_document_type']),
             ]);
         } catch (OcrException $exception) {
+            return response()->json(['success' => false, 'message' => $exception->getMessage()], 422);
+        }
+    }
+
+    public function validateImage(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'image' => ['required', 'image', 'mimes:jpg,jpeg,png', 'max:8192', 'dimensions:min_width=800,min_height=450'],
+            'expected_view' => ['required', 'in:FRONT,REAR,SIDE'],
+        ]);
+
+        try {
+            return response()->json([
+                'success' => true,
+                ...$this->vehicleImageValidator->validate($validated['image'], $validated['expected_view']),
+            ]);
+        } catch (\RuntimeException $exception) {
             return response()->json(['success' => false, 'message' => $exception->getMessage()], 422);
         }
     }

@@ -43,6 +43,29 @@
             </form></section>
             <div class="mt-6"><x-phone-verification-card :user="$user" /></div>
             <div class="mt-6"><x-emergency-contacts-card :user="$user" /></div>
+            <section class="mt-8">
+                <h3 class="mb-3 text-base font-bold text-gray-900">Account</h3>
+                <div class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+                    <button type="button" @click="currentView = 'security'; $nextTick(() => window.scrollTo({ top: 0, behavior: 'smooth' }))" class="group flex w-full items-center justify-between border-b border-gray-100 px-6 py-4 text-left transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#2E7D32]">
+                        <span class="flex items-center gap-4">
+                            <x-icons.lucide name="lock-keyhole" class="h-5 w-5 text-gray-400" />
+                            <span><span class="block text-sm font-semibold text-gray-900">Change Password</span><span class="mt-0.5 block text-xs text-gray-400">Update your account password</span></span>
+                        </span>
+                        <x-icons.lucide name="chevron-right" class="h-5 w-5 text-gray-300 group-hover:text-gray-500" />
+                    </button>
+                    <button type="button" @click="currentView = 'security'; $nextTick(() => window.scrollTo({ top: 0, behavior: 'smooth' }))" class="group flex w-full items-center justify-between border-b border-gray-100 px-6 py-4 text-left transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#2E7D32]">
+                        <span class="flex items-center gap-4">
+                            <x-icons.lucide name="shield-check" class="h-5 w-5 text-gray-400" />
+                            <span><span class="block text-sm font-semibold text-gray-900">Account Settings</span><span class="mt-0.5 block text-xs text-gray-400">Manage account data</span></span>
+                        </span>
+                        <x-icons.lucide name="chevron-right" class="h-5 w-5 text-gray-300 group-hover:text-gray-500" />
+                    </button>
+                    <button type="button" @click="showLogoutModal = true" class="group flex w-full items-center justify-between px-6 py-4 text-left transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#2E7D32]">
+                        <span class="flex items-center gap-4"><x-icons.lucide name="log-out" class="h-5 w-5 text-gray-400" /><span class="text-sm font-semibold text-gray-900">Log Out</span></span>
+                        <x-icons.lucide name="chevron-right" class="h-5 w-5 text-gray-300 group-hover:text-gray-500" />
+                    </button>
+                </div>
+            </section>
         </div>
 
         <div x-cloak x-show="currentView === 'vehicles'" x-transition.opacity><section class="rounded-2xl border border-gray-200 bg-white p-6"><div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"><div><h3 class="text-xl font-bold text-gray-950">My Vehicles</h3><p class="mt-1 text-sm text-gray-600">Vehicles are available for trip management once verified and active.</p></div><a href="{{ route('driver.vehicles.create') }}" class="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-[#2E7D32] px-4 py-2 text-sm font-semibold text-white hover:bg-[#256b29]"><x-icons.lucide name="plus" class="h-4 w-4" />Add Vehicle</a></div>
