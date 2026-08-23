@@ -21,6 +21,19 @@ Laravel is a web application framework with expressive, elegant syntax. We belie
 
 Laravel is accessible, powerful, and provides tools required for large, robust applications.
 
+## Local document OCR
+
+Vehicle onboarding can prefill Malaysian Driving Licence and Vehicle Ownership Certificate fields with a local PaddleOCR worker. OCR is advisory only: the driver must review the editable fields, and Laravel calculates the final result. Verification succeeds only when both normalized names and both exact 12-digit identity numbers match.
+
+Setup (Python 3.8 or newer):
+
+```powershell
+python -m venv .venv
+.venv\Scripts\python -m pip install -r ocr\requirements.txt
+```
+
+Set `OCR_PYTHON_BINARY` in `.env` to the virtual environment's Python executable. The first scan downloads PaddleOCR models and therefore needs network access; later scans use the local model cache. Production deployments should pre-download the models during deployment. Uploaded identity documents are stored on Laravel's private `local` disk, never under `public/storage`.
+
 ## Learning Laravel
 
 Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.

@@ -15,6 +15,7 @@ class VehicleDocumentVerificationTest extends TestCase
     public function test_matching_normalized_names_and_identity_numbers_can_be_saved(): void
     {
         Storage::fake('public');
+        Storage::fake('local');
         $driver = User::factory()->create(['role' => 'driver']);
 
         $response = $this->actingAs($driver)->post(route('driver.vehicles.store'), $this->payload([
@@ -27,7 +28,7 @@ class VehicleDocumentVerificationTest extends TestCase
             'registered_owner_name' => 'ER KIM WEN',
             'licence_name' => 'ER KIM WEN',
             'owner_identity_no' => '991109040290',
-            'verification_status' => 'Pending',
+            'verification_status' => 'Verified',
         ]);
     }
 
