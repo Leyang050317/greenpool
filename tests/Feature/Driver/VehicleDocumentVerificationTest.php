@@ -30,6 +30,8 @@ class VehicleDocumentVerificationTest extends TestCase
             'registered_owner_name' => 'ER KIM WEN',
             'licence_name' => 'ER KIM WEN',
             'owner_identity_no' => '991109040290',
+            'brand' => 'PROTON',
+            'model' => 'SAGA 1.3 PREMIUM',
             'verification_status' => 'Verified',
         ]);
     }
@@ -93,6 +95,7 @@ class VehicleDocumentVerificationTest extends TestCase
             'driving_licence' => UploadedFile::fake()->image('licence.jpg', 500, 300),
             'registered_owner_name' => 'ER KIM WEN', 'owner_identity_no' => '991109040290',
             'licence_name' => 'ER KIM WEN', 'licence_identity_no' => '991109040290',
+            'manufacturer' => 'PROTON', 'model_name' => 'SAGA 1.3 PREMIUM',
         ], $overrides);
     }
 }

@@ -130,6 +130,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('vehicles/images/validate', [VehicleController::class, 'validateImage'])
             ->middleware('throttle:12,1')
             ->name('vehicles.images.validate');
+        Route::post('vehicles/plate-availability', [VehicleController::class, 'plateAvailability'])
+            ->middleware('throttle:30,1')
+            ->name('vehicles.plate-availability');
         Route::resource('vehicles', VehicleController::class);
     });
 

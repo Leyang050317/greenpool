@@ -44,6 +44,7 @@ class VehicleImageValidationService
         $result['token'] = $accepted ? Crypt::encryptString(json_encode([
             'hash' => hash_file('sha256', $image->getRealPath()),
             'view' => $expectedView,
+            'colour' => ($result['colour_reliable'] ?? false) ? ($result['colour_group'] ?? $result['detected_colour'] ?? null) : null,
             'expires_at' => now()->addMinutes(30)->timestamp,
         ], JSON_THROW_ON_ERROR)) : null;
 
@@ -52,14 +53,21 @@ class VehicleImageValidationService
 
     public function tokenMatches(string $token, UploadedFile $image, string $expectedView): bool
     {
+        return $this->tokenPayload($token, $image, $expectedView) !== null;
+    }
+
+    public function tokenPayload(string $token, UploadedFile $image, string $expectedView): ?array
+    {
         try {
             $payload = json_decode(Crypt::decryptString($token), true, 512, JSON_THROW_ON_ERROR);
 
-            return ($payload['view'] ?? null) === $expectedView
+            $matches = ($payload['view'] ?? null) === $expectedView
                 && ($payload['expires_at'] ?? 0) >= now()->timestamp
                 && hash_equals((string) ($payload['hash'] ?? ''), hash_file('sha256', $image->getRealPath()));
+
+            return $matches ? $payload : null;
         } catch (\Throwable) {
-            return false;
+            return null;
         }
     }
 
