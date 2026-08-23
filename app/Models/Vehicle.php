@@ -31,6 +31,7 @@ class Vehicle extends Model
         'voc_reference_no', 'registered_owner_name', 'owner_identity_no', 'owner_address',
         'chassis_no', 'engine_no', 'manufacturer', 'model_name', 'engine_capacity', 'fuel_type',
         'origin_status', 'usage_class', 'body_type', 'manufacturing_year', 'registration_date',
+        'bdm', 'bgk', 'btm', 'registration_condition_1', 'registration_condition_2', 'registration_condition_3',
         'licence_name', 'licence_identity_no', 'date_of_birth', 'nationality', 'licence_class',
         'licence_valid_from', 'licence_valid_until', 'licence_address',
         'verification_status',
@@ -46,6 +47,10 @@ class Vehicle extends Model
             'registration_date' => 'date',
             'licence_valid_from' => 'date',
             'licence_valid_until' => 'date',
+            'engine_capacity' => 'integer',
+            'bdm' => 'integer',
+            'bgk' => 'integer',
+            'btm' => 'integer',
         ];
     }
 

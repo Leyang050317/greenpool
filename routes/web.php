@@ -1,19 +1,19 @@
 <?php
 
 use App\Http\Controllers\AttractionController;
+use App\Http\Controllers\Auth\LinkedAccountController;
 use App\Http\Controllers\Driver\DriverBookingController;
 use App\Http\Controllers\Driver\HomeController as DriverHomeController;
 use App\Http\Controllers\Driver\ProfileController as DriverProfileController;
 use App\Http\Controllers\Driver\TripController;
 use App\Http\Controllers\Driver\VehicleController;
+use App\Http\Controllers\EmergencyContactController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\Passenger\HomeController as PassengerHomeController;
 use App\Http\Controllers\Passenger\PassengerBookingController;
-use App\Http\Controllers\NotificationController;
-use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PhoneVerificationController;
-use App\Http\Controllers\EmergencyContactController;
+use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RatingController;
-use App\Http\Controllers\Auth\LinkedAccountController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
@@ -124,6 +124,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->name('vehicles.activate');
         Route::patch('vehicles/{vehicle}/deactivate', [VehicleController::class, 'deactivate'])
             ->name('vehicles.deactivate');
+        Route::post('vehicles/documents/ocr', [VehicleController::class, 'ocr'])
+            ->middleware('throttle:10,1')
+            ->name('vehicles.documents.ocr');
         Route::resource('vehicles', VehicleController::class);
     });
 
@@ -136,5 +139,5 @@ use App\Http\Controllers\Auth\GoogleLoginController;
 Route::get('/auth/google', [GoogleLoginController::class, 'redirectToGoogle'])->name('auth.google');
 Route::get('/auth/google/callback', [GoogleLoginController::class, 'handleGoogleCallback'])->name('auth.google.callback');
 
-Route::get('/auth/google/role', [App\Http\Controllers\Auth\GoogleLoginController::class, 'showRoleSelection'])->name('auth.google.role');
-Route::post('/auth/google/role', [App\Http\Controllers\Auth\GoogleLoginController::class, 'storeRole'])->name('auth.google.storeRole');
+Route::get('/auth/google/role', [GoogleLoginController::class, 'showRoleSelection'])->name('auth.google.role');
+Route::post('/auth/google/role', [GoogleLoginController::class, 'storeRole'])->name('auth.google.storeRole');
