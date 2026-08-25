@@ -14,7 +14,7 @@ class TripDistanceService
 
         try {
             $shouldOptimize = $optimizeWaypointOrder && $intermediates !== [];
-            $fieldMask = 'routes.distanceMeters,routes.duration'.($shouldOptimize ? ',routes.optimizedIntermediateWaypointIndex' : '');
+            $fieldMask = 'routes.distanceMeters,routes.duration,routes.polyline.encodedPolyline'.($shouldOptimize ? ',routes.optimizedIntermediateWaypointIndex' : '');
             $payload = [
                 'origin' => ['location' => ['latLng' => $this->latLng($departure)]],
                 'destination' => ['location' => ['latLng' => $this->latLng($destination)]],
@@ -64,6 +64,7 @@ class TripDistanceService
         $result = [
             'estimated_distance_km' => round(((float) $route['distanceMeters']) / 1000, 2),
             'estimated_duration_seconds' => $duration,
+            'encoded_polyline' => data_get($route, 'polyline.encodedPolyline'),
         ];
         if ($optimizeWaypointOrder && $intermediates !== []) {
             $indexes = $route['optimizedIntermediateWaypointIndex'] ?? [];

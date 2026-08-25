@@ -18,6 +18,7 @@ class DriverProfileControllerTest extends TestCase
             ->get(route('driver.profile.edit'))
             ->assertOk()
             ->assertViewHas('user', fn (User $user) => $user->is($driver))
+            ->assertSee('<title>Profile - GreenPool</title>', false)
             ->assertSee('Personal Info')
             ->assertSee('My Vehicles')
             ->assertSee('Driving Preferences');

@@ -62,7 +62,7 @@ class BookingModuleTest extends TestCase
             ->assertSee('Pending Requests')
             ->assertSee('Mid Valley Megamall')
             ->assertSee('Recent updates')
-            ->assertSee('Trip cancelled')
+            ->assertSee('Trip Cancelled')
             ->assertSee('Total Bookings')
             ->assertSee('Completed Rides')
             ->assertSee('Cancelled / Rejected');
@@ -350,7 +350,7 @@ class BookingModuleTest extends TestCase
         $notification = $driver->unreadNotifications()->where('type', BookingRequestNotification::class)->firstOrFail();
 
         $this->assertSame('New booking request', $notification->data['title']);
-        $this->assertStringContainsString('Passenger One submitted a booking request to Suria KLCC.', $notification->data['message']);
+        $this->assertStringContainsString('Passenger One requested a seat on your trip from Campus Main Gate → Suria KLCC.', $notification->data['message']);
         $this->assertSame(route('driver.booking-requests.show', Booking::query()->firstOrFail()), $notification->data['url']);
     }
 
@@ -485,7 +485,7 @@ class BookingModuleTest extends TestCase
         $notification = $driver->unreadNotifications()->where('type', BookingRequestNotification::class)->firstOrFail();
 
         $this->assertSame('Booking request cancelled', $notification->data['title']);
-        $this->assertStringContainsString('Passenger Two cancelled their booking request to Mid Valley Megamall.', $notification->data['message']);
+        $this->assertStringContainsString('Passenger Two cancelled their booking request for Campus Main Gate → Mid Valley Megamall.', $notification->data['message']);
         $this->assertSame(route('driver.booking-requests.show', $booking), $notification->data['url']);
     }
 
@@ -530,9 +530,9 @@ class BookingModuleTest extends TestCase
 
         $notification = $passenger->unreadNotifications()->where('type', BookingStatusNotification::class)->firstOrFail();
 
-        $this->assertSame('Booking request accepted', $notification->data['title']);
-        $this->assertStringContainsString('Driver One accepted your booking request to Suria KLCC.', $notification->data['message']);
-        $this->assertSame(route('passenger.bookings.history'), $notification->data['url']);
+        $this->assertSame('Booking Accepted', $notification->data['title']);
+        $this->assertStringContainsString('Your booking for Campus Main Gate → Suria KLCC has been accepted.', $notification->data['message']);
+        $this->assertSame(route('passenger.bookings.show', $booking), $notification->data['url']);
         Event::assertDispatched(
             BookingStatusUpdated::class,
             fn (BookingStatusUpdated $event) => $event->passengerNotificationType === 'booking_request_accepted'
@@ -642,9 +642,9 @@ class BookingModuleTest extends TestCase
 
         $notification = $passenger->unreadNotifications()->where('type', BookingStatusNotification::class)->firstOrFail();
 
-        $this->assertSame('Booking request rejected', $notification->data['title']);
-        $this->assertStringContainsString('Driver Two rejected your booking request to Mid Valley Megamall.', $notification->data['message']);
-        $this->assertSame(route('passenger.bookings.history'), $notification->data['url']);
+        $this->assertSame('Booking Rejected', $notification->data['title']);
+        $this->assertStringContainsString('Your booking request for Campus Main Gate → Mid Valley Megamall was rejected.', $notification->data['message']);
+        $this->assertSame(route('passenger.bookings.show', $booking), $notification->data['url']);
         Event::assertDispatched(
             BookingStatusUpdated::class,
             fn (BookingStatusUpdated $event) => $event->passengerNotificationType === 'booking_request_rejected'

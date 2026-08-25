@@ -26,7 +26,7 @@ class BookingRequestNotification extends Notification
 
         $isCancelled = $this->action === 'cancelled';
         $passengerName = $this->booking->passenger->name;
-        $destination = $this->booking->trip->destination;
+        $route = $this->booking->trip->departure_location.' → '.$this->booking->trip->destination;
 
         return [
             'booking_id' => $this->booking->id,
@@ -39,8 +39,8 @@ class BookingRequestNotification extends Notification
             'title' => $isCancelled ? 'Booking request cancelled' : 'New booking request',
             'icon' => $isCancelled ? 'circle-x' : 'clipboard-list',
             'message' => $isCancelled
-                ? "{$passengerName} cancelled their booking request to {$destination}."
-                : "{$passengerName} submitted a booking request to {$destination}.",
+                ? "{$passengerName} cancelled their booking request for {$route}."
+                : "{$passengerName} requested a seat on your trip from {$route}.",
             'url' => route('driver.booking-requests.show', $this->booking),
         ];
     }

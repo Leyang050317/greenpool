@@ -58,7 +58,7 @@
                                             ? $booking->trip->status
                                             : $booking->booking_status; 
                                     @endphp
-                                    <tr>
+                                    <tr x-data data-booking-url="{{ route('passenger.bookings.show', $booking) }}" tabindex="0" role="link" @click="window.location.href = $el.dataset.bookingUrl" @keydown.enter="window.location.href = $el.dataset.bookingUrl" class="cursor-pointer transition hover:bg-green-50/50 focus:outline-none focus-visible:bg-green-50">
                                         <td class="px-4 py-3 text-sm">
                                             <div class="font-semibold text-gray-900">{{ $booking->trip->departure_location }} to {{ $booking->trip->destination }}</div>
                                             <div class="flex flex-wrap items-center gap-2 text-xs text-gray-500">
@@ -76,7 +76,7 @@
                                         <td class="whitespace-nowrap px-4 py-3">
                                             <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-medium {{ $badge[$displayStatus] }}">{{ $displayStatus }}</span>
                                         </td>
-                                        <td class="whitespace-nowrap px-4 py-3">
+                                        <td class="whitespace-nowrap px-4 py-3" @click.stop>
                                             <div class="flex items-center gap-2">
                                             @if($booking->booking_status === 'Pending')
                                                 <x-trip-confirmation

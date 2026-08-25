@@ -1,0 +1,19 @@
+@props(['trip'])
+
+@php $issueTypes = ['personal_emergency' => 'Personal Emergency', 'medical_emergency' => 'Medical Emergency', 'other' => 'Other']; @endphp
+
+<section x-data="{ open: false }" class="rounded-2xl border border-red-200 bg-red-50 p-5" aria-label="Report an issue">
+    <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"><div><h2 class="flex items-center gap-2 text-sm font-semibold text-red-900"><x-icons.lucide name="triangle-alert" class="h-4 w-4" />Report an Issue</h2><p class="mt-1 text-xs leading-5 text-red-800">Report an issue to your driver during this active trip.</p></div><button type="button" @click="open = true" class="shrink-0 rounded-xl border border-red-200 bg-white px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-100">Report an Issue</button></div>
+    @if($trip->emergencies->isNotEmpty())
+        <div class="mt-4 space-y-3 border-t border-red-200 pt-4">
+            @foreach($trip->emergencies as $emergency)
+                @php $tone = ['Active' => 'bg-red-100 text-red-700', 'Acknowledged' => 'bg-amber-100 text-amber-700'][$emergency->status] ?? 'bg-slate-100 text-slate-700'; @endphp
+                <div class="rounded-xl bg-white/80 p-3"><div class="flex flex-wrap items-center justify-between gap-2"><div><p class="text-xs font-semibold text-slate-900">{{ $emergency->issueLabel() }}</p><p class="mt-1 text-xs text-slate-500">Reported by {{ $emergency->user->name }} · {{ $emergency->triggered_at->format('g:i A') }}</p></div><span class="rounded-full px-2 py-1 text-xs font-semibold {{ $tone }}">{{ $emergency->status }}</span></div>
+                    @if($emergency->description)<p class="mt-2 text-xs text-slate-600">{{ $emergency->description }}</p>@endif
+                    @if($emergency->status === 'Active' && $emergency->user_id !== auth()->id())<form method="POST" action="{{ route('emergencies.acknowledge', $emergency) }}" class="mt-3">@csrf @method('PATCH')<button class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 hover:bg-amber-100">Acknowledge</button></form>@endif
+                </div>
+            @endforeach
+        </div>
+    @endif
+    <div x-cloak x-show="open" class="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true"><div class="absolute inset-0 bg-slate-900/40" @click="open = false"></div><form method="POST" action="{{ route('trips.emergencies.store', $trip) }}" class="relative w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">@csrf <h2 class="text-lg font-semibold text-gray-900">Report an Issue</h2><p class="mt-2 text-sm text-gray-500">Select an issue to share with your driver.</p><fieldset class="mt-5 space-y-3"><legend class="text-sm font-medium text-gray-700">Select an issue</legend>@foreach($issueTypes as $value => $label)<label class="flex cursor-pointer items-center gap-3 rounded-xl border border-gray-200 px-3 py-3 text-sm text-gray-700 hover:border-red-200 hover:bg-red-50"><input type="radio" name="issue_type" value="{{ $value }}" required class="text-red-600 focus:ring-red-500" />{{ $label }}</label>@endforeach</fieldset><label class="mt-5 block text-sm font-medium text-gray-700" for="passenger-issue-description-{{ $trip->trip_id }}">Description <span class="font-normal text-gray-400">(optional)</span></label><textarea id="passenger-issue-description-{{ $trip->trip_id }}" name="description" rows="3" maxlength="1000" class="mt-2 w-full rounded-xl border-gray-200 text-sm focus:border-red-500 focus:ring-red-500"></textarea><div class="mt-6 flex flex-wrap justify-end gap-3"><button type="button" @click="open = false" class="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button><button class="rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700">Submit Report</button></div></form></div>
+</section>
