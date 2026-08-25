@@ -27,7 +27,7 @@ class TripDistanceService
                 $payload['optimizeWaypointOrder'] = true;
             }
 
-            $response = Http::acceptJson()->connectTimeout(5)->timeout(12)
+            $response = Http::acceptJson()->connectTimeout(8)->timeout(20)->retry(2, 300, throw: false)
                 ->withHeaders([
                     'X-Goog-Api-Key' => config('services.google_maps.key'),
                     'X-Goog-FieldMask' => $fieldMask,

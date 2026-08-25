@@ -12,6 +12,7 @@ use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\Passenger\HomeController as PassengerHomeController;
 use App\Http\Controllers\Passenger\PassengerBookingController;
 use App\Http\Controllers\PhoneVerificationController;
+use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RatingController;
 use Illuminate\Support\Facades\Auth;
@@ -60,6 +61,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/ratings/{rating}/submitted', [RatingController::class, 'submitted'])->name('ratings.submitted');
     Route::get('/ratings/{rating}/edit', [RatingController::class, 'edit'])->name('ratings.edit');
     Route::patch('/ratings/{rating}', [RatingController::class, 'update'])->name('ratings.update');
+
+    Route::get('/payments', [PaymentController::class, 'index'])->name('payments.index');
+    Route::get('/payments/bookings/{booking}/checkout', [PaymentController::class, 'checkout'])->name('payments.checkout');
+    Route::post('/payments/{payment}', [PaymentController::class, 'store'])->name('payments.store');
+    Route::get('/payments/{payment}/receipt', [PaymentController::class, 'receipt'])->name('payments.receipt');
+    Route::get('/payments/{payment}', [PaymentController::class, 'show'])->name('payments.show');
 
     Route::get('/attractions', [AttractionController::class, 'index'])
         ->name('attractions.index');
@@ -119,6 +126,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::patch('trips/{trip}/bookings/{booking}/pickup', [TripController::class, 'pickup'])->name('trips.bookings.pickup');
         Route::patch('trips/{trip}/cancel', [TripController::class, 'cancel'])->name('trips.cancel');
         Route::get('trips/locations/autocomplete', [TripController::class, 'autocomplete'])->name('trips.locations.autocomplete');
+        Route::get('trips/fare-estimate', [TripController::class, 'fareEstimate'])->name('trips.fare-estimate');
         Route::resource('trips', TripController::class);
         Route::patch('vehicles/{vehicle}/activate', [VehicleController::class, 'activate'])
             ->name('vehicles.activate');

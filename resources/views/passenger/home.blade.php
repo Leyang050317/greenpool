@@ -25,7 +25,23 @@
                 </a>
             </div>
 
-            @if($pendingRatingBooking)
+            @if($pendingPaymentBooking)
+                <section class="mt-8 overflow-hidden rounded-xl border border-green-200 bg-white shadow-sm" aria-labelledby="pending-payment-title">
+                    <div class="bg-green-50 px-5 py-4 sm:px-6">
+                        <p class="text-xs font-semibold uppercase text-green-700">Trip completed</p>
+                        <h2 id="pending-payment-title" class="mt-1 text-xl font-bold text-slate-900">Complete your payment</h2>
+                    </div>
+                    <div class="flex flex-col gap-5 p-5 sm:flex-row sm:items-center sm:p-6">
+                        <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-green-100 text-sm font-bold text-green-700">RM</div>
+                        <div class="min-w-0 flex-1">
+                            <p class="font-semibold text-slate-900">{{ $pendingPaymentBooking->trip->user->name }}</p>
+                            <p class="mt-1 text-sm text-slate-500">{{ $pendingPaymentBooking->trip->departure_location }} to {{ $pendingPaymentBooking->trip->destination }}</p>
+                            <p class="mt-2 text-xl font-bold text-[#2E7D32]">RM {{ number_format((float) $pendingPaymentBooking->payment->amount, 2) }}</p>
+                        </div>
+                        <a href="{{ route('payments.checkout', $pendingPaymentBooking) }}" class="w-full rounded-lg bg-[#22C55E] px-5 py-3 text-center text-sm font-bold text-white hover:bg-green-600 sm:w-auto">Pay Now</a>
+                    </div>
+                </section>
+            @elseif($pendingRatingBooking)
                 <section class="mt-8 overflow-hidden rounded-xl border border-green-200 bg-white shadow-sm" aria-labelledby="pending-rating-title">
                     <div class="bg-green-50 px-5 py-4 sm:px-6">
                         <p class="text-xs font-semibold uppercase text-green-700">Trip completed</p>

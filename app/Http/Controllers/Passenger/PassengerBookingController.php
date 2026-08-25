@@ -210,6 +210,7 @@ class PassengerBookingController extends Controller
                     ->withCount('ratingsReceived'),
                 'trip.vehicle',
                 'ratings',
+                'payment',
             ])
             ->latest()
             ->paginate(8);

@@ -13,6 +13,8 @@ use App\Notifications\BookingStatusNotification;
 use App\Services\Routing\TripDistanceService;
 use App\Services\Routing\TripLocationService;
 use App\Services\Routing\TripRoutingException;
+use App\Services\PaymentService;
+use App\Services\FareRecommendationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -22,7 +24,7 @@ use Illuminate\View\View;
 
 class TripController extends Controller
 {
-    public function __construct(private readonly TripDistanceService $tripDistanceService, private readonly TripLocationService $tripLocationService) {}
+    public function __construct(private readonly TripDistanceService $tripDistanceService, private readonly TripLocationService $tripLocationService, private readonly PaymentService $paymentService, private readonly FareRecommendationService $fareRecommendationService) {}
 
     public function autocomplete(Request $request): JsonResponse
     {
@@ -33,6 +35,27 @@ class TripController extends Controller
         } catch (TripRoutingException $exception) {
             return response()->json(['message' => $exception->getMessage(), 'errors' => [$exception->errorField => [$exception->getMessage()]]], 422);
         }
+    }
+
+    public function fareEstimate(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'departure_place_id' => ['required', 'string', 'max:255'],
+            'destination_place_id' => ['required', 'string', 'max:255'],
+        ]);
+
+        try {
+            $departure = $this->tripLocationService->resolve($validated['departure_place_id'], 'departure_place_id');
+            $destination = $this->tripLocationService->resolve($validated['destination_place_id'], 'destination_place_id');
+            $route = $this->tripDistanceService->calculate($departure, $destination);
+        } catch (TripRoutingException $exception) {
+            return response()->json(['message' => $exception->getMessage()], 422);
+        }
+
+        return response()->json(['data' => [
+            ...$route,
+            ...$this->fareRecommendationService->recommend($route['estimated_distance_km']),
+        ]]);
     }
 
     public function index(Request $request): View|JsonResponse
@@ -74,7 +97,12 @@ class TripController extends Controller
         }
 
         $routingData = $this->routingDataOrEmpty($locations);
-        $trip = $request->user()->trips()->create([...$request->tripData(), ...$locations['attributes'], ...$routingData]);
+        $tripData = $request->tripData();
+        if (blank($request->input('price_per_passenger')) && isset($routingData['estimated_distance_km'])) {
+            $tripData['price_per_passenger'] = $this->fareRecommendationService
+                ->recommend((float) $routingData['estimated_distance_km'])['recommended_price'];
+        }
+        $trip = $request->user()->trips()->create([...$tripData, ...$locations['attributes'], ...$routingData]);
         TripCreated::dispatch($trip);
 
         return $this->response($request, $trip, 'Trip published successfully.', 201, 'driver.trips.index');
@@ -168,7 +196,10 @@ class TripController extends Controller
         $bookingsToNotify = DB::transaction(function () use ($trip) {
             $trip->update(['status' => 'Completed', 'completed_at' => now()]);
 
-            return $this->acceptedBookingsFor($trip);
+            $bookings = $this->acceptedBookingsFor($trip);
+            $bookings->each(fn (Booking $booking) => $this->paymentService->createPendingForBooking($booking));
+
+            return $bookings;
         });
         $this->broadcastBookingUpdates($bookingsToNotify);
 
