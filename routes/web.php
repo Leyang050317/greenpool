@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AttractionController;
 use App\Http\Controllers\Auth\LinkedAccountController;
+use App\Http\Controllers\ChatController;
 use App\Http\Controllers\Driver\DriverBookingController;
 use App\Http\Controllers\Driver\HomeController as DriverHomeController;
 use App\Http\Controllers\Driver\ProfileController as DriverProfileController;
@@ -67,6 +68,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/payments/{payment}', [PaymentController::class, 'store'])->name('payments.store');
     Route::get('/payments/{payment}/receipt', [PaymentController::class, 'receipt'])->name('payments.receipt');
     Route::get('/payments/{payment}', [PaymentController::class, 'show'])->name('payments.show');
+
+    Route::get('/messages', [ChatController::class, 'index'])->name('messages.index');
+    Route::get('/bookings/{booking}/chat', [ChatController::class, 'show'])->name('bookings.chat.show');
+    Route::post('/bookings/{booking}/chat', [ChatController::class, 'store'])->name('bookings.chat.store');
 
     Route::get('/attractions', [AttractionController::class, 'index'])
         ->name('attractions.index');

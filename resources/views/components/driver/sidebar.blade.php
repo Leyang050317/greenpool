@@ -1,9 +1,11 @@
 @php
     $unreadNotificationCount = Auth::user()->unreadNotifications()->count();
+    $unreadMessageCount = Auth::user()->receivedMessages()->whereNull('read_at')->count();
     $mainNavigation = [
         ['label' => 'Dashboard', 'icon' => 'layout-dashboard', 'href' => route('driver.home'), 'active' => request()->routeIs('driver.home')],
         ['label' => 'My Trips', 'icon' => 'route', 'href' => route('driver.trips.index'), 'active' => request()->routeIs('driver.trips.*')],
         ['label' => 'Booking Requests', 'icon' => 'clipboard-list', 'href' => route('driver.booking-requests.index'), 'active' => request()->routeIs('driver.booking-requests.*')],
+        ['label' => 'Messages', 'icon' => 'message-square', 'href' => route('messages.index'), 'active' => request()->routeIs('messages.*', 'bookings.chat.*'), 'unread' => $unreadMessageCount > 0, 'unreadLabel' => 'Unread messages'],
         ['label' => 'My Vehicles', 'icon' => 'car-front', 'href' => route('driver.vehicles.index'), 'active' => request()->routeIs('driver.vehicles.*')],
         ['label' => 'Tourist Attractions', 'icon' => 'map-pinned', 'href' => route('attractions.index'), 'active' => request()->routeIs('attractions.*')],
         ['label' => 'Notifications', 'icon' => 'bell', 'href' => route('notifications.index'), 'active' => request()->routeIs('notifications.*'), 'unread' => $unreadNotificationCount > 0],
@@ -74,7 +76,7 @@
                             @endif
                             @if ($item['unread'] ?? false)
                                 <span class="absolute right-0 top-0 h-2 w-2 rounded-full bg-[#2E7D32] ring-2 ring-white" aria-hidden="true"></span>
-                                <span class="sr-only">Unread notifications</span>
+                                <span class="sr-only">{{ $item['unreadLabel'] ?? 'Unread notifications' }}</span>
                             @endif
                         </span>
                         <span x-show="sidebarExpanded || mobileDrawerOpen" x-transition.opacity.duration.150ms class="ml-3 whitespace-nowrap">
