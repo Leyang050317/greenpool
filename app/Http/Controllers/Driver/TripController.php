@@ -20,6 +20,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Throwable;
 use Illuminate\View\View;
 
 class TripController extends Controller
@@ -185,7 +186,8 @@ class TripController extends Controller
         } catch (TripRoutingException $exception) {
             return $this->routingError($request, $exception);
         }
-        $this->broadcastBookingUpdates($bookingsToNotify);
+        $this->notifyPassengers($bookingsToNotify, 'Started');
+        $this->broadcastBookingUpdates($bookingsToNotify, null, 'trip_started');
 
         return $this->response($request, $trip->refresh(), 'Journey started successfully.', 200, 'driver.trips.journey');
     }
@@ -201,7 +203,8 @@ class TripController extends Controller
 
             return $bookings;
         });
-        $this->broadcastBookingUpdates($bookingsToNotify);
+        $this->notifyPassengers($bookingsToNotify, 'Completed');
+        $this->broadcastBookingUpdates($bookingsToNotify, null, 'trip_completed');
 
         if (! $request->expectsJson()) {
             $bookingToRate = $trip->bookings()
@@ -266,15 +269,14 @@ class TripController extends Controller
     public function cancel(Request $request, Trip $trip): RedirectResponse|JsonResponse
     {
         $this->ensureStatus($request, $trip, ['Scheduled']);
-        $bookingsToNotify = DB::transaction(function () use ($trip) {
+        $cancellation = DB::transaction(function () use ($trip) {
             $trip->update(['status' => 'Cancelled', 'cancelled_at' => now()]);
 
             return $this->cancelOpenBookingsFor($trip);
         });
-        $bookingsToNotify->each(
-            fn (Booking $booking) => $booking->passenger->notify(new BookingStatusNotification($booking, 'Cancelled'))
-        );
-        $this->broadcastBookingUpdates($bookingsToNotify, 'trip_cancelled');
+        $this->notifyPassengers($cancellation['accepted'], 'Cancelled');
+        $acceptedIds = $cancellation['accepted']->modelKeys();
+        $this->broadcastBookingUpdates($cancellation['all'], null, 'trip_cancelled', $acceptedIds);
 
         return $this->response($request, $trip->refresh(), 'Trip cancelled successfully.', 200, 'driver.trips.index');
     }
@@ -303,12 +305,19 @@ class TripController extends Controller
                     ->orderByRaw('case when pickup_sequence is null then 1 else 0 end')
                     ->orderBy('pickup_sequence')
                     ->oldest(),
+                'emergencies' => fn ($emergencies) => $emergencies->with('user')->latest('triggered_at'),
+                'latestLocation',
             ])
             ->withSum(['bookings as accepted_passengers_count' => fn ($booking) => $booking->where('booking_status', 'Accepted')], 'number_of_seats')
             ->orderBy('departure_at')
             ->get();
 
-        return $request->expectsJson() ? response()->json(['data' => $trips]) : view('driver.trips.journey', compact('trips'));
+        $mapRoutes = $trips
+            ->where('status', 'In Progress')
+            ->mapWithKeys(fn (Trip $trip) => [$trip->trip_id => $this->mapRoute($trip)])
+            ->all();
+
+        return $request->expectsJson() ? response()->json(['data' => $trips]) : view('driver.trips.journey', compact('trips', 'mapRoutes'));
     }
 
     public function history(Request $request): View|JsonResponse
@@ -421,15 +430,17 @@ class TripController extends Controller
 
     private function cancelOpenBookingsFor(Trip $trip)
     {
-        return Booking::query()
+        $bookings = Booking::query()
             ->with(['passenger', 'trip.user'])
             ->where('trip_id', $trip->getKey())
             ->whereIn('booking_status', ['Pending', 'Accepted'])
             ->lockForUpdate()
             ->oldest()
-            ->get()
-            ->each
-            ->update(['booking_status' => 'Cancelled']);
+            ->get();
+        $accepted = $bookings->where('booking_status', 'Accepted')->values();
+        $bookings->each->update(['booking_status' => 'Cancelled']);
+
+        return ['all' => $bookings, 'accepted' => $accepted];
     }
 
     private function assertRouteCoordinates(Trip $trip, $bookings): void
@@ -468,17 +479,70 @@ class TripController extends Controller
             && (float) $location['longitude'] >= -180 && (float) $location['longitude'] <= 180;
     }
 
+    private function mapRoute(Trip $trip): ?array
+    {
+        if (blank(config('services.google_maps.browser_key'))) {
+            return null;
+        }
+
+        $bookings = $trip->bookings;
+        $locations = [
+            $this->tripDeparture($trip),
+            $this->tripDestination($trip),
+            ...$bookings->map(fn (Booking $booking) => $this->bookingPickup($booking))->all(),
+        ];
+
+        if (collect($locations)->contains(fn (array $location) => ! $this->hasCoordinates($location))) {
+            return null;
+        }
+
+        try {
+            return $this->tripDistanceService->calculate(
+                $this->tripDeparture($trip),
+                $this->tripDestination($trip),
+                $bookings->map(fn (Booking $booking) => $this->bookingPickup($booking))->all(),
+            );
+        } catch (TripRoutingException) {
+            return null;
+        }
+    }
+
     private function persistPickupSequence($bookings, array $optimizedIndexes): void
     {
         foreach ($optimizedIndexes as $sequence => $index) {
             $bookings->get($index)?->update(['pickup_sequence' => $sequence + 1]);
         }
     }
-    private function broadcastBookingUpdates($bookings, ?string $passengerNotificationType = null): void
+    private function notifyPassengers($bookings, string $status): void
+    {
+        foreach ($bookings as $booking) {
+            try {
+                $booking->passenger->notify(new BookingStatusNotification($booking, $status));
+            } catch (Throwable $exception) {
+                Log::warning('Trip lifecycle notification could not be created.', [
+                    'booking_id' => $booking->id,
+                    'trip_id' => $booking->trip_id,
+                    'status' => $status,
+                    'exception' => $exception->getMessage(),
+                ]);
+            }
+        }
+    }
+
+    private function broadcastBookingUpdates($bookings, ?string $driverNotificationType = null, ?string $passengerNotificationType = null, array $passengerNotificationBookingIds = []): void
     {
         foreach ($bookings as $booking) {
             $booking->unsetRelation('trip')->load('trip');
-            BookingStatusUpdated::dispatch($booking, null, $passengerNotificationType);
+            $shouldNotifyPassenger = $passengerNotificationBookingIds === [] || in_array($booking->getKey(), $passengerNotificationBookingIds, true);
+            try {
+                BookingStatusUpdated::dispatch($booking, $driverNotificationType, $shouldNotifyPassenger ? $passengerNotificationType : null);
+            } catch (Throwable $exception) {
+                Log::warning('Trip lifecycle update could not be broadcast.', [
+                    'booking_id' => $booking->id,
+                    'trip_id' => $booking->trip_id,
+                    'exception' => $exception->getMessage(),
+                ]);
+            }
         }
     }
 

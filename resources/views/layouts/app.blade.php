@@ -1,3 +1,28 @@
+@php
+    $pageTitle = Auth::user()?->role === 'driver' ? match (true) {
+        request()->routeIs('driver.home') => 'Dashboard',
+        request()->routeIs('driver.trips.index') => 'My Trips',
+        request()->routeIs('driver.trips.create') => 'Create Trip',
+        request()->routeIs('driver.trips.edit') => 'Edit Trip',
+        request()->routeIs('driver.trips.show') => 'Trip Details',
+        request()->routeIs('driver.trips.journey') => 'My Journey',
+        request()->routeIs('driver.trips.history') => 'Trip History',
+        request()->routeIs('driver.booking-requests.index') => 'My Booking Requests',
+        request()->routeIs('driver.booking-requests.show') => 'Booking Request Details',
+        request()->routeIs('driver.vehicles.index') => 'My Vehicles',
+        request()->routeIs('driver.vehicles.create') => 'Add Vehicle',
+        request()->routeIs('driver.vehicles.edit') => 'Edit Vehicle',
+        request()->routeIs('driver.vehicles.show') => 'Vehicle Details',
+        request()->routeIs('driver.profile.*') => 'Profile',
+        request()->routeIs('notifications.*') => 'Notifications',
+        request()->routeIs('messages.*', 'bookings.chat.*') => 'Messages',
+        request()->routeIs('payments.*') => 'Payments',
+        request()->routeIs('ratings.*') => 'Ratings',
+        request()->routeIs('attractions.*') => 'Tourist Attractions',
+        default => config('app.name', 'GreenPool'),
+    } : config('app.name', 'Laravel');
+@endphp
+
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
     <head>
@@ -5,7 +30,7 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="csrf-token" content="{{ csrf_token() }}">
 
-        <title>{{ config('app.name', 'Laravel') }}</title>
+        <title>{{ $pageTitle }} - GreenPool</title>
 
         <!-- Fonts -->
         <link rel="preconnect" href="https://fonts.bunny.net">

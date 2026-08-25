@@ -7,8 +7,10 @@ use App\Http\Controllers\Driver\DriverBookingController;
 use App\Http\Controllers\Driver\HomeController as DriverHomeController;
 use App\Http\Controllers\Driver\ProfileController as DriverProfileController;
 use App\Http\Controllers\Driver\TripController;
+use App\Http\Controllers\Driver\TripLocationController;
 use App\Http\Controllers\Driver\VehicleController;
 use App\Http\Controllers\EmergencyContactController;
+use App\Http\Controllers\EmergencyController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\Passenger\HomeController as PassengerHomeController;
 use App\Http\Controllers\Passenger\PassengerBookingController;
@@ -108,8 +110,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('passenger.bookings.store');
     Route::get('/passenger/booking/history', [PassengerBookingController::class, 'history'])
         ->name('passenger.bookings.history');
+    Route::get('/passenger/bookings/{booking}', [PassengerBookingController::class, 'show'])
+        ->name('passenger.bookings.show');
     Route::patch('/passenger/booking/{booking}/cancel', [PassengerBookingController::class, 'cancel'])
         ->name('passenger.bookings.cancel');
+    Route::post('/trips/{trip}/emergencies', [EmergencyController::class, 'store'])->name('trips.emergencies.store');
+    Route::patch('/emergencies/{emergency}/acknowledge', [EmergencyController::class, 'acknowledge'])->name('emergencies.acknowledge');
 
     Route::middleware('driver')->prefix('driver')->name('driver.')->group(function () {
         Route::get('profile', [DriverProfileController::class, 'edit'])->name('profile.edit');
@@ -130,6 +136,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::patch('trips/{trip}/complete', [TripController::class, 'complete'])->name('trips.complete');
         Route::patch('trips/{trip}/bookings/{booking}/pickup', [TripController::class, 'pickup'])->name('trips.bookings.pickup');
         Route::patch('trips/{trip}/cancel', [TripController::class, 'cancel'])->name('trips.cancel');
+        Route::post('trips/{trip}/location', [TripLocationController::class, 'store'])->middleware('throttle:15,1')->name('trips.location.store');
         Route::get('trips/locations/autocomplete', [TripController::class, 'autocomplete'])->name('trips.locations.autocomplete');
         Route::get('trips/fare-estimate', [TripController::class, 'fareEstimate'])->name('trips.fare-estimate');
         Route::resource('trips', TripController::class);

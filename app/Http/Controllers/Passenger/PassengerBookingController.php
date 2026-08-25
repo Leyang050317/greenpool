@@ -10,6 +10,7 @@ use App\Models\Booking;
 use App\Models\Trip;
 use App\Notifications\BookingRequestNotification;
 use App\Services\Routing\TripLocationService;
+use App\Services\Routing\TripDistanceService;
 use App\Services\Routing\TripRoutingException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -24,7 +25,10 @@ class PassengerBookingController extends Controller
     private const DESTINATION_CLOSE_RADIUS_KM = 5;
     private const DESTINATION_NEAR_RADIUS_KM = 10;
 
-    public function __construct(private readonly TripLocationService $tripLocationService) {}
+    public function __construct(
+        private readonly TripLocationService $tripLocationService,
+        private readonly TripDistanceService $tripDistanceService,
+    ) {}
 
     public function autocomplete(Request $request): JsonResponse
     {
@@ -218,6 +222,32 @@ class PassengerBookingController extends Controller
         return view('passenger.booking.history', compact('bookings'));
     }
 
+    public function show(Request $request, Booking $booking): View
+    {
+        $this->ensurePassenger($request);
+        abort_unless($booking->passenger_id === $request->user()->id, 403);
+
+        $booking->load([
+            'trip.user' => fn ($driver) => $driver
+                ->withAvg('ratingsReceived', 'score')
+                ->withCount('ratingsReceived'),
+            'trip.vehicle',
+            'trip.bookings' => fn ($tripBookings) => $tripBookings
+                ->where('booking_status', 'Accepted')
+                ->orderByRaw('case when pickup_sequence is null then 1 else 0 end')
+                ->orderBy('pickup_sequence')
+                ->oldest(),
+            'trip.emergencies' => fn ($emergencies) => $emergencies->with('user')->latest('triggered_at'),
+            'trip.latestLocation',
+            'ratings',
+            'payment',
+        ]);
+
+        $mapRoute = $this->mapRoute($booking);
+
+        return view('passenger.booking.show', compact('booking', 'mapRoute'));
+    }
+
     public function cancel(Request $request, Booking $booking): RedirectResponse
     {
         $this->ensurePassenger($request);
@@ -238,6 +268,38 @@ class PassengerBookingController extends Controller
     private function ensurePassenger(Request $request): void
     {
         abort_unless($request->user()?->role === 'passenger', 403);
+    }
+
+    private function mapRoute(Booking $booking): ?array
+    {
+        $trip = $booking->trip;
+
+        if ($booking->booking_status !== 'Accepted'
+            || $trip->status !== 'In Progress'
+            || blank(config('services.google_maps.browser_key'))
+        ) {
+            return null;
+        }
+
+        $locations = [
+            [$trip->departure_latitude, $trip->departure_longitude],
+            [$trip->destination_latitude, $trip->destination_longitude],
+            ...$trip->bookings->map(fn (Booking $item) => [$item->pickup_latitude, $item->pickup_longitude])->all(),
+        ];
+
+        if (collect($locations)->contains(fn (array $location) => ! is_numeric($location[0]) || ! is_numeric($location[1]))) {
+            return null;
+        }
+
+        try {
+            return $this->tripDistanceService->calculate(
+                ['latitude' => $trip->departure_latitude, 'longitude' => $trip->departure_longitude],
+                ['latitude' => $trip->destination_latitude, 'longitude' => $trip->destination_longitude],
+                $trip->bookings->map(fn (Booking $item) => ['latitude' => $item->pickup_latitude, 'longitude' => $item->pickup_longitude])->all(),
+            );
+        } catch (TripRoutingException) {
+            return null;
+        }
     }
 
     private function applyDestinationSearch($query, Request $request): void

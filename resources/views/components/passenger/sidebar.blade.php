@@ -6,7 +6,7 @@
 
         ['label' => 'Dashboard', 'icon' => 'layout-dashboard', 'href' => route('passenger.home'), 'active' => request()->routeIs('passenger.home')],
         ['label' => 'Find a Ride', 'icon' => 'search', 'href' => route('passenger.booking'), 'active' => request()->routeIs('passenger.booking', 'passenger.bookings.create')],
-        ['label' => 'My Bookings', 'icon' => 'clipboard-list', 'href' => route('passenger.bookings.history'), 'active' => request()->routeIs('passenger.bookings.history')],
+        ['label' => 'My Bookings', 'icon' => 'clipboard-list', 'href' => route('passenger.bookings.history'), 'active' => request()->routeIs('passenger.bookings.history', 'passenger.bookings.show')],
         ['label' => 'Messages', 'icon' => 'message-square', 'href' => route('messages.index'), 'active' => request()->routeIs('messages.*', 'bookings.chat.*'), 'unread' => $unreadMessageCount > 0, 'unreadLabel' => 'Unread messages'],
         ['label' => 'Tourist Attractions', 'icon' => 'map-pinned', 'href' => route('attractions.index'), 'active' => request()->routeIs('attractions.*')],
         ['label' => 'Notifications', 'icon' => 'bell', 'href' => route('notifications.index'), 'active' => request()->routeIs('notifications.*'), 'unread' => $unreadNotificationCount > 0],

@@ -122,8 +122,15 @@ class TripLifecycleRulesTest extends TestCase
             fn (BookingStatusUpdated $event) => $event->booking->is($acceptedBooking)
                 && $event->booking->passenger_id === $acceptedPassenger->id
                 && $event->booking->trip->status === 'In Progress'
+                && $event->passengerNotificationType === 'trip_started'
         );
         Event::assertDispatchedTimes(BookingStatusUpdated::class, 1);
+        $notification = $acceptedPassenger->unreadNotifications()->where('type', BookingStatusNotification::class)->firstOrFail();
+        $this->assertSame('Trip Started', $notification->data['title']);
+        $this->assertSame('trip_started', $notification->data['type']);
+        $this->assertSame($acceptedBooking->id, $notification->data['booking_id']);
+        $this->assertSame($trip->trip_id, $notification->data['trip_id']);
+        $this->assertSame(route('passenger.bookings.show', $acceptedBooking), $notification->data['url']);
     }
 
     public function test_cancel_trip_marks_open_bookings_cancelled_and_notifies_passengers(): void
@@ -156,19 +163,39 @@ class TripLifecycleRulesTest extends TestCase
         Event::assertDispatched(
             BookingStatusUpdated::class,
             fn (BookingStatusUpdated $event) => $event->booking->getKey() === $pendingBooking->getKey()
-                && $event->passengerNotificationType === 'trip_cancelled'
+                && $event->passengerNotificationType === null
         );
         Event::assertDispatchedTimes(BookingStatusUpdated::class, 2);
 
         $acceptedNotification = $acceptedPassenger->unreadNotifications()->where('type', BookingStatusNotification::class)->firstOrFail();
-        $pendingNotification = $pendingPassenger->unreadNotifications()->where('type', BookingStatusNotification::class)->firstOrFail();
 
-        $this->assertSame('Trip cancelled', $acceptedNotification->data['title']);
-        $this->assertSame('Trip cancelled', $pendingNotification->data['title']);
-        $this->assertStringContainsString('Driver Cancel cancelled the trip to Suria KLCC.', $acceptedNotification->data['message']);
-        $this->assertStringContainsString('Driver Cancel cancelled the trip to Suria KLCC.', $pendingNotification->data['message']);
-        $this->assertSame(route('passenger.bookings.history'), $acceptedNotification->data['url']);
+        $this->assertSame('Trip Cancelled', $acceptedNotification->data['title']);
+        $this->assertSame('trip_cancelled', $acceptedNotification->data['type']);
+        $this->assertStringContainsString('Your booked trip from Departure → Suria KLCC has been cancelled.', $acceptedNotification->data['message']);
+        $this->assertSame(route('passenger.bookings.show', $acceptedBooking), $acceptedNotification->data['url']);
+        $this->assertSame(0, $pendingPassenger->unreadNotifications()->count());
         $this->assertSame(0, $rejectedPassenger->unreadNotifications()->count());
+    }
+
+    public function test_complete_trip_notifies_accepted_passengers_once_after_completion(): void
+    {
+        Event::fake([BookingStatusUpdated::class]);
+
+        $driver = $this->driver();
+        $trip = $this->trip($driver, ['status' => 'In Progress', 'started_at' => now()->subMinutes(10)]);
+        $passenger = $this->passenger();
+        $booking = Booking::create(['trip_id' => $trip->trip_id, 'passenger_id' => $passenger->id, 'booking_status' => 'Accepted', 'number_of_seats' => 1, 'pickup_point' => 'Main Gate']);
+
+        $this->actingAs($driver)->patch(route('driver.trips.complete', $trip))->assertRedirect();
+
+        $notification = $passenger->unreadNotifications()->where('type', BookingStatusNotification::class)->firstOrFail();
+        $this->assertSame('Trip Completed', $notification->data['title']);
+        $this->assertSame('trip_completed', $notification->data['type']);
+        $this->assertSame($booking->id, $notification->data['booking_id']);
+        $this->assertSame(route('passenger.bookings.show', $booking), $notification->data['url']);
+
+        $this->actingAs($driver)->patch(route('driver.trips.complete', $trip))->assertStatus(422);
+        $this->assertSame(1, $passenger->fresh()->notifications()->where('type', BookingStatusNotification::class)->count());
     }
 
     private function fakeGoogle(array $optimizedIndexes = []): void

@@ -37,6 +37,9 @@ return [
 
     'google_maps' => [
         'key' => env('GOOGLE_MAPS_API_KEY'),
+        // This must be a browser-restricted key. Keep the server Routes/Places
+        // key separate because this value is intentionally sent to the browser.
+        'browser_key' => env('GOOGLE_MAPS_BROWSER_KEY'),
         'places_base_url' => env('GOOGLE_PLACES_URL', 'https://places.googleapis.com/v1'),
         'routes_base_url' => env('GOOGLE_ROUTES_URL', 'https://routes.googleapis.com/directions/v2'),
     ],

@@ -3,7 +3,9 @@
 namespace Tests\Feature\Driver;
 
 use App\Models\Booking;
+use App\Models\Emergency;
 use App\Models\Trip;
+use App\Models\TripLocation;
 use App\Models\User;
 use App\Models\Vehicle;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -18,6 +20,7 @@ class TripJourneyTest extends TestCase
     {
         parent::setUp();
         config()->set('services.google_maps.key', 'test-key');
+        config()->set('services.google_maps.browser_key', null);
     }
 
     public function test_active_journey_displays_timeline_pickups_avatar_and_estimates(): void
@@ -40,7 +43,75 @@ class TripJourneyTest extends TestCase
             ->assertSee('KL Sentral')
             ->assertSee('Estimated Arrival')
             ->assertSee('25.40 km')
-            ->assertSee('35 min');
+            ->assertSee('35 min')
+            ->assertSee('Report an Issue')
+            ->assertSee('Inform accepted passengers about an issue during this trip')
+            ->assertSee(route('trips.emergencies.store', $trip), false)
+            ->assertSee('name="issue_type" value="traffic_delay"', false);
+    }
+
+    public function test_active_journey_shows_the_latest_live_driver_location_state(): void
+    {
+        $driver = $this->driver();
+        $trip = $this->trip($driver);
+        TripLocation::create(['trip_id' => $trip->trip_id, 'driver_id' => $driver->id, 'latitude' => 3.139, 'longitude' => 101.6869, 'recorded_at' => now()]);
+
+        $this->actingAs($driver)->get(route('driver.trips.journey'))
+            ->assertOk()
+            ->assertSee('Live driver location is shown when available.')
+            ->assertSee('Live location updated');
+    }
+
+    public function test_active_journey_displays_an_active_issue_report_and_acknowledgement_control(): void
+    {
+        $driver = $this->driver();
+        $trip = $this->trip($driver);
+        $emergency = Emergency::create([
+            'trip_id' => $trip->trip_id,
+            'user_id' => $driver->id,
+            'role' => 'driver',
+            'issue_type' => 'traffic_delay',
+            'latitude' => $trip->departure_latitude,
+            'longitude' => $trip->departure_longitude,
+            'status' => 'Active',
+            'triggered_at' => now(),
+        ]);
+
+        $this->actingAs($driver)->get(route('driver.trips.journey'))
+            ->assertOk()
+            ->assertSee('Report an Issue')
+            ->assertSee('Traffic Delay')
+            ->assertSee('Active')
+            ->assertSee('Reported by')
+            ->assertSee($driver->name)
+            ->assertDontSee('Acknowledge')
+            ->assertDontSee('Resolve');
+
+        $this->assertSame('Active', $emergency->fresh()->status);
+    }
+
+    public function test_acknowledged_issue_report_has_no_resolve_control(): void
+    {
+        $driver = $this->driver();
+        $trip = $this->trip($driver);
+        Emergency::create([
+            'trip_id' => $trip->trip_id,
+            'user_id' => $driver->id,
+            'role' => 'driver',
+            'latitude' => $trip->departure_latitude,
+            'longitude' => $trip->departure_longitude,
+            'issue_type' => 'road_hazard',
+            'status' => 'Acknowledged',
+            'triggered_at' => now()->subMinutes(10),
+            'acknowledged_at' => now(),
+            'acknowledged_by' => $driver->id,
+        ]);
+
+        $this->actingAs($driver)->get(route('driver.trips.journey'))
+            ->assertOk()
+            ->assertSee('Road Hazard')
+            ->assertSee('Acknowledged')
+            ->assertDontSee('Resolve');
     }
 
     public function test_picking_up_a_booking_advances_the_timeline_without_changing_trip_lifecycle_times(): void
