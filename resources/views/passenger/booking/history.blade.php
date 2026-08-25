@@ -77,12 +77,19 @@
                                             <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-medium {{ $badge[$displayStatus] }}">{{ $displayStatus }}</span>
                                         </td>
                                         <td class="whitespace-nowrap px-4 py-3">
+                                            <div class="flex items-center gap-2">
                                             @if($booking->booking_status === 'Pending')
-                                                <form method="POST" action="{{ route('passenger.bookings.cancel', $booking) }}">
-                                                    @csrf
-                                                    @method('PATCH')
-                                                    <button type="submit" class="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100">Cancel</button>
-                                                </form>
+                                                <x-trip-confirmation
+                                                    name="cancel-booking-{{ $booking->id }}"
+                                                    title="Cancel Booking Request?"
+                                                    message="Are you sure you want to cancel this booking request?"
+                                                    confirm-label="Confirm Cancel"
+                                                    :action="route('passenger.bookings.cancel', $booking)"
+                                                    variant="danger"
+                                                    class="h-9 rounded-lg px-3 text-xs font-medium"
+                                                >
+                                                    Cancel
+                                                </x-trip-confirmation>
                                             @elseif($booking->booking_status === 'Accepted' && $booking->trip->status === 'Completed' && ! $booking->payment?->isPaid())
                                                 <a href="{{ route('payments.checkout', $booking) }}" class="rounded-lg bg-green-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-green-700">Pay RM {{ number_format((float) $booking->trip->price_per_passenger * $booking->number_of_seats, 2) }}</a>
                                             @elseif($booking->booking_status === 'Accepted' && $booking->trip->status === 'Completed' && ! $booking->ratings->contains('reviewer_id', Auth::id()))
@@ -93,9 +100,8 @@
                                                 @endif
                                             @elseif($booking->ratings->contains('reviewer_id', Auth::id()))
                                                 <span class="text-xs font-medium text-green-600">Rated</span>
-                                            @else
-                                                <span class="text-xs text-gray-400">No action</span>
                                             @endif
+                                            </div>
                                         </td>
                                     </tr>
                                 @endforeach

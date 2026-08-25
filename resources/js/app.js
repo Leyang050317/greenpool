@@ -157,6 +157,27 @@ const subscribeToBookingUpdates = () => {
     }
 };
 
+const subscribeToChatListUpdates = () => {
+    const userId = document.body.dataset.authId;
+    const userRole = document.body.dataset.authRole;
+    const bookingIds = [...document.querySelectorAll('[data-chat-booking-id]')]
+        .map((element) => element.dataset.chatBookingId)
+        .filter(Boolean);
+
+    if (!userId || !userRole || !window.Echo || bookingIds.length === 0) {
+        return;
+    }
+
+    bookingIds.forEach((bookingId) => {
+        window.Echo.private(`booking.${bookingId}`)
+            .listen('MessageSent', (event) => {
+                if (Number.parseInt(event.sender_id, 10) !== Number.parseInt(userId, 10)) {
+                    refreshBookingPage();
+                }
+            });
+    });
+};
+
 Alpine.data('driverNavigation', () => ({
     sidebarExpanded: true,
     mobileDrawerOpen: false,
@@ -214,8 +235,87 @@ Alpine.data('passengerNavigation', () => ({
     },
 }));
 
+Alpine.data('bookingChat', (config) => ({
+    bookingId: config.bookingId,
+    currentUserId: Number.parseInt(config.currentUserId, 10),
+    messages: config.messages || [],
+    message: '',
+    sending: false,
+    canSend: Boolean(config.canSend),
+    endpoint: config.endpoint,
+
+    init() {
+        this.scrollToBottom();
+
+        if (window.Echo && this.bookingId) {
+            window.Echo.private(`booking.${this.bookingId}`)
+                .listen('MessageSent', (event) => {
+                    this.appendMessage(event);
+                });
+        }
+    },
+
+    isMine(message) {
+        return Number.parseInt(message.sender_id, 10) === this.currentUserId;
+    },
+
+    appendMessage(message) {
+        if (this.messages.some((existing) => existing.id === message.id)) {
+            return;
+        }
+
+        this.messages.push(message);
+        this.scrollToBottom();
+    },
+
+    scrollToBottom() {
+        this.$nextTick(() => {
+            const container = this.$refs.messages;
+            if (container) {
+                container.scrollTop = container.scrollHeight;
+            }
+        });
+    },
+
+    async sendMessage() {
+        const value = this.message.trim();
+
+        if (!value || this.sending || !this.canSend) {
+            return;
+        }
+
+        this.sending = true;
+
+        try {
+            const response = await fetch(this.endpoint, {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                },
+                body: JSON.stringify({ message: value }),
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.message || 'Unable to send message.');
+            }
+
+            this.message = '';
+            this.appendMessage(data.message);
+        } catch (error) {
+            window.alert(error.message);
+        } finally {
+            this.sending = false;
+        }
+    },
+}));
+
 subscribeToBookingUpdates();
 subscribeToRatingNotifications();
 subscribeToPaymentNotifications();
+subscribeToChatListUpdates();
 
 Alpine.start();
