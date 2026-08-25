@@ -8,6 +8,7 @@
         ['label' => 'My Bookings', 'icon' => 'clipboard-list', 'href' => route('passenger.bookings.history'), 'active' => request()->routeIs('passenger.bookings.history')],
         ['label' => 'Tourist Attractions', 'icon' => 'map-pinned', 'href' => route('attractions.index'), 'active' => request()->routeIs('attractions.*')],
         ['label' => 'Notifications', 'icon' => 'bell', 'href' => route('notifications.index'), 'active' => request()->routeIs('notifications.*'), 'unread' => $unreadNotificationCount > 0],
+        ['label' => 'Payments', 'icon' => 'credit-card', 'href' => route('payments.index'), 'active' => request()->routeIs('payments.*')],
         ['label' => 'Ratings', 'icon' => 'star', 'href' => route('ratings.index'), 'active' => request()->routeIs('ratings.*')],
         ['label' => 'Profile', 'icon' => 'user-circle', 'href' => route('profile.edit'), 'active' => request()->routeIs('profile.edit')],
     ];

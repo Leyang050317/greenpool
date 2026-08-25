@@ -93,6 +93,35 @@ class TripGoogleMapsTest extends TestCase
         Event::assertDispatched(TripCreated::class);
     }
 
+    public function test_fare_estimate_uses_actual_google_route_distance(): void
+    {
+        $driver = User::factory()->create(['role' => 'driver']);
+        $this->fakeGooglePlacesAndRoute();
+
+        $this->actingAs($driver)->getJson(route('driver.trips.fare-estimate', [
+            'departure_place_id' => 'departure',
+            'destination_place_id' => 'destination',
+        ]))->assertOk()
+            ->assertJsonPath('data.estimated_distance_km', 12.35)
+            ->assertJsonPath('data.estimated_duration_seconds', 988)
+            ->assertJsonPath('data.recommended_price', 7.5)
+            ->assertJsonPath('data.minimum_price', 6)
+            ->assertJsonPath('data.maximum_price', 9);
+    }
+
+    public function test_blank_trip_price_uses_the_route_recommendation(): void
+    {
+        Event::fake([TripCreated::class]);
+        $driver = User::factory()->create(['role' => 'driver']);
+        $vehicle = $this->vehicle($driver);
+        $this->fakeGooglePlacesAndRoute();
+
+        $this->actingAs($driver)->post(route('driver.trips.store'), $this->tripData($vehicle, ['price_per_passenger' => '']))
+            ->assertRedirect(route('driver.trips.index'));
+
+        $this->assertDatabaseHas('trips', ['price_per_passenger' => 7.50, 'estimated_distance_km' => 12.35]);
+    }
+
     public function test_trip_update_recalculates_only_when_a_selected_place_changes(): void
     {
         $driver = User::factory()->create(['role' => 'driver']);

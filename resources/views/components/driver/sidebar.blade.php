@@ -7,6 +7,7 @@
         ['label' => 'My Vehicles', 'icon' => 'car-front', 'href' => route('driver.vehicles.index'), 'active' => request()->routeIs('driver.vehicles.*')],
         ['label' => 'Tourist Attractions', 'icon' => 'map-pinned', 'href' => route('attractions.index'), 'active' => request()->routeIs('attractions.*')],
         ['label' => 'Notifications', 'icon' => 'bell', 'href' => route('notifications.index'), 'active' => request()->routeIs('notifications.*'), 'unread' => $unreadNotificationCount > 0],
+        ['label' => 'Payments', 'icon' => 'credit-card', 'href' => route('payments.index'), 'active' => request()->routeIs('payments.*')],
         ['label' => 'Ratings', 'icon' => 'star', 'href' => route('ratings.index'), 'active' => request()->routeIs('ratings.*')],
         ['label' => 'Profile', 'icon' => 'user-circle', 'href' => route('driver.profile.edit'), 'active' => request()->routeIs('driver.profile.*')],
     ];

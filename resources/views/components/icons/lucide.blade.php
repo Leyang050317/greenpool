@@ -42,6 +42,10 @@
         @case('bell')
             <path d="M10.3 21h3.4M18 8A6 6 0 0 0 6 8c0 7-3 7-3 9h18c0-2-3-2-3-9" />
             @break
+        @case('credit-card')
+            <rect width="20" height="14" x="2" y="5" rx="2" />
+            <path d="M2 10h20M6 15h2" />
+            @break
         @case('user-circle')
             <circle cx="12" cy="12" r="10" />
             <circle cx="12" cy="10" r="3" />

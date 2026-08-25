@@ -14,6 +14,15 @@ class HomeController extends Controller
     {
         $user = $request->user();
 
+        $pendingPaymentBooking = Booking::query()
+            ->with(['trip.user', 'payment'])
+            ->where('passenger_id', $user->id)
+            ->where('booking_status', 'Accepted')
+            ->whereHas('trip', fn ($trip) => $trip->where('status', 'Completed'))
+            ->whereHas('payment', fn ($payment) => $payment->where('payment_status', 'Pending'))
+            ->latest('updated_at')
+            ->first();
+
         $pendingRatingBooking = Booking::query()
             ->with(['trip.user'])
             ->where('passenger_id', $user->id)
@@ -22,6 +31,9 @@ class HomeController extends Controller
                 ->where('status', 'Completed')
                 ->where('completed_at', '>=', now()->subDays(7)))
             ->whereDoesntHave('ratings', fn ($rating) => $rating->where('reviewer_id', $user->id))
+            ->where(fn ($booking) => $booking
+                ->whereDoesntHave('payment')
+                ->orWhereHas('payment', fn ($payment) => $payment->where('payment_status', 'Paid')))
             ->latest('updated_at')
             ->first();
 
@@ -72,6 +84,7 @@ class HomeController extends Controller
         ];
 
         return view('passenger.home', compact(
+            'pendingPaymentBooking',
             'pendingRatingBooking',
             'upcomingRide',
             'pendingRequests',

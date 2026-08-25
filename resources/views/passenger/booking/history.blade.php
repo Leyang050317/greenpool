@@ -83,6 +83,8 @@
                                                     @method('PATCH')
                                                     <button type="submit" class="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100">Cancel</button>
                                                 </form>
+                                            @elseif($booking->booking_status === 'Accepted' && $booking->trip->status === 'Completed' && ! $booking->payment?->isPaid())
+                                                <a href="{{ route('payments.checkout', $booking) }}" class="rounded-lg bg-green-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-green-700">Pay RM {{ number_format((float) $booking->trip->price_per_passenger * $booking->number_of_seats, 2) }}</a>
                                             @elseif($booking->booking_status === 'Accepted' && $booking->trip->status === 'Completed' && ! $booking->ratings->contains('reviewer_id', Auth::id()))
                                                 @if($booking->trip->completed_at?->addDays(7)->isPast())
                                                     <span class="inline-flex items-center gap-1 text-xs font-medium text-gray-400"><x-icons.lucide name="lock" class="h-3.5 w-3.5" /> Rating expired</span>

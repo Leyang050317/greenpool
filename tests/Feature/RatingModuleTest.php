@@ -2,12 +2,14 @@
 
 namespace Tests\Feature;
 
+use App\Events\RatingReceived;
 use App\Models\Booking;
 use App\Models\Rating;
 use App\Models\Trip;
 use App\Models\User;
 use App\Models\Vehicle;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Event;
 use Tests\TestCase;
 
 class RatingModuleTest extends TestCase
@@ -276,6 +278,28 @@ class RatingModuleTest extends TestCase
         $this->assertNotNull($notification->fresh()->read_at);
     }
 
+    public function test_rating_submission_is_broadcast_to_the_reviewee_in_real_time(): void
+    {
+        Event::fake([RatingReceived::class]);
+        [$driver, $passenger, $booking] = $this->completedBooking();
+
+        $this->actingAs($passenger)->post(route('ratings.store', $booking), [
+            'score' => 5,
+            'comment' => 'Excellent driver.',
+        ]);
+
+        Event::assertDispatched(RatingReceived::class, function (RatingReceived $event) use ($driver, $passenger): bool {
+            $payload = $event->broadcastWith();
+
+            return $event->rating->reviewer_id === $passenger->id
+                && $event->rating->reviewee_id === $driver->id
+                && (string) $event->broadcastOn() === 'private-driver.'.$driver->id
+                && $payload['title'] === 'New rating received'
+                && $payload['score'] === 5
+                && $payload['url'] === route('ratings.received', $driver);
+        });
+    }
+
     public function test_submission_confirmation_page_shows_success_message_and_stars(): void
     {
         [, $passenger, $booking] = $this->completedBooking();
@@ -416,6 +440,43 @@ class RatingModuleTest extends TestCase
             ->assertOk()
             ->assertSee($passenger->name)
             ->assertSee(route('ratings.create', $booking), false);
+    }
+
+    public function test_driver_can_see_every_unrated_passenger_from_the_same_completed_trip(): void
+    {
+        [$driver, $firstPassenger, $firstBooking] = $this->completedBooking();
+        $secondPassenger = User::factory()->create(['role' => 'passenger', 'email_verified_at' => now()]);
+        $secondBooking = Booking::create([
+            'trip_id' => $firstBooking->trip_id,
+            'passenger_id' => $secondPassenger->id,
+            'booking_status' => 'Accepted',
+            'number_of_seats' => 1,
+            'pickup_point' => 'TBS',
+        ]);
+
+        $this->actingAs($driver)
+            ->get(route('ratings.pending'))
+            ->assertOk()
+            ->assertSee($firstPassenger->name)
+            ->assertSee($secondPassenger->name)
+            ->assertSee(route('ratings.create', $firstBooking), false)
+            ->assertSee(route('ratings.create', $secondBooking), false);
+
+        $this->actingAs($driver)->post(route('ratings.store', $firstBooking), ['score' => 5]);
+        $rating = $driver->ratingsGiven()->where('booking_id', $firstBooking->id)->firstOrFail();
+
+        $this->actingAs($driver)
+            ->get(route('ratings.submitted', $rating))
+            ->assertOk()
+            ->assertSee('Rate Next Passenger')
+            ->assertSee(route('ratings.create', $secondBooking), false);
+
+        $this->actingAs($driver)
+            ->get(route('ratings.pending'))
+            ->assertOk()
+            ->assertDontSee(route('ratings.create', $firstBooking), false)
+            ->assertSee($secondPassenger->name)
+            ->assertSee(route('ratings.create', $secondBooking), false);
     }
 
     public function test_passenger_dashboard_prompts_for_completed_unrated_trip(): void

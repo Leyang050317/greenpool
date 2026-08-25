@@ -11,6 +11,7 @@
         request()->routeIs('attractions.index') && request()->query('tab') === 'favourites' => 'Favourite Attractions',
         request()->routeIs('attractions.index', 'driver.attractions.*', 'passenger.attractions.*') => 'Tourist Attractions',
         request()->routeIs('driver.notifications.*', 'passenger.notifications.*', 'notifications.*') => 'Notifications',
+        request()->routeIs('payments.*') => 'Payments',
         request()->routeIs('ratings.*') => 'Ratings',
         request()->routeIs('profile.*', 'driver.profile.*', 'passenger.profile.*') => 'Profile',
         request()->routeIs('driver.settings.*', 'passenger.settings.*') => 'Settings',
