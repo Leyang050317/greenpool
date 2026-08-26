@@ -4,6 +4,8 @@ namespace Tests\Feature\Driver;
 
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class DriverProfileControllerTest extends TestCase
@@ -76,5 +78,65 @@ class DriverProfileControllerTest extends TestCase
             'pets_allowed' => true,
             'conversation_preference' => 'Chatty',
         ]);
+    }
+
+    public function test_driver_can_upload_and_verify_driving_licence(): void
+    {
+        Storage::fake('local');
+        $driver = User::factory()->create(['role' => 'driver', 'name' => 'ER KIM WEN']);
+        $licenceImage = UploadedFile::fake()->image('licence.jpg', 800, 500);
+
+        $this->actingAs($driver)
+            ->withSession(['driver_licence_ocr_hash' => hash_file('sha256', $licenceImage->getRealPath())])
+            ->put(route('driver.profile.driving-licence.update'), [
+            'driving_licence' => $licenceImage,
+            'holder_name' => ' er   kim wen ',
+            'identity_no' => '991109040290',
+            'licence_class' => 'D',
+            'valid_from' => now()->subYear()->toDateString(),
+            'valid_until' => now()->addYear()->toDateString(),
+        ])->assertRedirect(route('driver.profile.edit', ['section' => 'licence']));
+
+        $licence = $driver->driverLicence()->firstOrFail();
+        $this->assertSame('Verified', $licence->verification_status);
+        $this->assertTrue($licence->isValidOn(now()));
+        Storage::disk('local')->assertExists($licence->image_path);
+        $this->actingAs($driver)
+            ->get(route('driver.profile.driving-licence.image'))
+            ->assertOk();
+    }
+
+    public function test_driver_must_scan_a_new_driving_licence_before_saving(): void
+    {
+        Storage::fake('local');
+        $driver = User::factory()->create(['role' => 'driver', 'name' => 'ER KIM WEN']);
+
+        $this->actingAs($driver)->put(route('driver.profile.driving-licence.update'), [
+            'driving_licence' => UploadedFile::fake()->image('licence.jpg', 800, 500),
+            'holder_name' => 'ER KIM WEN',
+            'identity_no' => '991109040290',
+            'licence_class' => 'D',
+            'valid_from' => now()->subYear()->toDateString(),
+            'valid_until' => now()->addYear()->toDateString(),
+        ])->assertSessionHasErrors('driving_licence');
+
+        $this->assertDatabaseCount('driver_licences', 0);
+    }
+
+    public function test_expired_or_mismatched_driving_licence_is_rejected(): void
+    {
+        Storage::fake('local');
+        $driver = User::factory()->create(['role' => 'driver', 'name' => 'ER KIM WEN']);
+
+        $this->actingAs($driver)->put(route('driver.profile.driving-licence.update'), [
+            'driving_licence' => UploadedFile::fake()->image('licence.jpg', 800, 500),
+            'holder_name' => 'ANOTHER DRIVER',
+            'identity_no' => '991109040290',
+            'valid_from' => '2020-01-01',
+            'valid_until' => now()->subDay()->toDateString(),
+        ])->assertSessionHasErrors(['holder_name', 'valid_until']);
+
+        $this->assertDatabaseCount('driver_licences', 0);
+        $this->assertSame([], Storage::disk('local')->allFiles());
     }
 }

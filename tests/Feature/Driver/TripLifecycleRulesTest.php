@@ -19,6 +19,53 @@ class TripLifecycleRulesTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_trip_creation_only_requires_an_uploaded_driving_licence(): void
+    {
+        $driver = User::factory()->create(['role' => 'driver']);
+        $vehicle = $this->vehicle($driver);
+        $departureAt = now()->addDays(10)->setTime(10, 0);
+
+        $this->actingAs($driver)
+            ->post(route('driver.trips.store'), $this->requestData($vehicle, $departureAt))
+            ->assertSessionHasErrors('driver_licence');
+
+        $driver->driverLicence()->create([
+            'image_path' => 'driver-licences/test.jpg',
+            'holder_name' => $driver->name,
+            'identity_no' => '991109040290',
+            'valid_until' => now()->addDays(5),
+            'verification_status' => 'Verified',
+            'verified_at' => now(),
+        ]);
+
+        $this->actingAs($driver)
+            ->post(route('driver.trips.store'), $this->requestData($vehicle, $departureAt))
+            ->assertSessionDoesntHaveErrors('driver_licence');
+    }
+
+    public function test_create_trip_page_redirects_to_profile_when_driving_licence_is_missing(): void
+    {
+        $driver = User::factory()->create(['role' => 'driver']);
+
+        $this->actingAs($driver)
+            ->get(route('driver.trips.create'))
+            ->assertRedirect(route('driver.profile.edit', ['section' => 'licence']))
+            ->assertSessionHas('error', 'Upload your driving licence before creating a trip.');
+    }
+
+    public function test_driver_cannot_start_trip_with_missing_or_expired_licence(): void
+    {
+        $driver = User::factory()->create(['role' => 'driver']);
+        $trip = $this->trip($driver);
+
+        $this->actingAs($driver)
+            ->patchJson(route('driver.trips.start', $trip))
+            ->assertUnprocessable()
+            ->assertSee('driving licence');
+
+        $this->assertSame('Scheduled', $trip->refresh()->status);
+    }
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -224,7 +271,19 @@ class TripLifecycleRulesTest extends TestCase
 
     private function driver(): User
     {
-        return User::factory()->create(['role' => 'driver']);
+        $driver = User::factory()->create(['role' => 'driver']);
+        $driver->driverLicence()->create([
+            'image_path' => 'driver-licences/test.jpg',
+            'holder_name' => $driver->name,
+            'identity_no' => '991109040290',
+            'licence_class' => 'D',
+            'valid_from' => now()->subYear(),
+            'valid_until' => now()->addYears(5),
+            'verification_status' => 'Verified',
+            'verified_at' => now(),
+        ]);
+
+        return $driver;
     }
 
     private function passenger(): User

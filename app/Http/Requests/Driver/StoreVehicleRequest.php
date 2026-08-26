@@ -17,7 +17,7 @@ class StoreVehicleRequest extends FormRequest
 
     public function rules(): array
     {
-        $documentFlow = collect(['front_image', 'rear_image', 'side_image', 'vehicle_geran', 'driving_licence'])
+        $documentFlow = collect(['front_image', 'rear_image', 'side_image', 'vehicle_geran'])
             ->contains(fn (string $field) => $this->hasFile($field));
         $requiredForDocuments = Rule::requiredIf($documentFlow);
         $requiredAiToken = Rule::requiredIf($documentFlow && config('vehicle_vision.enabled'));
@@ -36,7 +36,6 @@ class StoreVehicleRequest extends FormRequest
             'rear_image_validation_token' => [$requiredAiToken, 'nullable', 'string'],
             'side_image_validation_token' => [$requiredAiToken, 'nullable', 'string'],
             'vehicle_geran' => $this->documentImageRules($requiredForDocuments),
-            'driving_licence' => $this->documentImageRules($requiredForDocuments),
             'voc_reference_no' => ['nullable', 'string', 'max:30', 'regex:/^[A-Z0-9]+$/'],
             'registered_owner_name' => [$requiredForDocuments, 'nullable', 'string', 'max:150'],
             'owner_identity_no' => [$requiredForDocuments, 'nullable', 'regex:/^\d{12}$/'],
@@ -58,14 +57,6 @@ class StoreVehicleRequest extends FormRequest
             'registration_condition_1' => ['nullable', 'string', 'max:255'],
             'registration_condition_2' => ['nullable', 'string', 'max:255'],
             'registration_condition_3' => ['nullable', 'string', 'max:255'],
-            'licence_name' => [$requiredForDocuments, 'nullable', 'string', 'max:150'],
-            'licence_identity_no' => [$requiredForDocuments, 'nullable', 'regex:/^\d{12}$/'],
-            'date_of_birth' => ['nullable', 'date', 'before_or_equal:today'],
-            'nationality' => ['nullable', 'string', 'max:50'],
-            'licence_class' => ['nullable', 'string', 'max:20'],
-            'licence_valid_from' => ['nullable', 'date'],
-            'licence_valid_until' => ['nullable', 'date', 'after_or_equal:licence_valid_from', 'after_or_equal:today'],
-            'licence_address' => ['nullable', 'string', 'max:1000'],
         ];
     }
 
@@ -74,13 +65,10 @@ class StoreVehicleRequest extends FormRequest
         return [
             '*.required' => 'This field is required.',
             'owner_identity_no.regex' => 'Identity number must contain exactly 12 digits.',
-            'licence_identity_no.regex' => 'Identity number must contain exactly 12 digits.',
-            'licence_valid_until.after_or_equal' => 'Driving licence has expired. Upload a renewed licence and scan it again.',
             'front_image.dimensions' => 'Vehicle photos must be at least 800 × 450 pixels.',
             'rear_image.dimensions' => 'Vehicle photos must be at least 800 × 450 pixels.',
             'side_image.dimensions' => 'Vehicle photos must be at least 800 × 450 pixels.',
             'vehicle_geran.dimensions' => 'Vehicle Geran image must be at least 500 × 300 pixels.',
-            'driving_licence.dimensions' => 'Driving licence image must be at least 500 × 300 pixels.',
         ];
     }
 
@@ -103,15 +91,17 @@ class StoreVehicleRequest extends FormRequest
             }
         }
         $values['registered_owner_name'] = DocumentIdentity::normalizeName($this->input('registered_owner_name'));
-        $values['licence_name'] = DocumentIdentity::normalizeName($this->input('licence_name'));
         $values['owner_identity_no'] = trim((string) $this->input('owner_identity_no'));
-        $values['licence_identity_no'] = trim((string) $this->input('licence_identity_no'));
         $this->merge($values);
     }
 
     public function after(): array
     {
         return [function (Validator $validator): void {
+            if (! ($this->user()->driverLicence?->isValidOn(now()) ?? false)) {
+                $validator->errors()->add('driver_licence', 'Upload and verify a valid driving licence in My Profile before adding a vehicle.');
+            }
+
             if (config('vehicle_vision.enabled')) {
                 $service = app(VehicleImageValidationService::class);
                 $photoContexts = [];
@@ -134,21 +124,12 @@ class StoreVehicleRequest extends FormRequest
                 }
             }
 
-            if (! $this->hasFile('vehicle_geran') && ! $this->hasFile('driving_licence')) {
+            if (! $this->hasFile('vehicle_geran')) {
                 return;
-            }
-            if (DocumentIdentity::normalizeName($this->input('registered_owner_name')) !== DocumentIdentity::normalizeName($this->input('licence_name'))) {
-                $validator->errors()->add('registered_owner_name', 'Registered owner name does not match the driving licence holder name.');
             }
             $accountName = DocumentIdentity::normalizeName($this->user()?->name);
             if (DocumentIdentity::normalizeName($this->input('registered_owner_name')) !== $accountName) {
                 $validator->errors()->add('registered_owner_name', 'Geran registered owner name does not match your driver account name. Update your profile to your legal name or upload the correct Geran.');
-            }
-            if (DocumentIdentity::normalizeName($this->input('licence_name')) !== $accountName) {
-                $validator->errors()->add('licence_name', 'Driving licence holder name does not match your driver account name. Update your profile to your legal name or upload the correct licence.');
-            }
-            if (trim((string) $this->input('owner_identity_no')) !== trim((string) $this->input('licence_identity_no'))) {
-                $validator->errors()->add('owner_identity_no', 'Registered owner identity number does not match the driving licence identity number.');
             }
         }];
     }

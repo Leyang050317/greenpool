@@ -32,10 +32,14 @@ class StoreTripRequest extends FormRequest
     public function after(): array
     {
         return [function (Validator $validator): void {
+            if (! $this->user()->driverLicence()->exists()) {
+                $validator->errors()->add('driver_licence', 'Upload your driving licence in My Profile before creating a trip.');
+            }
+
             $vehicle = Vehicle::find($this->integer('vehicle_id'));
 
-            if ($vehicle && ($vehicle->user_id !== $this->user()->id || $vehicle->status !== 'Active' || $vehicle->verification_status !== 'Verified')) {
-                $validator->errors()->add('vehicle_id', 'Please select one of your active, verified vehicles.');
+            if ($vehicle && $vehicle->user_id !== $this->user()->id) {
+                $validator->errors()->add('vehicle_id', 'Please select one of your vehicles.');
             }
 
             if ($vehicle && $this->integer('available_seats') > $vehicle->seat_capacity) {

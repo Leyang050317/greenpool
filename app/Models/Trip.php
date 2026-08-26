@@ -48,7 +48,7 @@ class Trip extends Model
 
     public function vehicle(): BelongsTo
     {
-        return $this->belongsTo(Vehicle::class, 'vehicle_id', 'vehicle_id');
+        return $this->belongsTo(Vehicle::class, 'vehicle_id', 'vehicle_id')->withTrashed();
     }
 
     public function bookings(): HasMany

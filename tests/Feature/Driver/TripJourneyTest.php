@@ -258,7 +258,19 @@ class TripJourneyTest extends TestCase
 
     private function driver(): User
     {
-        return User::factory()->create(['role' => 'driver']);
+        $driver = User::factory()->create(['role' => 'driver']);
+        $driver->driverLicence()->create([
+            'image_path' => 'driver-licences/test.jpg',
+            'holder_name' => $driver->name,
+            'identity_no' => '991109040290',
+            'licence_class' => 'D',
+            'valid_from' => now()->subYear(),
+            'valid_until' => now()->addYears(5),
+            'verification_status' => 'Verified',
+            'verified_at' => now(),
+        ]);
+
+        return $driver;
     }
 
     private function passenger(array $overrides = []): User

@@ -87,6 +87,16 @@ class AttractionDiscoveryTest extends TestCase
     public function test_driver_can_create_a_trip_with_an_attraction_prefilled_as_the_destination(): void
     {
         $user = User::factory()->create(['email_verified_at' => now(), 'role' => 'driver']);
+        $user->driverLicence()->create([
+            'image_path' => 'driver-licences/test.jpg',
+            'holder_name' => $user->name,
+            'identity_no' => '991109040290',
+            'licence_class' => 'D',
+            'valid_from' => now()->subYear(),
+            'valid_until' => now()->addYears(5),
+            'verification_status' => 'Verified',
+            'verified_at' => now(),
+        ]);
         Vehicle::factory()->verified()->create(['user_id' => $user->id, 'status' => 'Active']);
         $attraction = Attraction::query()->create([
             'attraction_name' => 'Batu Caves',

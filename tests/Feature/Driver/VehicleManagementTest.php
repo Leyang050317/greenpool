@@ -60,6 +60,7 @@ class VehicleManagementTest extends TestCase
     {
         Storage::fake('public');
         $driver = User::factory()->create(['role' => 'driver']);
+        $this->addValidDrivingLicence($driver);
 
         $response = $this->actingAs($driver)->post(route('driver.vehicles.store'), [
             'plate_number' => 'vab 1234',
@@ -85,10 +86,35 @@ class VehicleManagementTest extends TestCase
         Storage::disk('public')->assertExists($vehicle->vehicle_image_path);
     }
 
+    public function test_driver_requires_a_valid_driving_licence_to_add_a_vehicle(): void
+    {
+        Storage::fake('public');
+        $driver = User::factory()->create(['role' => 'driver']);
+
+        $this->actingAs($driver)
+            ->get(route('driver.vehicles.create'))
+            ->assertRedirect(route('driver.profile.edit', ['section' => 'licence']))
+            ->assertSessionHas('error');
+
+        $this->actingAs($driver)
+            ->post(route('driver.vehicles.store'), [
+                'plate_number' => 'VAB 1234',
+                'brand' => 'Perodua',
+                'model' => 'Myvi',
+                'colour' => 'Silver',
+                'seat_capacity' => 4,
+                'vehicle_image' => UploadedFile::fake()->image('myvi.jpg'),
+            ])
+            ->assertSessionHasErrors('driver_licence');
+
+        $this->assertDatabaseCount('vehicles', 0);
+    }
+
     public function test_ajax_vehicle_creation_flashes_success_and_returns_the_vehicle_list_redirect(): void
     {
         Storage::fake('public');
         $driver = User::factory()->create(['role' => 'driver']);
+        $this->addValidDrivingLicence($driver);
 
         $this->actingAs($driver)
             ->postJson(route('driver.vehicles.store'), [
@@ -107,6 +133,7 @@ class VehicleManagementTest extends TestCase
     public function test_vehicle_validation_is_enforced(): void
     {
         $driver = User::factory()->create(['role' => 'driver']);
+        $this->addValidDrivingLicence($driver);
 
         $this->actingAs($driver)
             ->from(route('driver.vehicles.create'))
@@ -237,7 +264,9 @@ class VehicleManagementTest extends TestCase
             ->assertRedirect(route('driver.vehicles.index'))
             ->assertSessionHas('success');
 
-        $this->assertDatabaseMissing('vehicles', ['vehicle_id' => $vehicle->vehicle_id]);
+        $this->assertSoftDeleted('vehicles', ['vehicle_id' => $vehicle->vehicle_id]);
+        $this->assertSame('Inactive', $vehicle->fresh()->status);
+        $this->assertNull(Vehicle::find($vehicle->vehicle_id));
     }
 
     public function test_json_endpoints_return_vehicle_data(): void
@@ -260,6 +289,7 @@ class VehicleManagementTest extends TestCase
     {
         Storage::fake('public');
         $driver = User::factory()->create(['role' => 'driver']);
+        $this->addValidDrivingLicence($driver);
         $files = [
             'JPG' => UploadedFile::fake()->image('vehicle.jpg'),
             'PNG' => UploadedFile::fake()->image('vehicle.png'),
@@ -286,6 +316,7 @@ class VehicleManagementTest extends TestCase
     {
         Storage::fake('public');
         $driver = User::factory()->create(['role' => 'driver']);
+        $this->addValidDrivingLicence($driver);
 
         $this->actingAs($driver)->post(route('driver.vehicles.store'), [
             ...$this->validVehicleData('BAD 1'),
@@ -393,19 +424,110 @@ class VehicleManagementTest extends TestCase
         $this->assertSame('Verified', $vehicle->refresh()->verification_status);
     }
 
-    public function test_deleting_vehicle_removes_picture_and_missing_picture_does_not_block_deletion(): void
+    public function test_soft_deleting_vehicle_retains_picture_and_hides_vehicle_from_normal_access(): void
     {
         Storage::fake('public');
         Storage::disk('public')->put('vehicles/delete.jpg', 'image');
         $driver = User::factory()->create(['role' => 'driver']);
-        $withImage = Vehicle::factory()->create(['user_id' => $driver->id, 'vehicle_image_path' => 'vehicles/delete.jpg']);
-        $missingImage = Vehicle::factory()->create(['user_id' => $driver->id, 'vehicle_image_path' => 'vehicles/missing.jpg']);
+        $vehicle = Vehicle::factory()->create(['user_id' => $driver->id, 'vehicle_image_path' => 'vehicles/delete.jpg']);
 
-        $this->actingAs($driver)->delete(route('driver.vehicles.destroy', $withImage))->assertSessionHasNoErrors();
-        Storage::disk('public')->assertMissing('vehicles/delete.jpg');
+        $this->actingAs($driver)->delete(route('driver.vehicles.destroy', $vehicle))->assertSessionHasNoErrors();
 
-        $this->actingAs($driver)->delete(route('driver.vehicles.destroy', $missingImage))->assertSessionHasNoErrors();
-        $this->assertDatabaseMissing('vehicles', ['vehicle_id' => $missingImage->vehicle_id]);
+        $this->assertSoftDeleted('vehicles', ['vehicle_id' => $vehicle->vehicle_id]);
+        Storage::disk('public')->assertExists('vehicles/delete.jpg');
+        $this->actingAs($driver)->get(route('driver.vehicles.index'))->assertDontSee($vehicle->plate_number);
+        $this->actingAs($driver)->get(route('driver.vehicles.show', $vehicle->vehicle_id))->assertNotFound();
+    }
+
+    public function test_soft_deleted_plate_number_remains_unavailable(): void
+    {
+        $driver = User::factory()->create(['role' => 'driver']);
+        $vehicle = Vehicle::factory()->create(['user_id' => $driver->id, 'plate_number' => 'VNU 8601']);
+        $vehicle->delete();
+
+        $this->actingAs($driver)
+            ->postJson(route('driver.vehicles.plate-availability'), ['plate_number' => 'vnu-8601'])
+            ->assertOk()
+            ->assertJsonPath('available', false);
+    }
+
+    public function test_completed_trip_retains_its_soft_deleted_vehicle_relationship(): void
+    {
+        $driver = User::factory()->create(['role' => 'driver']);
+        $vehicle = Vehicle::factory()->verified()->create(['user_id' => $driver->id]);
+        $trip = $driver->trips()->create([
+            'vehicle_id' => $vehicle->vehicle_id,
+            'departure_location' => 'Kuala Lumpur',
+            'destination' => 'Putrajaya',
+            'departure_at' => now()->subDay(),
+            'available_seats' => 2,
+            'status' => 'Completed',
+        ]);
+
+        $vehicle->delete();
+
+        $this->assertSame($vehicle->vehicle_id, $trip->fresh()->vehicle->vehicle_id);
+        $this->assertNotNull($trip->vehicle->deleted_at);
+    }
+
+    public function test_driver_can_view_and_restore_their_archived_vehicle(): void
+    {
+        $driver = User::factory()->create(['role' => 'driver']);
+        $vehicle = Vehicle::factory()->verified()->create([
+            'user_id' => $driver->id,
+            'status' => 'Active',
+        ]);
+        $vehicle->delete();
+
+        $this->actingAs($driver)
+            ->get(route('driver.vehicles.archived'))
+            ->assertOk()
+            ->assertSee($vehicle->plate_number);
+
+        $this->actingAs($driver)
+            ->patch(route('driver.vehicles.restore', $vehicle->vehicle_id))
+            ->assertRedirect(route('driver.vehicles.index'))
+            ->assertSessionHas('success');
+
+        $restored = Vehicle::findOrFail($vehicle->vehicle_id);
+        $this->assertNull($restored->deleted_at);
+        $this->assertSame('Inactive', $restored->status);
+        $this->assertSame('Verified', $restored->verification_status);
+    }
+
+    public function test_restoring_vehicle_does_not_use_legacy_vehicle_licence_fields(): void
+    {
+        $driver = User::factory()->create(['role' => 'driver']);
+        $vehicle = Vehicle::factory()->verified()->create([
+            'user_id' => $driver->id,
+            'licence_valid_until' => now()->subDay()->toDateString(),
+        ]);
+        $vehicle->delete();
+
+        $this->actingAs($driver)
+            ->patch(route('driver.vehicles.restore', $vehicle->vehicle_id))
+            ->assertRedirect(route('driver.vehicles.index'));
+
+        $restored = Vehicle::findOrFail($vehicle->vehicle_id);
+        $this->assertSame('Verified', $restored->verification_status);
+        $this->assertNotNull($restored->verified_at);
+    }
+
+    public function test_driver_cannot_view_or_restore_another_drivers_archived_vehicle(): void
+    {
+        $driver = User::factory()->create(['role' => 'driver']);
+        $otherDriver = User::factory()->create(['role' => 'driver']);
+        $vehicle = Vehicle::factory()->create(['user_id' => $otherDriver->id]);
+        $vehicle->delete();
+
+        $this->actingAs($driver)
+            ->get(route('driver.vehicles.archived'))
+            ->assertDontSee($vehicle->plate_number);
+
+        $this->actingAs($driver)
+            ->patch(route('driver.vehicles.restore', $vehicle->vehicle_id))
+            ->assertForbidden();
+        $this->assertTrue($vehicle->fresh()->trashed());
     }
 
     public function test_driver_cannot_replace_another_drivers_vehicle_picture(): void
@@ -434,25 +556,20 @@ class VehicleManagementTest extends TestCase
         $this->assertCount(1, $driver->vehicles()->selectableForTrips()->get());
     }
 
-    public function test_pending_vehicle_cannot_be_used_to_create_a_trip(): void
+    public function test_pending_vehicle_can_be_selected_when_creating_a_trip(): void
     {
         $driver = User::factory()->create(['role' => 'driver']);
+        $this->addValidDrivingLicence($driver);
         $vehicle = Vehicle::factory()->create([
             'user_id' => $driver->id,
             'status' => 'Active',
             'verification_status' => 'Pending',
         ]);
 
-        $this->actingAs($driver)->post(route('driver.trips.store'), [
-            'vehicle_id' => $vehicle->vehicle_id,
-            'departure_location' => 'Kuala Lumpur',
-            'destination' => 'Putrajaya',
-            'departure_date' => now()->addDay()->toDateString(),
-            'departure_time' => '10:00',
-            'available_seats' => 2,
-        ])->assertSessionHasErrors('vehicle_id');
-
-        $this->assertDatabaseCount('trips', 0);
+        $this->actingAs($driver)
+            ->get(route('driver.trips.create'))
+            ->assertOk()
+            ->assertSee($vehicle->plate_number);
     }
 
     public function test_vehicle_with_upcoming_trip_cannot_be_deleted(): void
@@ -510,6 +627,20 @@ class VehicleManagementTest extends TestCase
             'colour' => 'Silver',
             'seat_capacity' => 4,
         ];
+    }
+
+    private function addValidDrivingLicence(User $driver): void
+    {
+        $driver->driverLicence()->create([
+            'image_path' => 'driver-licences/test.jpg',
+            'holder_name' => $driver->name,
+            'identity_no' => '991109040290',
+            'licence_class' => 'D',
+            'valid_from' => now()->subYear(),
+            'valid_until' => now()->addYears(5),
+            'verification_status' => 'Verified',
+            'verified_at' => now(),
+        ]);
     }
 
     private function vehicleDataFrom(Vehicle $vehicle): array

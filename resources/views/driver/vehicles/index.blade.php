@@ -16,6 +16,9 @@
                 </div>
 
                 <div class="flex flex-wrap gap-2.5">
+                    <a href="{{ route('driver.vehicles.archived') }}" class="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-xl border border-gray-300 bg-white px-5 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2E7D32] focus-visible:ring-offset-2">
+                        Archived Vehicles
+                    </a>
                     <button
                         type="button"
                         @click="managementMode = managementMode === 'availability' ? 'details' : 'availability'"

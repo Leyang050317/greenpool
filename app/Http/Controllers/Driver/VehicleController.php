@@ -8,7 +8,6 @@ use App\Http\Requests\Driver\UpdateVehicleRequest;
 use App\Models\Vehicle;
 use App\Services\Ocr\DocumentOcrService;
 use App\Services\Ocr\OcrException;
-use App\Services\Vehicle\DocumentMatchingService;
 use App\Services\Vehicle\PlateNumberExtractionService;
 use App\Services\Vehicle\VehicleImageValidationService;
 use Illuminate\Http\JsonResponse;
@@ -24,7 +23,6 @@ class VehicleController extends Controller
 {
     public function __construct(
         private readonly DocumentOcrService $documentOcr,
-        private readonly DocumentMatchingService $documentMatcher,
         private readonly VehicleImageValidationService $vehicleImageValidator,
         private readonly PlateNumberExtractionService $plateNumberExtractor,
     ) {}
@@ -43,9 +41,29 @@ class VehicleController extends Controller
         return view('driver.vehicles.index', compact('vehicles'));
     }
 
-    public function create(): View
+    public function create(Request $request): View|RedirectResponse
     {
+        if (! ($request->user()->driverLicence?->isValidOn(now()) ?? false)) {
+            return redirect()
+                ->route('driver.profile.edit', ['section' => 'licence'])
+                ->with('error', 'Upload and verify a valid driving licence before adding a vehicle.');
+        }
+
         return view('driver.vehicles.create');
+    }
+
+    public function archived(Request $request): View|JsonResponse
+    {
+        $vehicles = Vehicle::onlyTrashed()
+            ->where('user_id', $request->user()->id)
+            ->orderByDesc('deleted_at')
+            ->get();
+
+        if ($request->expectsJson()) {
+            return response()->json(['data' => $vehicles]);
+        }
+
+        return view('driver.vehicles.archived', compact('vehicles'));
     }
 
     public function store(StoreVehicleRequest $request): RedirectResponse|JsonResponse
@@ -63,23 +81,17 @@ class VehicleController extends Controller
         ])->all();
         $privateFiles = collect([
             'vehicle_geran_path' => 'vehicle_geran',
-            'driving_licence_path' => 'driving_licence',
         ])->mapWithKeys(fn (string $input, string $column) => [
             $column => $request->file($input)->store('vehicle-documents', 'local'),
         ])->all();
         $files = [...$publicFiles, ...$privateFiles];
-        $match = $this->documentMatcher->match(
-            ['name' => $request->validated('licence_name'), 'identity_no' => $request->validated('licence_identity_no')],
-            ['registered_owner_name' => $request->validated('registered_owner_name'), 'owner_identity_no' => $request->validated('owner_identity_no')],
-        );
-
         try {
             $vehicle = $request->user()->vehicles()->create([
-                ...$request->safe()->except(['front_image', 'rear_image', 'side_image', 'vehicle_geran', 'driving_licence', 'front_image_validation_token', 'rear_image_validation_token', 'side_image_validation_token']),
+                ...$request->safe()->except(['front_image', 'rear_image', 'side_image', 'vehicle_geran', 'front_image_validation_token', 'rear_image_validation_token', 'side_image_validation_token']),
                 ...$files,
                 'vehicle_image_path' => $files['front_image_path'],
-                'verification_status' => $match['status'],
-                'verified_at' => $match['status'] === 'Verified' ? now() : null,
+                'verification_status' => 'Verified',
+                'verified_at' => now(),
             ]);
         } catch (Throwable $exception) {
             foreach ($publicFiles as $path) {
@@ -92,7 +104,7 @@ class VehicleController extends Controller
             throw $exception;
         }
 
-        $successMessage = 'Vehicle added successfully. '.$match['message'];
+        $successMessage = 'Vehicle added successfully. Geran details match your driver profile.';
 
         if ($request->expectsJson()) {
             $request->session()->flash('success', $successMessage);
@@ -149,9 +161,15 @@ class VehicleController extends Controller
         ]);
 
         try {
+            $result = $this->documentOcr->process($validated['document'], $validated['expected_document_type']);
+
+            if ($validated['expected_document_type'] === 'DRIVING_LICENCE') {
+                $request->session()->put('driver_licence_ocr_hash', hash_file('sha256', $validated['document']->getRealPath()));
+            }
+
             return response()->json([
                 'success' => true,
-                ...$this->documentOcr->process($validated['document'], $validated['expected_document_type']),
+                ...$result,
             ]);
         } catch (OcrException $exception) {
             return response()->json(['success' => false, 'message' => $exception->getMessage()], 422);
@@ -194,6 +212,7 @@ class VehicleController extends Controller
         $plateNumber = mb_strtoupper(trim($validated['plate_number']));
         $canonicalPlate = preg_replace('/[^A-Z0-9]/', '', $plateNumber);
         $exists = Vehicle::query()
+            ->withTrashed()
             ->whereRaw("REPLACE(REPLACE(UPPER(plate_number), ' ', ''), '-', '') = ?", [$canonicalPlate])
             ->exists();
 
@@ -271,21 +290,47 @@ class VehicleController extends Controller
             return back()->with('error', $message);
         }
 
-        $imagePaths = collect(['vehicle_image_path', 'front_image_path', 'rear_image_path', 'side_image_path'])
-            ->map(fn (string $field) => $vehicle->{$field})->filter()->unique();
-        $documentPaths = collect(['vehicle_geran_path', 'driving_licence_path'])
-            ->map(fn (string $field) => $vehicle->{$field})->filter()->unique();
-        DB::transaction(fn () => $vehicle->delete());
-        $imagePaths->each(fn (string $path) => $this->deleteVehicleImage($path));
-        $documentPaths->each(fn (string $path) => Storage::disk('local')->delete($path));
+        DB::transaction(function () use ($vehicle): void {
+            $vehicle->update(['status' => 'Inactive']);
+            $vehicle->delete();
+        });
 
         if ($request->expectsJson()) {
-            return response()->json(['message' => 'Vehicle deleted successfully.']);
+            return response()->json(['message' => 'Vehicle archived successfully.']);
         }
 
         return redirect()
             ->route('driver.vehicles.index')
-            ->with('success', 'Vehicle deleted successfully.');
+            ->with('success', 'Vehicle archived successfully.');
+    }
+
+    public function restore(Request $request, int $vehicle): RedirectResponse|JsonResponse
+    {
+        $archivedVehicle = Vehicle::onlyTrashed()->findOrFail($vehicle);
+        $this->ensureOwnership($request, $archivedVehicle);
+
+        DB::transaction(function () use ($archivedVehicle): void {
+            $updates = ['status' => 'Inactive'];
+
+            $archivedVehicle->restore();
+            $archivedVehicle->update($updates);
+        });
+        $archivedVehicle->refresh();
+
+        $message = $archivedVehicle->verification_status === 'Pending'
+            ? 'Vehicle restored as Inactive. Its Geran details must be verified before it can be used for trips.'
+            : 'Vehicle restored successfully as Inactive.';
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'message' => $message,
+                'data' => $archivedVehicle,
+            ]);
+        }
+
+        return redirect()
+            ->route('driver.vehicles.index')
+            ->with('success', $message);
     }
 
     public function activate(Request $request, Vehicle $vehicle): RedirectResponse|JsonResponse
