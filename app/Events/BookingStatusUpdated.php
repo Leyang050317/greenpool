@@ -15,7 +15,11 @@ class BookingStatusUpdated implements ShouldBroadcastNow
     use InteractsWithSockets;
     use SerializesModels;
 
-    public function __construct(public Booking $booking)
+    public function __construct(
+        public Booking $booking,
+        public ?string $driverNotificationType = null,
+        public ?string $passengerNotificationType = null,
+    )
     {
         $this->booking->loadMissing(['trip']);
     }
@@ -36,6 +40,11 @@ class BookingStatusUpdated implements ShouldBroadcastNow
             'trip_status' => $this->booking->trip->status,
             'driver_id' => $this->booking->trip->user_id,
             'trip_id' => $this->booking->trip_id,
+            'trip_route' => $this->booking->trip->departure_location.' → '.$this->booking->trip->destination,
+            'passenger_url' => route('passenger.bookings.show', $this->booking),
+            'driver_url' => route('driver.booking-requests.show', $this->booking),
+            'driver_notification_type' => $this->driverNotificationType,
+            'passenger_notification_type' => $this->passengerNotificationType,
             'updated_at' => $this->booking->updated_at?->toIso8601String(),
         ];
     }

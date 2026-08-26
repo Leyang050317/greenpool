@@ -7,6 +7,46 @@ use Throwable;
 
 class TripLocationService
 {
+    public function reverseGeocode(float $latitude, float $longitude, string $field): array
+    {
+        $this->assertConfigured($field);
+
+        if ($latitude < -90 || $latitude > 90 || $longitude < -180 || $longitude > 180) {
+            throw new TripRoutingException($field, 'The selected location does not have valid coordinates.');
+        }
+
+        try {
+            $response = Http::acceptJson()->connectTimeout(5)->timeout(12)->get('https://maps.googleapis.com/maps/api/geocode/json', [
+                'latlng' => "{$latitude},{$longitude}",
+                'key' => config('services.google_maps.key'),
+                'result_type' => 'street_address|premise|route|neighborhood|locality',
+            ]);
+        } catch (Throwable) {
+            throw new TripRoutingException($field, 'Unable to detect your current location. Please enter it manually.');
+        }
+
+        if (! $response->successful() || $response->json('status') !== 'OK') {
+            throw new TripRoutingException($field, 'Unable to detect your current location. Please enter it manually.');
+        }
+
+        $result = collect($response->json('results', []))
+            ->first(fn (array $result) => $this->isMalaysianGeocodeResult($result));
+
+        $display = trim((string) data_get($result, 'formatted_address', ''));
+        $placeId = trim((string) data_get($result, 'place_id', ''));
+
+        if ($display === '' || $placeId === '') {
+            throw new TripRoutingException($field, 'Unable to detect your current location. Please enter it manually.');
+        }
+
+        return [
+            'display' => $display,
+            'place_id' => $placeId,
+            'latitude' => $latitude,
+            'longitude' => $longitude,
+        ];
+    }
+
     public function autocomplete(string $input): array
     {
         $this->assertConfigured('departure_place_id');
@@ -68,6 +108,11 @@ class TripLocationService
     private function isMalaysian(array $place): bool
     {
         return collect($place['addressComponents'] ?? [])->contains(fn (array $component) => in_array('country', $component['types'] ?? [], true) && strtoupper((string) ($component['shortText'] ?? '')) === 'MY');
+    }
+
+    private function isMalaysianGeocodeResult(array $result): bool
+    {
+        return collect($result['address_components'] ?? [])->contains(fn (array $component) => in_array('country', $component['types'] ?? [], true) && strtoupper((string) ($component['short_name'] ?? '')) === 'MY');
     }
 
     private function assertConfigured(string $field): void

@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Trip extends Model
@@ -47,12 +48,27 @@ class Trip extends Model
 
     public function vehicle(): BelongsTo
     {
-        return $this->belongsTo(Vehicle::class, 'vehicle_id', 'vehicle_id');
+        return $this->belongsTo(Vehicle::class, 'vehicle_id', 'vehicle_id')->withTrashed();
     }
 
     public function bookings(): HasMany
     {
         return $this->hasMany(Booking::class, 'trip_id', 'trip_id');
+    }
+
+    public function emergencies(): HasMany
+    {
+        return $this->hasMany(Emergency::class, 'trip_id', 'trip_id');
+    }
+
+    public function locations(): HasMany
+    {
+        return $this->hasMany(TripLocation::class, 'trip_id', 'trip_id');
+    }
+
+    public function latestLocation(): HasOne
+    {
+        return $this->hasOne(TripLocation::class, 'trip_id', 'trip_id')->latestOfMany('recorded_at');
     }
 
     public function getDurationAttribute(): ?string

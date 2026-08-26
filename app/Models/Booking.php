@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Booking extends Model
 {
@@ -16,6 +17,7 @@ class Booking extends Model
         'passenger_id',
         'booking_status',
         'number_of_seats',
+        'number_of_luggage',
         'pickup_point',
         'pickup_place_id',
         'pickup_latitude',
@@ -28,6 +30,7 @@ class Booking extends Model
     {
         return [
             'number_of_seats' => 'integer',
+            'number_of_luggage' => 'integer',
             'picked_up_at' => 'datetime',
             'pickup_latitude' => 'decimal:7',
             'pickup_longitude' => 'decimal:7',
@@ -48,5 +51,20 @@ class Booking extends Model
     public function ratings(): HasMany
     {
         return $this->hasMany(Rating::class);
+    }
+
+    public function payment(): HasOne
+    {
+        return $this->hasOne(Payment::class);
+    }
+
+    public function messages(): HasMany
+    {
+        return $this->hasMany(Message::class);
+    }
+
+    public function latestMessage(): HasOne
+    {
+        return $this->hasOne(Message::class)->latestOfMany();
     }
 }

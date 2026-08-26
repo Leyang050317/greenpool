@@ -14,7 +14,7 @@ class TripDistanceService
 
         try {
             $shouldOptimize = $optimizeWaypointOrder && $intermediates !== [];
-            $fieldMask = 'routes.distanceMeters,routes.duration'.($shouldOptimize ? ',routes.optimizedIntermediateWaypointIndex' : '');
+            $fieldMask = 'routes.distanceMeters,routes.duration,routes.polyline.encodedPolyline'.($shouldOptimize ? ',routes.optimizedIntermediateWaypointIndex' : '');
             $payload = [
                 'origin' => ['location' => ['latLng' => $this->latLng($departure)]],
                 'destination' => ['location' => ['latLng' => $this->latLng($destination)]],
@@ -27,7 +27,7 @@ class TripDistanceService
                 $payload['optimizeWaypointOrder'] = true;
             }
 
-            $response = Http::acceptJson()->connectTimeout(5)->timeout(12)
+            $response = Http::acceptJson()->connectTimeout(8)->timeout(20)->retry(2, 300, throw: false)
                 ->withHeaders([
                     'X-Goog-Api-Key' => config('services.google_maps.key'),
                     'X-Goog-FieldMask' => $fieldMask,
@@ -64,6 +64,7 @@ class TripDistanceService
         $result = [
             'estimated_distance_km' => round(((float) $route['distanceMeters']) / 1000, 2),
             'estimated_duration_seconds' => $duration,
+            'encoded_polyline' => data_get($route, 'polyline.encodedPolyline'),
         ];
         if ($optimizeWaypointOrder && $intermediates !== []) {
             $indexes = $route['optimizedIntermediateWaypointIndex'] ?? [];

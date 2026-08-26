@@ -38,7 +38,10 @@
                         <dl class="grid gap-4 sm:grid-cols-2">
                             <div>
                                 <dt class="text-xs font-medium text-gray-500">Driver</dt>
-                                <dd class="mt-1 text-sm font-semibold text-gray-900">{{ $trip->user->name }}</dd>
+                                <dd class="mt-1 flex items-center gap-2 text-sm font-semibold text-gray-900">
+                                    @if ($trip->user->photo)<img src="{{ asset('storage/'.$trip->user->photo) }}" alt="Profile photo for {{ $trip->user->name }}" class="h-8 w-8 rounded-full object-cover">@else<span class="flex h-8 w-8 items-center justify-center rounded-full bg-green-50 text-xs font-bold text-[#2E7D32]">{{ mb_strtoupper(mb_substr($trip->user->name, 0, 1)) }}</span>@endif
+                                    {{ $trip->user->name }}
+                                </dd>
                                 @if($trip->user->ratings_received_count > 0)
                                     <dd class="mt-1 flex items-center gap-1 text-xs text-amber-500"><x-icons.lucide name="star" class="h-3 w-3 fill-current" />{{ number_format((float) $trip->user->ratings_received_avg_score, 1) }} <span class="text-gray-400">({{ $trip->user->ratings_received_count }} {{ Str::plural('review', $trip->user->ratings_received_count) }})</span></dd>
                                 @else
@@ -81,6 +84,37 @@
                                 <p class="mt-1 text-sm leading-6 text-gray-700">{{ $trip->description }}</p>
                             </div>
                         @endif
+
+                        <div class="mt-5 border-t border-gray-50 pt-4">
+                            <p class="text-xs font-medium text-gray-500">Driver Preferences</p>
+                            @if($trip->user->driverPreference)
+                                <div class="mt-3 grid gap-3 sm:grid-cols-3">
+                                    <div class="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2">
+                                        <p class="text-xs text-gray-500">Smoking</p>
+                                        <p class="mt-1 flex items-center gap-1.5 text-sm font-semibold {{ $trip->user->driverPreference->smoking_allowed ? 'text-green-700' : 'text-gray-700' }}">
+                                            <x-icons.lucide :name="$trip->user->driverPreference->smoking_allowed ? 'circle-check' : 'circle-x'" class="h-3.5 w-3.5" />
+                                            {{ $trip->user->driverPreference->smoking_allowed ? 'Allowed' : 'Not allowed' }}
+                                        </p>
+                                    </div>
+                                    <div class="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2">
+                                        <p class="text-xs text-gray-500">Pets</p>
+                                        <p class="mt-1 flex items-center gap-1.5 text-sm font-semibold {{ $trip->user->driverPreference->pets_allowed ? 'text-green-700' : 'text-gray-700' }}">
+                                            <x-icons.lucide :name="$trip->user->driverPreference->pets_allowed ? 'circle-check' : 'circle-x'" class="h-3.5 w-3.5" />
+                                            {{ $trip->user->driverPreference->pets_allowed ? 'Allowed' : 'Not allowed' }}
+                                        </p>
+                                    </div>
+                                    <div class="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2">
+                                        <p class="text-xs text-gray-500">Conversation</p>
+                                        <p class="mt-1 flex items-center gap-1.5 text-sm font-semibold text-gray-700">
+                                            <x-icons.lucide name="message-square" class="h-3.5 w-3.5" />
+                                            {{ $trip->user->driverPreference->conversation_preference }}
+                                        </p>
+                                    </div>
+                                </div>
+                            @else
+                                <p class="mt-1 text-sm leading-6 text-gray-500">This driver has not shared driving preferences yet.</p>
+                            @endif
+                        </div>
                     </section>
 
                     <form
@@ -107,12 +141,16 @@
                                         <button type="button" @click="select(suggestion)" class="block w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50" x-text="suggestion.text"></button>
                                     </template>
                                 </div>
-                                <p class="mt-1 text-xs text-gray-400">Select a suggestion in Malaysia to use it.</p>
                             </div>
 
                             <div>
                                 <label for="number_of_seats" class="mb-1.5 block text-xs font-semibold text-gray-500">Requested Seats</label>
                                 <input id="number_of_seats" type="number" name="number_of_seats" value="{{ old('number_of_seats', 1) }}" required min="1" max="{{ $trip->available_seats }}" class="block w-full rounded-xl border-gray-200 text-sm focus:border-[#16A34A] focus:ring-[#16A34A]" />
+                            </div>
+
+                            <div>
+                                <label for="number_of_luggage" class="mb-1.5 block text-xs font-semibold text-gray-500">Number of Luggage</label>
+                                <input id="number_of_luggage" type="number" name="number_of_luggage" value="{{ old('number_of_luggage', 0) }}" required min="0" class="block w-full rounded-xl border-gray-200 text-sm focus:border-[#16A34A] focus:ring-[#16A34A]" />
                             </div>
                         </div>
 

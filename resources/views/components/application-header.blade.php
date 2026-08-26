@@ -11,6 +11,8 @@
         request()->routeIs('attractions.index') && request()->query('tab') === 'favourites' => 'Favourite Attractions',
         request()->routeIs('attractions.index', 'driver.attractions.*', 'passenger.attractions.*') => 'Tourist Attractions',
         request()->routeIs('driver.notifications.*', 'passenger.notifications.*', 'notifications.*') => 'Notifications',
+        request()->routeIs('messages.*', 'bookings.chat.*') => 'Messages',
+        request()->routeIs('payments.*') => 'Payments',
         request()->routeIs('ratings.*') => 'Ratings',
         request()->routeIs('profile.*', 'driver.profile.*', 'passenger.profile.*') => 'Profile',
         request()->routeIs('driver.settings.*', 'passenger.settings.*') => 'Settings',
@@ -49,13 +51,17 @@
         <a
             href="{{ $notificationRoute }}"
             class="relative flex h-10 w-10 items-center justify-center rounded-lg text-gray-500 transition-colors duration-150 hover:bg-[#F3F4F6] hover:text-gray-700 active:bg-gray-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2E7D32] focus-visible:ring-offset-2"
+            data-notification-link
             aria-label="Notifications, {{ $unreadNotificationCount }} unread"
             title="Notifications"
         >
             <x-icons.lucide name="bell" />
-            @if($unreadNotificationCount > 0)
-                <span class="absolute -right-0.5 -top-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white ring-2 ring-white" aria-hidden="true">{{ min($unreadNotificationCount, 99) }}</span>
-            @endif
+            <span
+                class="{{ $unreadNotificationCount > 0 ? '' : 'hidden' }} absolute -right-0.5 -top-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white ring-2 ring-white"
+                data-notification-badge
+                data-count="{{ $unreadNotificationCount }}"
+                aria-hidden="true"
+            >{{ min($unreadNotificationCount, 99) }}</span>
         </a>
 
         <a

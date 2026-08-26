@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\HasProfileCompleteness;
+use App\Notifications\GreenPoolVerifyEmail;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Database\Factories\UserFactory;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
@@ -67,6 +68,11 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->hasOne(DriverPreference::class);
     }
 
+    public function driverLicence(): HasOne
+    {
+        return $this->hasOne(DriverLicence::class);
+    }
+
     public function emergencyContacts(): HasMany
     {
         return $this->hasMany(EmergencyContact::class);
@@ -80,6 +86,11 @@ class User extends Authenticatable implements MustVerifyEmail
     public function usesGoogleAuthentication(): bool
     {
         return $this->auth_provider === 'google';
+    }
+
+    public function sendEmailVerificationNotification(): void
+    {
+        $this->notify(new GreenPoolVerifyEmail());
     }
 
     public function trips(): HasMany
@@ -105,5 +116,30 @@ class User extends Authenticatable implements MustVerifyEmail
     public function ratingsReceived(): HasMany
     {
         return $this->hasMany(Rating::class, 'reviewee_id');
+    }
+
+    public function paymentsMade(): HasMany
+    {
+        return $this->hasMany(Payment::class, 'payer_id');
+    }
+
+    public function paymentsReceived(): HasMany
+    {
+        return $this->hasMany(Payment::class, 'payee_id');
+    }
+
+    public function sentMessages(): HasMany
+    {
+        return $this->hasMany(Message::class, 'sender_id');
+    }
+
+    public function receivedMessages(): HasMany
+    {
+        return $this->hasMany(Message::class, 'receiver_id');
+    }
+
+    public function emergencies(): HasMany
+    {
+        return $this->hasMany(Emergency::class);
     }
 }

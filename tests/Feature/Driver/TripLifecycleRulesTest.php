@@ -7,6 +7,7 @@ use App\Models\Booking;
 use App\Models\Trip;
 use App\Models\User;
 use App\Models\Vehicle;
+use App\Notifications\BookingStatusNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Artisan;
@@ -17,6 +18,53 @@ use Tests\TestCase;
 class TripLifecycleRulesTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_trip_creation_only_requires_an_uploaded_driving_licence(): void
+    {
+        $driver = User::factory()->create(['role' => 'driver']);
+        $vehicle = $this->vehicle($driver);
+        $departureAt = now()->addDays(10)->setTime(10, 0);
+
+        $this->actingAs($driver)
+            ->post(route('driver.trips.store'), $this->requestData($vehicle, $departureAt))
+            ->assertSessionHasErrors('driver_licence');
+
+        $driver->driverLicence()->create([
+            'image_path' => 'driver-licences/test.jpg',
+            'holder_name' => $driver->name,
+            'identity_no' => '991109040290',
+            'valid_until' => now()->addDays(5),
+            'verification_status' => 'Verified',
+            'verified_at' => now(),
+        ]);
+
+        $this->actingAs($driver)
+            ->post(route('driver.trips.store'), $this->requestData($vehicle, $departureAt))
+            ->assertSessionDoesntHaveErrors('driver_licence');
+    }
+
+    public function test_create_trip_page_redirects_to_profile_when_driving_licence_is_missing(): void
+    {
+        $driver = User::factory()->create(['role' => 'driver']);
+
+        $this->actingAs($driver)
+            ->get(route('driver.trips.create'))
+            ->assertRedirect(route('driver.profile.edit', ['section' => 'licence']))
+            ->assertSessionHas('error', 'Upload your driving licence before creating a trip.');
+    }
+
+    public function test_driver_cannot_start_trip_with_missing_or_expired_licence(): void
+    {
+        $driver = User::factory()->create(['role' => 'driver']);
+        $trip = $this->trip($driver);
+
+        $this->actingAs($driver)
+            ->patchJson(route('driver.trips.start', $trip))
+            ->assertUnprocessable()
+            ->assertSee('driving licence');
+
+        $this->assertSame('Scheduled', $trip->refresh()->status);
+    }
 
     protected function setUp(): void
     {
@@ -121,8 +169,80 @@ class TripLifecycleRulesTest extends TestCase
             fn (BookingStatusUpdated $event) => $event->booking->is($acceptedBooking)
                 && $event->booking->passenger_id === $acceptedPassenger->id
                 && $event->booking->trip->status === 'In Progress'
+                && $event->passengerNotificationType === 'trip_started'
         );
         Event::assertDispatchedTimes(BookingStatusUpdated::class, 1);
+        $notification = $acceptedPassenger->unreadNotifications()->where('type', BookingStatusNotification::class)->firstOrFail();
+        $this->assertSame('Trip Started', $notification->data['title']);
+        $this->assertSame('trip_started', $notification->data['type']);
+        $this->assertSame($acceptedBooking->id, $notification->data['booking_id']);
+        $this->assertSame($trip->trip_id, $notification->data['trip_id']);
+        $this->assertSame(route('passenger.bookings.show', $acceptedBooking), $notification->data['url']);
+    }
+
+    public function test_cancel_trip_marks_open_bookings_cancelled_and_notifies_passengers(): void
+    {
+        Event::fake([BookingStatusUpdated::class]);
+
+        $driver = User::factory()->create(['role' => 'driver', 'name' => 'Driver Cancel']);
+        $trip = $this->trip($driver, ['destination' => 'Suria KLCC']);
+        $acceptedPassenger = $this->passenger();
+        $pendingPassenger = $this->passenger();
+        $rejectedPassenger = $this->passenger();
+        $acceptedBooking = Booking::create(['trip_id' => $trip->trip_id, 'passenger_id' => $acceptedPassenger->id, 'booking_status' => 'Accepted', 'number_of_seats' => 1, 'pickup_point' => 'Main Gate']);
+        $pendingBooking = Booking::create(['trip_id' => $trip->trip_id, 'passenger_id' => $pendingPassenger->id, 'booking_status' => 'Pending', 'number_of_seats' => 1, 'pickup_point' => 'Library']);
+        $rejectedBooking = Booking::create(['trip_id' => $trip->trip_id, 'passenger_id' => $rejectedPassenger->id, 'booking_status' => 'Rejected', 'number_of_seats' => 1, 'pickup_point' => 'Cafeteria']);
+
+        $this->actingAs($driver)
+            ->patch(route('driver.trips.cancel', $trip))
+            ->assertRedirect(route('driver.trips.index'));
+
+        $this->assertSame('Cancelled', $trip->refresh()->status);
+        $this->assertSame('Cancelled', $acceptedBooking->refresh()->booking_status);
+        $this->assertSame('Cancelled', $pendingBooking->refresh()->booking_status);
+        $this->assertSame('Rejected', $rejectedBooking->refresh()->booking_status);
+
+        Event::assertDispatched(
+            BookingStatusUpdated::class,
+            fn (BookingStatusUpdated $event) => $event->booking->getKey() === $acceptedBooking->getKey()
+                && $event->passengerNotificationType === 'trip_cancelled'
+        );
+        Event::assertDispatched(
+            BookingStatusUpdated::class,
+            fn (BookingStatusUpdated $event) => $event->booking->getKey() === $pendingBooking->getKey()
+                && $event->passengerNotificationType === null
+        );
+        Event::assertDispatchedTimes(BookingStatusUpdated::class, 2);
+
+        $acceptedNotification = $acceptedPassenger->unreadNotifications()->where('type', BookingStatusNotification::class)->firstOrFail();
+
+        $this->assertSame('Trip Cancelled', $acceptedNotification->data['title']);
+        $this->assertSame('trip_cancelled', $acceptedNotification->data['type']);
+        $this->assertStringContainsString('Your booked trip from Departure → Suria KLCC has been cancelled.', $acceptedNotification->data['message']);
+        $this->assertSame(route('passenger.bookings.show', $acceptedBooking), $acceptedNotification->data['url']);
+        $this->assertSame(0, $pendingPassenger->unreadNotifications()->count());
+        $this->assertSame(0, $rejectedPassenger->unreadNotifications()->count());
+    }
+
+    public function test_complete_trip_notifies_accepted_passengers_once_after_completion(): void
+    {
+        Event::fake([BookingStatusUpdated::class]);
+
+        $driver = $this->driver();
+        $trip = $this->trip($driver, ['status' => 'In Progress', 'started_at' => now()->subMinutes(10)]);
+        $passenger = $this->passenger();
+        $booking = Booking::create(['trip_id' => $trip->trip_id, 'passenger_id' => $passenger->id, 'booking_status' => 'Accepted', 'number_of_seats' => 1, 'pickup_point' => 'Main Gate']);
+
+        $this->actingAs($driver)->patch(route('driver.trips.complete', $trip))->assertRedirect();
+
+        $notification = $passenger->unreadNotifications()->where('type', BookingStatusNotification::class)->firstOrFail();
+        $this->assertSame('Trip Completed', $notification->data['title']);
+        $this->assertSame('trip_completed', $notification->data['type']);
+        $this->assertSame($booking->id, $notification->data['booking_id']);
+        $this->assertSame(route('passenger.bookings.show', $booking), $notification->data['url']);
+
+        $this->actingAs($driver)->patch(route('driver.trips.complete', $trip))->assertStatus(422);
+        $this->assertSame(1, $passenger->fresh()->notifications()->where('type', BookingStatusNotification::class)->count());
     }
 
     private function fakeGoogle(array $optimizedIndexes = []): void
@@ -151,7 +271,19 @@ class TripLifecycleRulesTest extends TestCase
 
     private function driver(): User
     {
-        return User::factory()->create(['role' => 'driver']);
+        $driver = User::factory()->create(['role' => 'driver']);
+        $driver->driverLicence()->create([
+            'image_path' => 'driver-licences/test.jpg',
+            'holder_name' => $driver->name,
+            'identity_no' => '991109040290',
+            'licence_class' => 'D',
+            'valid_from' => now()->subYear(),
+            'valid_until' => now()->addYears(5),
+            'verification_status' => 'Verified',
+            'verified_at' => now(),
+        ]);
+
+        return $driver;
     }
 
     private function passenger(): User

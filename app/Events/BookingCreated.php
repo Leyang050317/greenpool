@@ -33,6 +33,9 @@ class BookingCreated implements ShouldBroadcastNow
             'pickup_point' => $this->booking->pickup_point,
             'number_of_seats' => $this->booking->number_of_seats,
             'status' => $this->booking->booking_status,
+            'trip_id' => $this->booking->trip_id,
+            'trip_route' => $this->booking->trip->departure_location.' → '.$this->booking->trip->destination,
+            'url' => route('driver.booking-requests.show', $this->booking),
             'created_at' => $this->booking->created_at?->toIso8601String(),
         ];
     }

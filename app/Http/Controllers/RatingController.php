@@ -2,12 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\RatingReceived;
 use App\Http\Requests\StoreRatingRequest;
 use App\Http\Requests\UpdateRatingRequest;
 use App\Models\Booking;
 use App\Models\Rating;
 use App\Models\User;
 use App\Notifications\RatingReceivedNotification;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -122,21 +124,9 @@ class RatingController extends Controller
     public function pending(Request $request): View
     {
         $user = $request->user();
-        $query = Booking::query()
-            ->with(['passenger', 'trip.user'])
-            ->where('booking_status', 'Accepted')
-            ->whereHas('trip', fn ($trip) => $trip->where('status', 'Completed'))
-            ->whereDoesntHave('ratings', fn ($rating) => $rating->where('reviewer_id', $user->id));
-
-        if ($user->role === 'passenger') {
-            $query->where('passenger_id', $user->id);
-        } elseif ($user->role === 'driver') {
-            $query->whereHas('trip', fn ($trip) => $trip->where('user_id', $user->id));
-        } else {
-            abort(403);
-        }
-
-        $bookings = $query->latest('updated_at')->paginate(8);
+        $bookings = $this->pendingBookingsQuery($user)
+            ->latest('updated_at')
+            ->paginate(8);
 
         return view('ratings.pending', compact('bookings'));
     }
@@ -152,6 +142,7 @@ class RatingController extends Controller
             ...$request->validated(),
         ]);
         $reviewee->notify(new RatingReceivedNotification($rating->load('reviewer')));
+        RatingReceived::dispatch($rating->load('reviewee'));
 
         return redirect()->route('ratings.submitted', $rating);
     }
@@ -160,8 +151,12 @@ class RatingController extends Controller
     {
         $this->ensureRatingOwnership($request, $rating);
         $rating->loadMissing(['reviewee', 'booking.trip']);
+        $nextBooking = $this->pendingBookingsQuery($request->user())
+            ->where('trip_id', $rating->booking->trip_id)
+            ->oldest('id')
+            ->first();
 
-        return view('ratings.submitted', compact('rating'));
+        return view('ratings.submitted', compact('rating', 'nextBooking'));
     }
 
     public function edit(Request $request, Rating $rating): View
@@ -201,7 +196,7 @@ class RatingController extends Controller
 
     private function ratingParticipants(Request $request, Booking $booking): array
     {
-        $booking->loadMissing(['trip.user', 'passenger']);
+        $booking->loadMissing(['trip.user', 'passenger', 'payment']);
         abort_unless($booking->booking_status === 'Accepted' && $booking->trip->status === 'Completed', 422, 'Ratings are available after a completed trip.');
         abort_if(
             $booking->trip->completed_at?->addDays(7)->isPast(),
@@ -209,8 +204,35 @@ class RatingController extends Controller
             'The 7-day rating period for this trip has expired.'
         );
         $actor = $request->user();
-        if ($actor->id === $booking->passenger_id) return [$booking->trip->user];
+        if ($actor->id === $booking->passenger_id) {
+            abort_if($booking->payment && ! $booking->payment->isPaid(), 402, 'Please complete payment before rating your driver.');
+
+            return [$booking->trip->user];
+        }
         if ($actor->id === $booking->trip->user_id) return [$booking->passenger];
+        abort(403);
+    }
+
+    private function pendingBookingsQuery(User $user): Builder
+    {
+        $query = Booking::query()
+            ->with(['passenger', 'trip.user'])
+            ->where('booking_status', 'Accepted')
+            ->whereHas('trip', fn ($trip) => $trip->where('status', 'Completed'))
+            ->whereDoesntHave('ratings', fn ($rating) => $rating->where('reviewer_id', $user->id));
+
+        if ($user->role === 'passenger') {
+            return $query
+                ->where('passenger_id', $user->id)
+                ->where(fn ($booking) => $booking
+                    ->whereDoesntHave('payment')
+                    ->orWhereHas('payment', fn ($payment) => $payment->where('payment_status', 'Paid')));
+        }
+
+        if ($user->role === 'driver') {
+            return $query->whereHas('trip', fn ($trip) => $trip->where('user_id', $user->id));
+        }
+
         abort(403);
     }
 

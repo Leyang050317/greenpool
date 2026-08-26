@@ -16,7 +16,7 @@
                     <p class="mt-1 text-sm text-gray-500">Review passenger requests for your trips.</p>
                 </div>
                 <form method="GET" action="{{ route('driver.booking-requests.index') }}" class="flex w-full gap-3 sm:w-auto">
-                    <select name="status" class="w-full rounded-xl border-gray-200 text-sm focus:border-[#16A34A] focus:ring-[#16A34A] sm:w-44">
+                    <select name="status" onchange="this.form.submit()" class="w-full rounded-xl border-gray-200 text-sm focus:border-[#16A34A] focus:ring-[#16A34A] sm:w-44">
                         <option value="">All Statuses</option>
                         @foreach(['Pending', 'Accepted', 'Rejected', 'Cancelled'] as $status)
                             <option value="{{ $status }}" @selected(request('status') === $status)>{{ $status }}</option>
@@ -93,6 +93,10 @@
                                 <p class="flex items-center gap-2">
                                     <x-icons.lucide name="users" class="h-3.5 w-3.5 text-gray-400" />
                                     {{ $booking->number_of_seats }} {{ Str::plural('passenger', $booking->number_of_seats) }}
+                                </p>
+                                <p class="flex items-center gap-2">
+                                    <x-icons.lucide name="briefcase" class="h-3.5 w-3.5 text-gray-400" />
+                                    {{ $booking->number_of_luggage }} {{ Str::plural('luggage', $booking->number_of_luggage) }}
                                 </p>
                                 <p class="flex items-center gap-2">
                                     <x-icons.lucide name="clock" class="h-3.5 w-3.5 text-gray-400" />

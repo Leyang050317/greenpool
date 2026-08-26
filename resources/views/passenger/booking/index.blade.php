@@ -28,7 +28,8 @@
                 method="GET"
                 action="{{ route('passenger.booking') }}"
                 class="mb-6 rounded-xl border border-gray-100 bg-white p-5"
-                x-data="rideSearchForm({{ Js::from(route('passenger.bookings.locations.autocomplete')) }}, {{ Js::from(request('destination', '')) }}, {{ Js::from(request('destination_place_id', '')) }})"
+                x-data="rideSearchForm({{ Js::from(route('passenger.bookings.locations.autocomplete')) }}, {{ Js::from(route('passenger.bookings.locations.current')) }}, {{ Js::from(request('destination', '')) }}, {{ Js::from(request('destination_place_id', '')) }})"
+                x-init="init()"
             >
                 <div class="grid gap-4 md:grid-cols-3">
                     <div class="relative">
@@ -73,8 +74,12 @@
                         <article class="rounded-xl border border-gray-100 bg-white p-5 transition-shadow hover:shadow-md">
                             <div class="mb-4 flex items-start justify-between gap-4">
                                 <div class="flex min-w-0 items-center gap-3">
-                                    <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-green-50 text-sm font-semibold text-[#2E7D32]">
-                                        {{ collect(preg_split('/\s+/', trim($trip->user->name)))->filter()->take(2)->map(fn ($part) => mb_strtoupper(mb_substr($part, 0, 1)))->implode('') ?: 'D' }}
+                                    <div class="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-green-50 text-sm font-semibold text-[#2E7D32]">
+                                        @if ($trip->user->photo)
+                                            <img src="{{ asset('storage/'.$trip->user->photo) }}" alt="Profile photo for {{ $trip->user->name }}" class="h-full w-full object-cover">
+                                        @else
+                                            {{ collect(preg_split('/\s+/', trim($trip->user->name)))->filter()->take(2)->map(fn ($part) => mb_strtoupper(mb_substr($part, 0, 1)))->implode('') ?: 'D' }}
+                                        @endif
                                     </div>
                                     <div class="min-w-0">
                                         <p class="truncate text-sm font-semibold text-gray-900">{{ $trip->user->name }}</p>
@@ -108,6 +113,19 @@
                                 </div>
                             </dl>
 
+                            <div class="mt-5 border-t border-gray-50 pt-4">
+                                <p class="text-xs font-medium text-gray-500">Driver Preferences</p>
+                                @if ($trip->user->driverPreference)
+                                    <div class="mt-2 flex flex-wrap gap-2 text-xs font-semibold">
+                                        <span class="rounded-full bg-gray-100 px-2.5 py-1 text-gray-700">Smoking: {{ $trip->user->driverPreference->smoking_allowed ? 'Allowed' : 'Not allowed' }}</span>
+                                        <span class="rounded-full bg-gray-100 px-2.5 py-1 text-gray-700">Pets: {{ $trip->user->driverPreference->pets_allowed ? 'Allowed' : 'Not allowed' }}</span>
+                                        <span class="rounded-full bg-green-50 px-2.5 py-1 text-[#2E7D32]">{{ $trip->user->driverPreference->conversation_preference }}</span>
+                                    </div>
+                                @else
+                                    <p class="mt-1 text-xs text-gray-400">Not provided</p>
+                                @endif
+                            </div>
+
                             <div class="mt-5 flex justify-end border-t border-gray-50 pt-4">
                                 <a href="{{ route('passenger.bookings.create', ['trip_id' => $trip->trip_id]) }}" class="inline-flex items-center gap-2 rounded-xl bg-[#2E7D32] px-4 py-2 text-sm font-semibold text-white hover:bg-[#256b29]">
                                     View Details
@@ -123,11 +141,93 @@
     </div>
 
     <script>
-        window.rideSearchForm = (endpoint, destinationText, destinationPlaceId) => ({
+        window.rideSearchForm = (endpoint, currentLocationEndpoint, destinationText, destinationPlaceId) => ({
             timer: null,
-            destination: { text: destinationText, placeId: destinationPlaceId, suggestions: [], open: false },
+            destination: { text: destinationText, placeId: destinationPlaceId, suggestions: [], open: false, autoFilled: false },
+            async browserReverseGeocode(position) {
+                const params = new URLSearchParams({
+                    format: 'jsonv2',
+                    lat: position.coords.latitude,
+                    lon: position.coords.longitude,
+                    zoom: 18,
+                    addressdetails: 1,
+                });
+
+                try {
+                    const response = await fetch(`https://nominatim.openstreetmap.org/reverse?${params.toString()}`, {
+                        headers: { Accept: 'application/json' },
+                    });
+
+                    if (!response.ok) {
+                        return null;
+                    }
+
+                    const data = await response.json();
+                    const address = data.address || {};
+                    const parts = [
+                        address.road || address.neighbourhood || address.suburb,
+                        address.city || address.town || address.village || address.state,
+                        address.country,
+                    ].filter(Boolean);
+
+                    return data.display_name || parts.join(', ') || null;
+                } catch (_) {
+                    return null;
+                }
+            },
+            init() {
+                if (this.destination.text.trim() !== '' || !navigator.geolocation) {
+                    return;
+                }
+
+                navigator.geolocation.getCurrentPosition(
+                    async (position) => {
+                        if (this.destination.text.trim() !== '') {
+                            return;
+                        }
+
+                        try {
+                            const response = await window.axios.get(currentLocationEndpoint, {
+                                params: {
+                                    latitude: position.coords.latitude,
+                                    longitude: position.coords.longitude,
+                                },
+                            });
+                            const location = response.data.data;
+                            if (!location || !location.text) {
+                                return;
+                            }
+
+                            if (this.destination.text.trim() !== '') {
+                                return;
+                            }
+
+                            this.destination.text = location.text;
+                            this.destination.placeId = location.place_id || '';
+                            this.destination.autoFilled = true;
+                            this.destination.suggestions = [];
+                            this.destination.open = false;
+                        } catch (_) {
+                            this.destination.placeId = '';
+                        }
+
+                        if (!this.destination.placeId && this.destination.text.trim() === '') {
+                            const browserAddress = await this.browserReverseGeocode(position);
+                            if (browserAddress && this.destination.text.trim() === '') {
+                                this.destination.text = browserAddress;
+                                this.destination.autoFilled = true;
+                                this.destination.suggestions = [];
+                                this.destination.open = false;
+                            }
+                        }
+                    },
+                    () => {},
+                    { enableHighAccuracy: false, timeout: 15000, maximumAge: 300000 },
+                );
+            },
             async search() {
                 this.destination.placeId = '';
+                this.destination.autoFilled = false;
                 this.destination.suggestions = [];
                 this.destination.open = true;
 

@@ -67,13 +67,13 @@
                     @if ($hasBlockingTrips)
                         <div class="ml-auto text-right">
                             <button type="button" disabled class="inline-flex min-h-[44px] cursor-not-allowed items-center justify-center rounded-xl px-4 py-2.5 text-sm font-semibold text-gray-400">
-                                Delete vehicle
+                                Archive vehicle
                             </button>
                             <p class="max-w-xs text-xs text-gray-500">Cancel or complete the assigned trip before deleting this vehicle.</p>
                         </div>
                     @else
                         <button type="button" @click="confirmDelete = true" class="ml-auto inline-flex min-h-[44px] items-center justify-center rounded-xl px-4 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600">
-                            Delete vehicle
+                            Archive vehicle
                         </button>
                     @endif
                 </div>
@@ -83,16 +83,16 @@
         <div x-cloak x-show="confirmDelete" @keydown.escape.window="confirmDelete = false" class="fixed inset-0 z-[60] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="delete-vehicle-title">
             <button type="button" class="absolute inset-0 bg-gray-950/45" @click="confirmDelete = false" aria-label="Close confirmation"></button>
             <div x-show="confirmDelete" x-transition class="relative w-full max-w-md rounded-2xl border border-gray-200 bg-white p-6">
-                <h3 id="delete-vehicle-title" class="text-lg font-bold text-gray-900">Delete this vehicle?</h3>
-                <p class="mt-2 text-sm leading-6 text-gray-600">This permanently removes {{ $vehicle->brand }} {{ $vehicle->model }} ({{ $vehicle->plate_number }}). This action cannot be undone.</p>
+                <h3 id="delete-vehicle-title" class="text-lg font-bold text-gray-900">Archive this vehicle?</h3>
+                <p class="mt-2 text-sm leading-6 text-gray-600">{{ $vehicle->brand }} {{ $vehicle->model }} ({{ $vehicle->plate_number }}) will be hidden from vehicle management and new trips. You can restore it later from Archived Vehicles.</p>
                 <div class="mt-6 flex justify-end gap-3">
                     <button type="button" @click="confirmDelete = false" class="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-gray-300 px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2E7D32]">Cancel</button>
                     <form method="POST" action="{{ route('driver.vehicles.destroy', $vehicle) }}" x-data="{ submitting: false }" @submit="submitting = true">
                         @csrf
                         @method('DELETE')
                         <button type="submit" :disabled="submitting" class="inline-flex min-h-[44px] items-center justify-center rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-700 disabled:cursor-wait disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600 focus-visible:ring-offset-2">
-                            <span x-show="!submitting">Delete vehicle</span>
-                            <span x-cloak x-show="submitting">Deleting…</span>
+                            <span x-show="!submitting">Archive vehicle</span>
+                            <span x-cloak x-show="submitting">Archiving…</span>
                         </button>
                     </form>
                 </div>

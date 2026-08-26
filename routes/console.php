@@ -9,3 +9,4 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 Schedule::command('trips:cancel-unbooked-departed')->everyMinute()->withoutOverlapping();
+Schedule::command('trips:send-reminders')->everyMinute()->withoutOverlapping();

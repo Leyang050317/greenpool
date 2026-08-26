@@ -6,7 +6,7 @@
     $prefilledDestinationPlaceId = $isEditing ? '' : request('destination_place_id', '');
 @endphp
 
-<form method="POST" action="{{ $isEditing ? route('driver.trips.update', ['trip' => $trip, 'return_to' => $returnTo]) : route('driver.trips.store') }}" class="max-w-2xl space-y-6" x-data="tripLocationForm({{ Js::from(route('driver.trips.locations.autocomplete')) }}, {{ Js::from($isEditing) }}, {{ Js::from($value('departure_location', $trip->departure_location ?? '')) }}, {{ Js::from($value('destination', $prefilledDestination)) }}, {{ Js::from(old('departure_place_id', '')) }}, {{ Js::from(old('destination_place_id', $prefilledDestinationPlaceId)) }})" x-ref="tripForm" @submit.prevent="submitForm()">
+<form method="POST" action="{{ $isEditing ? route('driver.trips.update', ['trip' => $trip, 'return_to' => $returnTo]) : route('driver.trips.store') }}" class="max-w-2xl space-y-6" x-data="tripLocationForm({{ Js::from(route('driver.trips.locations.autocomplete')) }}, {{ Js::from(route('driver.trips.fare-estimate')) }}, {{ Js::from($isEditing) }}, {{ Js::from($value('departure_location', $trip->departure_location ?? '')) }}, {{ Js::from($value('destination', $prefilledDestination)) }}, {{ Js::from(old('departure_place_id', '')) }}, {{ Js::from(old('destination_place_id', $prefilledDestinationPlaceId)) }}, {{ Js::from((string) $value('price_per_passenger', $trip->price_per_passenger ?? '')) }})" x-ref="tripForm" @submit.prevent="submitForm()">
     @csrf
     @if ($isEditing) @method('PATCH') @endif
 
@@ -73,7 +73,17 @@
                 </div>
                 <div>
                     <label for="price_per_passenger" class="mb-1.5 flex items-center gap-1.5 text-sm font-medium text-gray-700"><x-icons.lucide name="dollar-sign" class="h-4 w-4 text-gray-400" />Price per passenger (RM)</label>
-                    <input id="price_per_passenger" type="number" name="price_per_passenger" min="0" step="0.01" value="{{ $value('price_per_passenger', $trip->price_per_passenger ?? '0.00') }}" class="block w-full rounded-xl border-gray-200 text-sm focus:border-[#16A34A] focus:ring-[#16A34A]" />
+                    <input id="price_per_passenger" type="number" name="price_per_passenger" min="0" step="0.01" x-model="price" @input="priceManuallyEdited = true" class="block w-full rounded-xl border-gray-200 text-sm focus:border-[#16A34A] focus:ring-[#16A34A]" placeholder="Select locations for a suggestion" />
+                    <div x-cloak x-show="estimating" class="mt-2 text-xs text-slate-400">Calculating route and suggested price...</div>
+                    <div x-cloak x-show="fareEstimate && !estimating" class="mt-2 rounded-lg bg-green-50 px-3 py-2 text-xs leading-5 text-green-800">
+                        <strong>Suggested: RM <span x-text="Number(fareEstimate?.recommended_price || 0).toFixed(2)"></span></strong>
+                        <span> · <span x-text="fareEstimate?.estimated_distance_km"></span> km · about <span x-text="Math.max(1, Math.round((fareEstimate?.estimated_duration_seconds || 0) / 60))"></span> min</span>
+                        <span class="block text-green-700">Recommended range RM <span x-text="Number(fareEstimate?.minimum_price || 0).toFixed(2)"></span>–RM <span x-text="Number(fareEstimate?.maximum_price || 0).toFixed(2)"></span>. You may adjust it.</span>
+                    </div>
+                    <div x-cloak x-show="fareError" class="mt-2 flex items-center justify-between gap-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                        <span x-text="fareError"></span>
+                        <button type="button" @click="updateFareEstimate()" class="shrink-0 font-semibold text-amber-900 underline">Retry suggestion</button>
+                    </div>
                     <x-input-error :messages="$errors->get('price_per_passenger')" class="mt-1.5" />
                 </div>
             </div>
@@ -92,8 +102,9 @@
     <div x-cloak x-show="discardOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4"><div class="absolute inset-0 bg-slate-900/40" @click="discardOpen = false"></div><div class="relative w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl"><h2 class="text-lg font-semibold text-gray-900">{{ $isEditing ? 'Discard Changes?' : 'Discard Trip?' }}</h2><p class="mt-2 text-sm leading-6 text-gray-500">{{ $isEditing ? 'Unsaved changes will be lost.' : 'Your entered information will not be saved.' }}</p><div class="mt-6 flex justify-end gap-3"><button type="button" @click="discardOpen = false" class="rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700">{{ $isEditing ? 'Continue Editing' : 'Keep Editing' }}</button><a href="{{ route($returnTo) }}" class="rounded-xl bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700">Discard</a></div></div></div>
 </form>
 <script>
-    window.tripLocationForm = (endpoint, isEditing, departureText, destinationText, departurePlaceId, destinationPlaceId) => ({
-        confirmOpen: false, discardOpen: false, timer: null, locationError: '',
+    window.tripLocationForm = (endpoint, fareEndpoint, isEditing, departureText, destinationText, departurePlaceId, destinationPlaceId, initialPrice) => ({
+        confirmOpen: false, discardOpen: false, timer: null, locationError: '', fareError: '', estimating: false, fareEstimate: null,
+        price: initialPrice, priceManuallyEdited: initialPrice !== '',
         departure: { text: departureText, initialText: departureText, placeId: departurePlaceId, suggestions: [], open: false },
         destination: { text: destinationText, initialText: destinationText, placeId: destinationPlaceId, suggestions: [], open: false },
         locationsValid() {
@@ -117,6 +128,18 @@
                 location.suggestions = response.data.data || [];
             } catch (_) { location.suggestions = []; } }, 250);
         },
-        select(field, suggestion) { this[field].text = suggestion.text; this[field].placeId = suggestion.place_id; this[field].suggestions = []; this[field].open = false; },
+        select(field, suggestion) { this[field].text = suggestion.text; this[field].placeId = suggestion.place_id; this[field].suggestions = []; this[field].open = false; this.updateFareEstimate(); },
+        async updateFareEstimate() {
+            if (!this.departure.placeId || !this.destination.placeId) return;
+            this.estimating = true; this.fareError = '';
+            try {
+                const response = await window.axios.get(fareEndpoint, { params: { departure_place_id: this.departure.placeId, destination_place_id: this.destination.placeId } });
+                this.fareEstimate = response.data.data;
+                if (!this.priceManuallyEdited) this.price = Number(this.fareEstimate.recommended_price).toFixed(2);
+            } catch (error) {
+                this.fareEstimate = null;
+                this.fareError = error.response?.data?.message || 'Unable to calculate a suggested price right now.';
+            } finally { this.estimating = false; }
+        },
     });
 </script>

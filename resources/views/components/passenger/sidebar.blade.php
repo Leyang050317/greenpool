@@ -1,13 +1,16 @@
 @php
 
     $unreadNotificationCount = Auth::user()->unreadNotifications()->count();
+    $unreadMessageCount = Auth::user()->receivedMessages()->whereNull('read_at')->count();
     $mainNavigation = [
 
         ['label' => 'Dashboard', 'icon' => 'layout-dashboard', 'href' => route('passenger.home'), 'active' => request()->routeIs('passenger.home')],
         ['label' => 'Find a Ride', 'icon' => 'search', 'href' => route('passenger.booking'), 'active' => request()->routeIs('passenger.booking', 'passenger.bookings.create')],
-        ['label' => 'My Bookings', 'icon' => 'clipboard-list', 'href' => route('passenger.bookings.history'), 'active' => request()->routeIs('passenger.bookings.history')],
+        ['label' => 'My Bookings', 'icon' => 'clipboard-list', 'href' => route('passenger.bookings.history'), 'active' => request()->routeIs('passenger.bookings.history', 'passenger.bookings.show')],
+        ['label' => 'Messages', 'icon' => 'message-square', 'href' => route('messages.index'), 'active' => request()->routeIs('messages.*', 'bookings.chat.*'), 'unread' => $unreadMessageCount > 0, 'unreadLabel' => 'Unread messages'],
         ['label' => 'Tourist Attractions', 'icon' => 'map-pinned', 'href' => route('attractions.index'), 'active' => request()->routeIs('attractions.*')],
         ['label' => 'Notifications', 'icon' => 'bell', 'href' => route('notifications.index'), 'active' => request()->routeIs('notifications.*'), 'unread' => $unreadNotificationCount > 0],
+        ['label' => 'Payments', 'icon' => 'credit-card', 'href' => route('payments.index'), 'active' => request()->routeIs('payments.*')],
         ['label' => 'Ratings', 'icon' => 'star', 'href' => route('ratings.index'), 'active' => request()->routeIs('ratings.*')],
         ['label' => 'Profile', 'icon' => 'user-circle', 'href' => route('profile.edit'), 'active' => request()->routeIs('profile.edit')],
     ];
@@ -56,7 +59,7 @@
                             @endif
                             @if ($item['unread'] ?? false)
                                 <span class="absolute right-0 top-0 h-2 w-2 rounded-full bg-[#2E7D32] ring-2 ring-white" aria-hidden="true"></span>
-                                <span class="sr-only">Unread notifications</span>
+                                <span class="sr-only">{{ $item['unreadLabel'] ?? 'Unread notifications' }}</span>
                             @endif
                         </span>
                         <span x-show="sidebarExpanded || mobileDrawerOpen" x-transition.opacity.duration.150ms class="ml-3 whitespace-nowrap">{{ $item['label'] }}</span>

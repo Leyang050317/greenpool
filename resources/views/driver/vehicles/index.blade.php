@@ -1,10 +1,11 @@
 <x-app-layout>
-    <div class="px-4 py-8 sm:px-6 lg:px-8" x-data="{ managementMode: 'details' }">
+    <div class="px-4 py-8 sm:px-6 lg:px-8" x-data="{ managementMode: 'details', successVisible: {{ session('success') || request()->boolean('created') ? 'true' : 'false' }} }">
         <div class="mx-auto max-w-7xl">
-            @if (session('success'))
-                <div class="mb-6 flex items-center justify-between rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-medium text-green-800" role="status">
-                    <span>{{ session('success') }}</span>
-                    <button type="button" @click="$el.parentElement.remove()" class="rounded p-1 hover:bg-green-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2E7D32]" aria-label="Dismiss message">×</button>
+            @if (session('success') || request()->boolean('created'))
+                <div x-cloak x-show="successVisible" x-transition x-init="history.replaceState({}, document.title, @js(route('driver.vehicles.index'))); setTimeout(() => successVisible = false, 6000)" class="fixed inset-x-4 bottom-5 z-50 mx-auto flex max-w-md items-center gap-3 rounded-xl bg-green-700 px-4 py-3 text-sm font-medium text-white shadow-2xl sm:inset-x-auto sm:right-6" role="status" aria-live="polite">
+                    <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white/20 font-bold" aria-hidden="true">✓</span>
+                    <span class="min-w-0 flex-1">{{ session('success', 'Vehicle added successfully.') }}</span>
+                    <button type="button" @click="successVisible = false" class="rounded p-1 text-green-100 hover:bg-white/10 hover:text-white" aria-label="Dismiss message">×</button>
                 </div>
             @endif
 
@@ -15,6 +16,9 @@
                 </div>
 
                 <div class="flex flex-wrap gap-2.5">
+                    <a href="{{ route('driver.vehicles.archived') }}" class="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-xl border border-gray-300 bg-white px-5 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2E7D32] focus-visible:ring-offset-2">
+                        Archived Vehicles
+                    </a>
                     <button
                         type="button"
                         @click="managementMode = managementMode === 'availability' ? 'details' : 'availability'"

@@ -1,0 +1,6 @@
+# PaddleOCR 3.x requires Python 3.8+ and PaddlePaddle 3.x.
+paddlepaddle>=3.0,<4.0
+paddleocr>=3.0,<4.0
+opencv-python-headless>=4.8,<5.0
+Pillow>=10.0,<13.0
+numpy>=1.24,<3.0

@@ -23,6 +23,9 @@ class RatingReceivedNotification extends Notification
             'rating_id' => $this->rating->id,
             'reviewer_name' => $this->rating->reviewer->name,
             'score' => $this->rating->score,
+            'type' => 'rating_received',
+            'title' => 'New rating received',
+            'icon' => 'star',
             'message' => $this->rating->reviewer->name.' gave you a '.$this->rating->score.'-star rating.',
             'url' => route('ratings.received', $notifiable),
         ];

@@ -12,28 +12,33 @@ class VehicleDocumentVerificationTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_matching_normalized_names_and_identity_numbers_can_be_saved(): void
+    public function test_matching_normalized_geran_owner_name_can_be_saved(): void
     {
         Storage::fake('public');
-        $driver = User::factory()->create(['role' => 'driver']);
+        Storage::fake('local');
+        $driver = User::factory()->create(['role' => 'driver', 'name' => 'ER KIM WEN']);
+        $this->addValidDrivingLicence($driver);
 
         $response = $this->actingAs($driver)->post(route('driver.vehicles.store'), $this->payload([
             'registered_owner_name' => ' ER   KIM WEN ',
-            'licence_name' => 'er kim wen',
         ]));
 
-        $response->assertSessionHasNoErrors();
+        $response
+            ->assertSessionHasNoErrors()
+            ->assertRedirect(route('driver.vehicles.index'));
         $this->assertDatabaseHas('vehicles', [
             'registered_owner_name' => 'ER KIM WEN',
-            'licence_name' => 'ER KIM WEN',
             'owner_identity_no' => '991109040290',
-            'verification_status' => 'Pending',
+            'brand' => 'PROTON',
+            'model' => 'SAGA 1.3 PREMIUM',
+            'verification_status' => 'Verified',
         ]);
     }
 
     public function test_different_owner_name_is_rejected_and_not_saved(): void
     {
-        $driver = User::factory()->create(['role' => 'driver']);
+        $driver = User::factory()->create(['role' => 'driver', 'name' => 'ER KIM WEN']);
+        $this->addValidDrivingLicence($driver);
 
         $this->actingAs($driver)->post(route('driver.vehicles.store'), $this->payload([
             'registered_owner_name' => 'ER KIM WEI',
@@ -42,14 +47,25 @@ class VehicleDocumentVerificationTest extends TestCase
         $this->assertDatabaseCount('vehicles', 0);
     }
 
-    public function test_different_or_malformed_identity_number_is_rejected(): void
+    public function test_malformed_geran_identity_number_is_rejected(): void
     {
-        $driver = User::factory()->create(['role' => 'driver']);
+        $driver = User::factory()->create(['role' => 'driver', 'name' => 'ER KIM WEN']);
+        $this->addValidDrivingLicence($driver);
 
         $this->actingAs($driver)->post(route('driver.vehicles.store'), $this->payload([
             'owner_identity_no' => '991109-04-0290',
-            'licence_identity_no' => '991109040291',
         ]))->assertSessionHasErrors('owner_identity_no');
+
+        $this->assertDatabaseCount('vehicles', 0);
+    }
+
+    public function test_geran_name_must_match_driver_account_name(): void
+    {
+        $driver = User::factory()->create(['role' => 'driver', 'name' => 'ANOTHER DRIVER']);
+        $this->addValidDrivingLicence($driver);
+
+        $this->actingAs($driver)->post(route('driver.vehicles.store'), $this->payload())
+            ->assertSessionHasErrors(['registered_owner_name']);
 
         $this->assertDatabaseCount('vehicles', 0);
     }
@@ -63,9 +79,22 @@ class VehicleDocumentVerificationTest extends TestCase
             'rear_image' => UploadedFile::fake()->image('rear.jpg', 800, 450),
             'side_image' => UploadedFile::fake()->image('side.jpg', 800, 450),
             'vehicle_geran' => UploadedFile::fake()->image('geran.jpg', 500, 300),
-            'driving_licence' => UploadedFile::fake()->image('licence.jpg', 500, 300),
             'registered_owner_name' => 'ER KIM WEN', 'owner_identity_no' => '991109040290',
-            'licence_name' => 'ER KIM WEN', 'licence_identity_no' => '991109040290',
+            'manufacturer' => 'PROTON', 'model_name' => 'SAGA 1.3 PREMIUM',
         ], $overrides);
+    }
+
+    private function addValidDrivingLicence(User $driver): void
+    {
+        $driver->driverLicence()->create([
+            'image_path' => 'driver-licences/test.jpg',
+            'holder_name' => $driver->name,
+            'identity_no' => '991109040290',
+            'licence_class' => 'D',
+            'valid_from' => now()->subYear(),
+            'valid_until' => now()->addYears(5),
+            'verification_status' => 'Verified',
+            'verified_at' => now(),
+        ]);
     }
 }
