@@ -162,10 +162,7 @@ class VehicleManagementTest extends TestCase
 
         $this->actingAs($driver)
             ->put(route('driver.vehicles.update', $vehicle), [
-                'plate_number' => $vehicle->plate_number,
-                'brand' => 'Toyota',
-                'model' => 'Vios',
-                'colour' => 'White',
+                ...$this->vehicleDataFrom($vehicle),
                 'seat_capacity' => 3,
             ])
             ->assertRedirect(route('driver.vehicles.show', $vehicle))
@@ -173,8 +170,6 @@ class VehicleManagementTest extends TestCase
 
         $this->assertDatabaseHas('vehicles', [
             'vehicle_id' => $vehicle->vehicle_id,
-            'brand' => 'Toyota',
-            'model' => 'Vios',
             'seat_capacity' => 3,
         ]);
     }
@@ -379,30 +374,64 @@ class VehicleManagementTest extends TestCase
         Storage::disk('public')->assertExists('vehicles/original.jpg');
     }
 
-    public function test_driver_can_replace_picture_and_old_picture_is_removed(): void
+    public function test_driver_can_revalidate_identity_changes_and_old_evidence_is_removed(): void
     {
         Storage::fake('public');
-        Storage::disk('public')->put('vehicles/old.jpg', 'old');
-        $driver = User::factory()->create(['role' => 'driver']);
+        Storage::fake('local');
+        foreach (['front', 'rear', 'side'] as $view) {
+            Storage::disk('public')->put("vehicles/old-{$view}.jpg", 'old');
+        }
+        Storage::disk('local')->put('vehicle-documents/old-geran.jpg', 'old');
+        $driver = User::factory()->create(['role' => 'driver', 'name' => 'TEST DRIVER']);
         $vehicle = Vehicle::factory()->verified()->create([
             'user_id' => $driver->id,
-            'vehicle_image_path' => 'vehicles/old.jpg',
+            'vehicle_image_path' => 'vehicles/old-front.jpg',
+            'front_image_path' => 'vehicles/old-front.jpg',
+            'rear_image_path' => 'vehicles/old-rear.jpg',
+            'side_image_path' => 'vehicles/old-side.jpg',
+            'vehicle_geran_path' => 'vehicle-documents/old-geran.jpg',
         ]);
 
         $this->actingAs($driver)->put(route('driver.vehicles.update', $vehicle), [
-            ...$this->vehicleDataFrom($vehicle),
-            'vehicle_image' => UploadedFile::fake()->image('replacement.png'),
+            ...$this->revalidationData($driver, $vehicle, ['plate_number' => 'NEW 1234']),
         ])->assertSessionHasNoErrors();
 
         $vehicle->refresh();
-        $this->assertNotSame('vehicles/old.jpg', $vehicle->vehicle_image_path);
-        $this->assertSame('Pending', $vehicle->verification_status);
-        $this->assertNull($vehicle->verified_at);
-        Storage::disk('public')->assertMissing('vehicles/old.jpg');
-        Storage::disk('public')->assertExists($vehicle->vehicle_image_path);
+        $this->assertSame('NEW 1234', $vehicle->plate_number);
+        $this->assertSame('Verified', $vehicle->verification_status);
+        $this->assertNotNull($vehicle->verified_at);
+        Storage::disk('public')->assertMissing('vehicles/old-front.jpg');
+        Storage::disk('public')->assertMissing('vehicles/old-rear.jpg');
+        Storage::disk('public')->assertMissing('vehicles/old-side.jpg');
+        Storage::disk('local')->assertMissing('vehicle-documents/old-geran.jpg');
+        Storage::disk('public')->assertExists($vehicle->front_image_path);
+        Storage::disk('local')->assertExists($vehicle->vehicle_geran_path);
     }
 
-    public function test_identity_edit_resets_verification_but_seat_only_edit_preserves_it(): void
+    public function test_model_edit_requires_new_geran_but_seat_only_edit_preserves_verification(): void
+    {
+        $driver = User::factory()->create(['role' => 'driver']);
+        $vehicle = Vehicle::factory()->verified()->create(['user_id' => $driver->id]);
+
+        $this->actingAs($driver)->put(route('driver.vehicles.update', $vehicle), [
+            ...$this->vehicleDataFrom($vehicle),
+            'model' => $vehicle->model === 'Vios' ? 'Myvi' : 'Vios',
+        ])->assertSessionHasErrors('vehicle_geran')
+            ->assertSessionDoesntHaveErrors(['front_image', 'rear_image', 'side_image']);
+
+        $this->assertSame('Verified', $vehicle->refresh()->verification_status);
+        $this->assertNotNull($vehicle->verified_at);
+
+        $vehicle->update(['verification_status' => 'Verified', 'verified_at' => now()]);
+        $this->actingAs($driver)->put(route('driver.vehicles.update', $vehicle), [
+            ...$this->vehicleDataFrom($vehicle),
+            'seat_capacity' => 1,
+        ])->assertSessionHasNoErrors();
+
+        $this->assertSame('Verified', $vehicle->refresh()->verification_status);
+    }
+
+    public function test_vehicle_brand_cannot_be_updated(): void
     {
         $driver = User::factory()->create(['role' => 'driver']);
         $vehicle = Vehicle::factory()->verified()->create(['user_id' => $driver->id]);
@@ -410,16 +439,21 @@ class VehicleManagementTest extends TestCase
         $this->actingAs($driver)->put(route('driver.vehicles.update', $vehicle), [
             ...$this->vehicleDataFrom($vehicle),
             'brand' => $vehicle->brand === 'Toyota' ? 'Honda' : 'Toyota',
-        ])->assertSessionHasNoErrors();
+        ])->assertSessionHasErrors('brand');
 
-        $this->assertSame('Pending', $vehicle->refresh()->verification_status);
-        $this->assertNull($vehicle->verified_at);
+        $this->assertSame($vehicle->brand, $vehicle->fresh()->brand);
+    }
 
-        $vehicle->update(['verification_status' => 'Verified', 'verified_at' => now()]);
+    public function test_colour_edit_requires_vehicle_photos_but_not_geran(): void
+    {
+        $driver = User::factory()->create(['role' => 'driver']);
+        $vehicle = Vehicle::factory()->verified()->create(['user_id' => $driver->id]);
+
         $this->actingAs($driver)->put(route('driver.vehicles.update', $vehicle), [
             ...$this->vehicleDataFrom($vehicle),
-            'seat_capacity' => 1,
-        ])->assertSessionHasNoErrors();
+            'colour' => mb_strtoupper($vehicle->colour) === 'BLACK' ? 'WHITE' : 'BLACK',
+        ])->assertSessionHasErrors(['front_image', 'rear_image', 'side_image'])
+            ->assertSessionDoesntHaveErrors('vehicle_geran');
 
         $this->assertSame('Verified', $vehicle->refresh()->verification_status);
     }
@@ -594,8 +628,9 @@ class VehicleManagementTest extends TestCase
     public function test_new_picture_is_removed_when_database_update_fails(): void
     {
         Storage::fake('public');
+        Storage::fake('local');
         Storage::disk('public')->put('vehicles/original.jpg', 'original');
-        $driver = User::factory()->create(['role' => 'driver']);
+        $driver = User::factory()->create(['role' => 'driver', 'name' => 'TEST DRIVER']);
         $vehicle = Vehicle::factory()->create([
             'user_id' => $driver->id,
             'vehicle_image_path' => 'vehicles/original.jpg',
@@ -605,8 +640,7 @@ class VehicleManagementTest extends TestCase
 
         try {
             $this->withoutExceptionHandling()->actingAs($driver)->put(route('driver.vehicles.update', $vehicle), [
-                ...$this->vehicleDataFrom($vehicle),
-                'vehicle_image' => UploadedFile::fake()->image('new.jpg'),
+                ...$this->revalidationData($driver, $vehicle, ['plate_number' => 'FAIL 123']),
             ]);
             $this->fail('The forced update failure was not thrown.');
         } catch (RuntimeException $exception) {
@@ -652,5 +686,39 @@ class VehicleManagementTest extends TestCase
             'colour' => $vehicle->colour,
             'seat_capacity' => $vehicle->seat_capacity,
         ];
+    }
+
+    private function revalidationData(User $driver, Vehicle $vehicle, array $overrides = []): array
+    {
+        $geran = UploadedFile::fake()->image('geran.jpg', 500, 300);
+        $data = [
+            'plate_number' => 'ABC 1234',
+            'brand' => $vehicle->brand,
+            'model' => $vehicle->model,
+            'colour' => $vehicle->colour,
+            'seat_capacity' => 4,
+            'front_image' => UploadedFile::fake()->image('front.jpg', 800, 450),
+            'rear_image' => UploadedFile::fake()->image('rear.jpg', 800, 450),
+            'side_image' => UploadedFile::fake()->image('side.jpg', 800, 450),
+            'vehicle_geran' => $geran,
+            'registered_owner_name' => $driver->name,
+            'owner_identity_no' => '991109040290',
+            'manufacturer' => $vehicle->brand,
+            'model_name' => $vehicle->model,
+        ];
+        $data = [...$data, ...$overrides];
+        $data['geran_plate_number'] = $data['plate_number'];
+        $this->withSession(['vehicle_geran_ocr' => [
+            'hash' => hash_file('sha256', $geran->getRealPath()),
+            'fields' => [
+                'registered_owner_name' => $data['registered_owner_name'],
+                'owner_identity_no' => $data['owner_identity_no'],
+                'manufacturer' => $data['manufacturer'],
+                'model_name' => $data['model_name'],
+                'registration_no' => $data['geran_plate_number'],
+            ],
+        ]]);
+
+        return $data;
     }
 }

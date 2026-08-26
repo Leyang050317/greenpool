@@ -1,97 +1,20 @@
 <div class="grid gap-6 md:grid-cols-2">
-    <div
-        class="md:col-span-2"
-        x-data="{
-            previewUrl: null,
-            fileName: '',
-            dragging: false,
-            previewFile(file) {
-                if (!file) return;
-                if (this.previewUrl) URL.revokeObjectURL(this.previewUrl);
-                this.previewUrl = URL.createObjectURL(file);
-                this.fileName = file.name;
-            },
-            chooseDroppedFile(event) {
-                const file = event.dataTransfer.files[0];
-                if (!file) return;
-                const transfer = new DataTransfer();
-                transfer.items.add(file);
-                this.$refs.vehicleImage.files = transfer.files;
-                this.previewFile(file);
-            }
-        }"
-    >
-        <label for="vehicle_image" class="block text-sm font-semibold text-gray-800">
-            Vehicle Picture @unless($vehicle)<span class="text-red-600" aria-hidden="true">*</span>@endunless
-        </label>
-        <p id="vehicle_image_help" class="mt-1.5 text-sm text-gray-500">Upload a clear picture of the vehicle. JPG, PNG or WEBP, maximum 5 MB.</p>
-
-        <input
-            id="vehicle_image"
-            x-ref="vehicleImage"
-            name="vehicle_image"
-            type="file"
-            accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
-            class="sr-only"
-            @change="previewFile($event.target.files[0])"
-            @unless($vehicle) required @endunless
-            aria-describedby="vehicle_image_help @error('vehicle_image') vehicle_image_error @enderror"
-        >
-
-        <button
-            type="button"
-            @click="$refs.vehicleImage.click()"
-            @dragover.prevent="dragging = true"
-            @dragleave.prevent="dragging = false"
-            @drop.prevent="dragging = false; chooseDroppedFile($event)"
-            :class="dragging ? 'border-[#2E7D32] bg-green-50' : 'border-gray-300 bg-gray-50 hover:bg-gray-100'"
-            class="mt-3 flex w-full flex-col items-center justify-center overflow-hidden rounded-xl border-2 border-dashed p-3 text-center transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2E7D32] focus-visible:ring-offset-2"
-        >
-            <img
-                x-cloak
-                x-show="previewUrl"
-                :src="previewUrl"
-                alt="Selected vehicle picture preview"
-                class="aspect-[16/7] w-full rounded-lg object-cover"
-            >
-
-            @if ($vehicle?->vehicle_image_path)
-                <img
-                    x-show="!previewUrl"
-                    src="{{ asset('storage/'.$vehicle->vehicle_image_path) }}"
-                    alt="{{ $vehicle->brand }} {{ $vehicle->model }} vehicle"
-                    class="aspect-[16/7] w-full rounded-lg object-cover"
-                >
-            @else
-                <span x-show="!previewUrl" class="flex min-h-40 flex-col items-center justify-center py-8">
-                    <x-icons.lucide name="car-front" class="h-8 w-8 text-gray-400" />
-                    <span class="mt-3 text-sm font-semibold text-gray-700">Click to select or drag and drop</span>
-                </span>
-            @endif
-
-            <span x-show="fileName" x-text="fileName" class="mt-3 max-w-full truncate text-sm font-medium text-[#2E7D32]"></span>
-            <span x-show="previewUrl" class="mt-1 text-xs text-gray-500">Click to choose another picture</span>
-        </button>
-
-        @error('vehicle_image')
-            <p id="vehicle_image_error" class="mt-2 text-sm font-medium text-red-600">{{ $message }}</p>
-        @enderror
-    </div>
-
     <div class="md:col-span-2">
         <label for="plate_number" class="block text-sm font-semibold text-gray-800">Plate number</label>
-        <input
+        <div class="mt-2 flex gap-2"><input
             id="plate_number"
-            name="plate_number"
             type="text"
             value="{{ old('plate_number', $vehicle?->plate_number) }}"
+            x-model="fields.plate_number"
             maxlength="20"
             required
             autocomplete="off"
             placeholder="e.g. VAB 1234"
-            class="mt-2 block w-full rounded-xl border-gray-300 uppercase shadow-none focus:border-[#2E7D32] focus:ring-[#2E7D32]"
+            readonly
+            class="block min-w-0 flex-1 cursor-not-allowed rounded-xl border-gray-300 bg-gray-100 uppercase text-gray-700 shadow-none"
             aria-describedby="plate_number_help @error('plate_number') plate_number_error @enderror"
-        >
+        ><button type="button" @click="requestRevalidation('plate')" :disabled="revalidationMode && revalidationMode !== 'plate'" :class="revalidationMode === 'plate' ? 'bg-green-50' : ''" class="shrink-0 rounded-xl border border-green-700 px-4 text-sm font-semibold text-green-700 hover:bg-green-50 disabled:cursor-not-allowed disabled:border-gray-300 disabled:bg-gray-100 disabled:text-gray-400">Redetect plate</button></div>
+        <input type="hidden" name="plate_number" :value="plateRedetectionRequested && detectedPlatePreview ? detectedPlatePreview : fields.plate_number">
         <p id="plate_number_help" class="mt-1.5 text-sm text-gray-500">Letters, numbers, spaces, and hyphens only.</p>
         @error('plate_number')
             <p id="plate_number_error" class="mt-1.5 text-sm font-medium text-red-600">{{ $message }}</p>
@@ -105,10 +28,12 @@
             name="brand"
             type="text"
             value="{{ old('brand', $vehicle?->brand) }}"
+            x-model="fields.brand"
             maxlength="50"
             required
             placeholder="e.g. Perodua"
-            class="mt-2 block w-full rounded-xl border-gray-300 shadow-none focus:border-[#2E7D32] focus:ring-[#2E7D32]"
+            readonly
+            class="mt-2 block w-full cursor-not-allowed rounded-xl border-gray-300 bg-gray-100 text-gray-700 shadow-none"
         >
         @error('brand')
             <p class="mt-1.5 text-sm font-medium text-red-600">{{ $message }}</p>
@@ -122,11 +47,14 @@
             name="model"
             type="text"
             value="{{ old('model', $vehicle?->model) }}"
+            x-model="fields.model"
             maxlength="50"
             required
             placeholder="e.g. Myvi"
-            class="mt-2 block w-full rounded-xl border-gray-300 shadow-none focus:border-[#2E7D32] focus:ring-[#2E7D32]"
+            readonly
+            class="mt-2 block w-full cursor-not-allowed rounded-xl border-gray-300 bg-gray-100 text-gray-700 shadow-none"
         >
+        <button type="button" @click="requestRevalidation('model')" :disabled="revalidationMode && revalidationMode !== 'model'" :class="revalidationMode === 'model' ? 'bg-green-50' : ''" class="mt-2 w-full rounded-xl border border-green-700 px-4 py-2.5 text-sm font-semibold text-green-700 hover:bg-green-50 disabled:cursor-not-allowed disabled:border-gray-300 disabled:bg-gray-100 disabled:text-gray-400">Rescan model</button>
         @error('model')
             <p class="mt-1.5 text-sm font-medium text-red-600">{{ $message }}</p>
         @enderror
@@ -134,16 +62,8 @@
 
     <div>
         <label for="colour" class="block text-sm font-semibold text-gray-800">Colour</label>
-        <input
-            id="colour"
-            name="colour"
-            type="text"
-            value="{{ old('colour', $vehicle?->colour) }}"
-            maxlength="20"
-            required
-            placeholder="e.g. Silver"
-            class="mt-2 block w-full rounded-xl border-gray-300 shadow-none focus:border-[#2E7D32] focus:ring-[#2E7D32]"
-        >
+        <div class="mt-2 flex gap-2"><input id="colour" name="colour" type="text" value="{{ old('colour', $vehicle?->colour) }}" x-model="fields.colour" maxlength="20" required readonly class="block min-w-0 flex-1 cursor-not-allowed rounded-xl border-gray-300 bg-gray-100 text-gray-700 shadow-none"><button type="button" @click="requestRevalidation('colour')" :disabled="revalidationMode && revalidationMode !== 'colour'" :class="revalidationMode === 'colour' ? 'bg-green-50' : ''" class="shrink-0 rounded-xl border border-green-700 px-4 text-sm font-semibold text-green-700 hover:bg-green-50 disabled:cursor-not-allowed disabled:border-gray-300 disabled:bg-gray-100 disabled:text-gray-400">Redetect colour</button></div>
+        <p class="mt-1.5 text-sm text-gray-500">Colour can only be updated using validated front, rear, and side photos.</p>
         @error('colour')
             <p class="mt-1.5 text-sm font-medium text-red-600">{{ $message }}</p>
         @enderror
@@ -168,4 +88,37 @@
             <p class="mt-1.5 text-sm font-medium text-red-600">{{ $message }}</p>
         @enderror
     </div>
+
+    <section x-ref="revalidationSection" x-cloak x-show="identityChanged" x-transition class="scroll-mt-6 space-y-6 rounded-2xl border border-amber-200 bg-amber-50/50 p-5 md:col-span-2">
+        <div class="flex items-start justify-between gap-4"><div><h3 class="font-bold text-gray-900">Revalidation required</h3><p class="mt-1 text-sm leading-6 text-gray-600" x-text="plateChanged ? 'A plate number change requires new front, rear, and side photos plus the latest Vehicle Geran/VOC.' : (modelChanged ? 'A model change requires the latest Vehicle Geran/VOC.' : 'A colour change requires new front, rear, and side photos.')"></p></div><button type="button" @click="cancelRevalidation" class="shrink-0 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">Cancel revalidation</button></div>
+
+        <div x-show="revalidationMode === 'plate'" class="grid gap-3 rounded-xl border border-green-200 bg-white p-4 sm:grid-cols-[1fr_auto_1fr] sm:items-center">
+            <div><p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Current plate</p><p class="mt-1 text-lg font-bold text-gray-900" x-text="original.plate_number"></p></div>
+            <span class="hidden text-gray-400 sm:block">→</span>
+            <div><p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Detected plate preview</p><p class="mt-1 text-lg font-bold" :class="detectedPlatePreview ? 'text-green-700' : 'text-gray-400'" x-text="detectedPlatePreview || 'Waiting for photo/VOC scan'"></p></div>
+        </div>
+
+        <div x-show="photosRequired" class="grid gap-4 md:grid-cols-3">
+            @foreach(['front_image' => ['Front photo','FRONT'], 'rear_image' => ['Rear photo','REAR'], 'side_image' => ['Side photo','SIDE']] as $field => [$label, $view])
+                <div>
+                    <label class="block text-sm font-semibold text-gray-800">{{ $label }} *<span class="relative mt-2 flex aspect-[4/3] cursor-pointer items-center justify-center overflow-hidden rounded-xl border-2 border-dashed border-gray-300 bg-white"><input x-ref="{{ $field }}" name="{{ $field }}" type="file" accept="image/jpeg,image/png,image/webp" class="sr-only" @change="selectEvidence('{{ $field }}', $event.target.files[0])"><img x-cloak x-show="previews.{{ $field }}" :src="previews.{{ $field }}" class="h-full w-full object-cover" alt="{{ $label }} preview"><span x-show="!previews.{{ $field }}" class="p-4 text-center text-sm font-normal text-gray-500">Choose {{ strtolower($label) }}</span></span></label>
+                    <input type="hidden" name="{{ $field }}_validation_token">
+                    <button type="button" @click="validatePhoto('{{ $field }}','{{ $view }}')" :disabled="busy.{{ $field }} || !previews.{{ $field }}" class="mt-2 w-full rounded-lg border border-green-700 px-3 py-2 text-sm font-semibold text-green-700 disabled:opacity-40" x-text="busy.{{ $field }} ? 'Validating…' : (validated.{{ $field }} ? 'Validated ✓' : 'Validate photo')"></button>
+                    @error($field)<p class="mt-1 text-sm text-red-600">{{ $message }}</p>@enderror
+                </div>
+            @endforeach
+        </div>
+
+        <div x-show="geranRequired"><p class="mb-2 text-sm font-semibold text-gray-800">Vehicle Geran / VOC *</p><div class="grid items-stretch gap-5 lg:grid-cols-2">
+            <label class="block h-full min-h-72"><span class="relative flex h-full min-h-72 cursor-pointer items-center justify-center overflow-hidden rounded-xl border-2 border-dashed border-gray-300 bg-white"><input x-ref="vehicle_geran" name="vehicle_geran" type="file" accept="image/jpeg,image/png" class="sr-only" @change="selectEvidence('vehicle_geran', $event.target.files[0])"><img x-cloak x-show="previews.vehicle_geran" :src="previews.vehicle_geran" class="h-full max-h-80 w-full object-contain" alt="Vehicle Geran preview"><span x-show="!previews.vehicle_geran" class="p-6 text-center text-sm font-normal text-gray-500">Choose the latest Geran/VOC image</span></span></label>
+            <div class="flex h-full min-h-72 flex-col rounded-xl border border-gray-200 bg-white p-5"><h4 class="font-bold text-gray-900">Document scan</h4><p class="mt-1 text-sm text-gray-500">The extracted owner and manufacturer must match the existing vehicle. The model will be populated from this document.</p><p x-show="scanMessage" x-text="scanMessage" class="mt-4 rounded-lg bg-gray-50 p-3 text-sm text-gray-700"></p><button type="button" @click="scanGeran" :disabled="busy.vehicle_geran || !previews.vehicle_geran" class="mt-auto rounded-xl bg-green-700 px-4 py-3 text-sm font-bold text-white disabled:bg-gray-300" x-text="busy.vehicle_geran ? 'Scanning…' : (geranScanned ? 'Scanned ✓' : 'Scan & prefill')"></button></div>
+        </div></div>
+        @error('vehicle_geran')<p class="text-sm text-red-600">{{ $message }}</p>@enderror
+
+        <input type="hidden" name="registered_owner_name" x-ref="registered_owner_name">
+        <input type="hidden" name="owner_identity_no" x-ref="owner_identity_no">
+        <input type="hidden" name="manufacturer" x-ref="manufacturer">
+        <input type="hidden" name="model_name" x-ref="model_name">
+        <input type="hidden" name="geran_plate_number" x-ref="geran_plate_number">
+    </section>
 </div>
