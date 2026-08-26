@@ -82,9 +82,15 @@ class TripController extends Controller
         return view('driver.trips.index', compact('trips', 'stats'));
     }
 
-    public function create(Request $request): View
+    public function create(Request $request): View|RedirectResponse
     {
-        $vehicles = $request->user()->vehicles()->selectableForTrips()->orderByDesc('vehicle_id')->get();
+        if (! $request->user()->driverLicence()->exists()) {
+            return redirect()
+                ->route('driver.profile.edit', ['section' => 'licence'])
+                ->with('error', 'Upload your driving licence before creating a trip.');
+        }
+
+        $vehicles = $request->user()->vehicles()->orderByDesc('vehicle_id')->get();
 
         return view('driver.trips.create', compact('vehicles'));
     }
@@ -130,7 +136,7 @@ class TripController extends Controller
     public function edit(Request $request, Trip $trip): View
     {
         $this->ensureEditable($request, $trip);
-        $vehicles = $request->user()->vehicles()->selectableForTrips()->orderByDesc('vehicle_id')->get();
+        $vehicles = $request->user()->vehicles()->orderByDesc('vehicle_id')->get();
         $returnTo = $this->returnRoute($request);
 
         return view('driver.trips.edit', compact('trip', 'vehicles', 'returnTo'));
@@ -158,6 +164,11 @@ class TripController extends Controller
     public function start(Request $request, Trip $trip): RedirectResponse|JsonResponse
     {
         $this->ensureStatus($request, $trip, ['Scheduled']);
+        abort_unless(
+            $request->user()->driverLicence?->isValidOn(now()) ?? false,
+            422,
+            'Your driving licence is missing, unverified, or expired. Update it in My Profile before starting the trip.'
+        );
         try {
             $bookingsToNotify = DB::transaction(function () use ($request, $trip) {
                 abort_if($request->user()->trips()->where('status', 'In Progress')->exists(), 422, 'Complete your current trip before starting another.');

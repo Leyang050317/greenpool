@@ -122,6 +122,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::patch('profile', [DriverProfileController::class, 'update'])->name('profile.update');
         Route::put('profile/preferences', [DriverProfileController::class, 'updatePreferences'])
             ->name('profile.preferences.update');
+        Route::put('profile/driving-licence', [DriverProfileController::class, 'updateLicence'])
+            ->name('profile.driving-licence.update');
+        Route::get('profile/driving-licence/image', [DriverProfileController::class, 'licenceImage'])
+            ->name('profile.driving-licence.image');
         Route::get('booking', [DriverBookingController::class, 'index'])
             ->name('booking-requests.index');
         Route::get('booking/{booking}', [DriverBookingController::class, 'show'])
@@ -153,6 +157,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('vehicles/plate-availability', [VehicleController::class, 'plateAvailability'])
             ->middleware('throttle:30,1')
             ->name('vehicles.plate-availability');
+        Route::get('vehicles/archived', [VehicleController::class, 'archived'])
+            ->name('vehicles.archived');
+        Route::patch('vehicles/archived/{vehicle}/restore', [VehicleController::class, 'restore'])
+            ->name('vehicles.restore');
         Route::resource('vehicles', VehicleController::class);
     });
 

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Driver;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Driver\UpdateDriverPreferenceRequest;
 use App\Http\Requests\Driver\UpdateDriverProfileRequest;
+use App\Http\Requests\Driver\UpdateDriverLicenceRequest;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Redirect;
@@ -32,6 +33,7 @@ class ProfileController extends Controller
                 ->limit(5)
                 ->get(),
             'profileCompleteness' => $driver->profileCompleteness(),
+            'driverLicence' => $driver->driverLicence,
         ]);
     }
 
@@ -61,5 +63,42 @@ class ProfileController extends Controller
         );
 
         return Redirect::route('driver.profile.edit')->with('status', 'driver-preferences-updated');
+    }
+
+    public function updateLicence(UpdateDriverLicenceRequest $request): RedirectResponse
+    {
+        $driver = $request->user();
+        $oldPath = $driver->driverLicence?->image_path;
+        $newPath = $request->file('driving_licence')->store('driver-licences', 'local');
+
+        try {
+            $driver->driverLicence()->updateOrCreate([], [
+                ...$request->safe()->except('driving_licence'),
+                'image_path' => $newPath,
+                'verification_status' => 'Verified',
+                'verified_at' => now(),
+            ]);
+        } catch (\Throwable $exception) {
+            Storage::disk('local')->delete($newPath);
+            throw $exception;
+        }
+
+        if ($oldPath && $oldPath !== $newPath) {
+            Storage::disk('local')->delete($oldPath);
+        }
+
+        $request->session()->forget('driver_licence_ocr_hash');
+
+        return Redirect::route('driver.profile.edit', ['section' => 'licence'])
+            ->with('status', 'driver-licence-updated');
+    }
+
+    public function licenceImage(Request $request)
+    {
+        $path = $request->user()->driverLicence()->value('image_path');
+
+        abort_unless($path && Storage::disk('local')->exists($path), 404);
+
+        return Storage::disk('local')->response($path);
     }
 }
