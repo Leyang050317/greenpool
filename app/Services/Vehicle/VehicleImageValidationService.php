@@ -45,6 +45,9 @@ class VehicleImageValidationService
             'hash' => hash_file('sha256', $image->getRealPath()),
             'view' => $expectedView,
             'colour' => ($result['colour_reliable'] ?? false) ? ($result['colour_group'] ?? $result['detected_colour'] ?? null) : null,
+            'detected_colour' => $result['detected_colour'] ?? null,
+            'colour_group' => $result['colour_group'] ?? $result['detected_colour'] ?? null,
+            'colour_confidence' => $result['colour_confidence'] ?? 0,
             'expires_at' => now()->addMinutes(30)->timestamp,
         ], JSON_THROW_ON_ERROR)) : null;
 
@@ -54,6 +57,18 @@ class VehicleImageValidationService
     public function tokenMatches(string $token, UploadedFile $image, string $expectedView): bool
     {
         return $this->tokenPayload($token, $image, $expectedView) !== null;
+    }
+
+    public function attachPlateNumber(string $token, ?string $plateNumber): string
+    {
+        try {
+            $payload = json_decode(Crypt::decryptString($token), true, 512, JSON_THROW_ON_ERROR);
+            $payload['plate_number'] = $plateNumber;
+
+            return Crypt::encryptString(json_encode($payload, JSON_THROW_ON_ERROR));
+        } catch (\Throwable) {
+            return $token;
+        }
     }
 
     public function tokenPayload(string $token, UploadedFile $image, string $expectedView): ?array

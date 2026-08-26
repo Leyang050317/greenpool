@@ -165,6 +165,11 @@ class VehicleController extends Controller
 
             if ($validated['expected_document_type'] === 'DRIVING_LICENCE') {
                 $request->session()->put('driver_licence_ocr_hash', hash_file('sha256', $validated['document']->getRealPath()));
+            } elseif ($validated['expected_document_type'] === 'VEHICLE_GERAN') {
+                $request->session()->put('vehicle_geran_ocr', [
+                    'hash' => hash_file('sha256', $validated['document']->getRealPath()),
+                    'fields' => collect($result['fields'] ?? [])->mapWithKeys(fn (array $field, string $name) => [$name => $field['value'] ?? null])->all(),
+                ]);
             }
 
             return response()->json([
@@ -181,6 +186,10 @@ class VehicleController extends Controller
         $validated = $request->validate([
             'image' => ['required', 'image', 'mimes:jpg,jpeg,png', 'max:8192', 'dimensions:min_width=800,min_height=450'],
             'expected_view' => ['required', 'in:FRONT,REAR,SIDE'],
+        ], [
+            'image.dimensions' => 'Vehicle photos must be at least 800 × 450 pixels. Choose a higher-resolution image.',
+            'image.mimes' => 'Vehicle photos must be JPG or PNG images.',
+            'image.max' => 'Vehicle photos must not exceed 8 MB.',
         ]);
 
         try {
@@ -192,6 +201,10 @@ class VehicleController extends Controller
                 } catch (OcrException) {
                     // Photo validation still succeeds when the plate is not readable.
                 }
+            }
+
+            if (filled($imageResult['token'] ?? null)) {
+                $imageResult['token'] = $this->vehicleImageValidator->attachPlateNumber($imageResult['token'], $plateNumber);
             }
 
             return response()->json([
@@ -249,19 +262,65 @@ class VehicleController extends Controller
 
     public function update(UpdateVehicleRequest $request, Vehicle $vehicle): RedirectResponse|JsonResponse
     {
-        $data = $request->safe()->except('vehicle_image');
+        $data = $request->safe()->except([
+            'front_image', 'rear_image', 'side_image', 'vehicle_geran',
+            'front_image_validation_token', 'rear_image_validation_token', 'side_image_validation_token',
+        ]);
+        $data['brand'] = $vehicle->brand;
         $identityChanged = collect(['plate_number', 'brand', 'model', 'colour'])
             ->contains(fn (string $field) => $data[$field] !== $vehicle->{$field});
 
-        if ($request->hasFile('vehicle_image')) {
-            $vehicle = $this->replaceVehicleImage($vehicle, $request->file('vehicle_image'), $data);
-        } else {
-            if ($identityChanged) {
-                $data['verification_status'] = 'Pending';
-                $data['verified_at'] = null;
+        if ($identityChanged) {
+            $photosChanged = $request->hasFile('front_image');
+            $geranChanged = $request->hasFile('vehicle_geran');
+            $newPublicFiles = $photosChanged
+                ? collect([
+                    'front_image_path' => 'front_image',
+                    'rear_image_path' => 'rear_image',
+                    'side_image_path' => 'side_image',
+                ])->mapWithKeys(fn (string $input, string $column) => [
+                    $column => $request->file($input)->store('vehicles', 'public'),
+                ])->all()
+                : [];
+            $newPrivateFiles = $geranChanged
+                ? ['vehicle_geran_path' => $request->file('vehicle_geran')->store('vehicle-documents', 'local')]
+                : [];
+            $oldPublicFiles = $photosChanged
+                ? array_filter([$vehicle->front_image_path, $vehicle->rear_image_path, $vehicle->side_image_path, $vehicle->vehicle_image_path])
+                : [];
+            $oldPrivateFiles = $geranChanged ? array_filter([$vehicle->vehicle_geran_path]) : [];
+
+            try {
+                DB::transaction(function () use ($vehicle, $data, $newPublicFiles, $newPrivateFiles, $photosChanged): void {
+                    $vehicle->update([
+                        ...$data,
+                        ...$newPublicFiles,
+                        ...$newPrivateFiles,
+                        ...($photosChanged ? ['vehicle_image_path' => $newPublicFiles['front_image_path']] : []),
+                        'verification_status' => 'Verified',
+                        'verified_at' => now(),
+                    ]);
+                });
+            } catch (Throwable $exception) {
+                foreach ($newPublicFiles as $path) {
+                    Storage::disk('public')->delete($path);
+                }
+                foreach ($newPrivateFiles as $path) {
+                    Storage::disk('local')->delete($path);
+                }
+                throw $exception;
             }
 
-            $vehicle->update($data);
+            foreach (array_unique($oldPublicFiles) as $path) {
+                Storage::disk('public')->delete($path);
+            }
+            foreach (array_unique($oldPrivateFiles) as $path) {
+                Storage::disk('local')->delete($path);
+            }
+
+            $vehicle->refresh();
+        } else {
+            $vehicle->update(['seat_capacity' => $data['seat_capacity']]);
             $vehicle->refresh();
         }
 
