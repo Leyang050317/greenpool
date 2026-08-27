@@ -4,7 +4,7 @@
         x-show="!open"
         x-transition
         @click="open = true; if (!featured.length) loadFeatured(); $nextTick(() => $refs.question.focus())"
-        @open-faq-bot.window="open = true; if (!featured.length) loadFeatured(); $nextTick(() => $refs.question.focus())"
+        @open-faq-bot.window="openBot($event)"
         class="flex h-14 w-14 items-center justify-center rounded-full bg-[#16803c] text-white shadow-lg shadow-green-900/20 transition hover:bg-[#126b32] focus:outline-none focus:ring-4 focus:ring-green-200"
         aria-label="Open GreenPool help bot"
         title="GreenPool Help"

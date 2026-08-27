@@ -11,12 +11,15 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Notifications\Notification;
 use Illuminate\Notifications\Notifiable;
 
 class User extends Authenticatable implements MustVerifyEmail
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, HasProfileCompleteness, Notifiable;
+    use HasFactory, HasProfileCompleteness, Notifiable {
+        Notifiable::notify as protected notifyThroughLaravel;
+    }
 
     /**
      * The attributes that are mass assignable.
@@ -71,6 +74,45 @@ class User extends Authenticatable implements MustVerifyEmail
     public function notificationPreference(): HasOne
     {
         return $this->hasOne(NotificationPreference::class);
+    }
+
+    /**
+     * Deliver optional in-app notifications only when the recipient enabled
+     * the relevant category in Settings. Safety and account emails bypass it.
+     */
+    public function notify($instance): void
+    {
+        if ($instance instanceof Notification && ! $this->allowsInAppNotification($instance)) {
+            return;
+        }
+
+        $this->notifyThroughLaravel($instance);
+    }
+
+    public function allowsInAppNotification(Notification $notification): bool
+    {
+        $preferenceField = match ($notification::class) {
+            \App\Notifications\TripUpdatedNotification::class,
+            \App\Notifications\TripReminderNotification::class => 'trip_updates',
+            \App\Notifications\BookingRequestNotification::class,
+            \App\Notifications\BookingStatusNotification::class => 'booking_updates',
+            \App\Notifications\PaymentDueNotification::class,
+            \App\Notifications\PaymentCompletedNotification::class,
+            \App\Notifications\PaymentReceivedNotification::class,
+            \App\Notifications\CashPaymentSelectedNotification::class => 'payment_updates',
+            \App\Notifications\MessageReceivedNotification::class => 'message_alerts',
+            \App\Notifications\RatingReminderNotification::class,
+            \App\Notifications\RatingReceivedNotification::class => 'rating_reminders',
+            default => null,
+        };
+
+        if ($preferenceField === null) {
+            return true;
+        }
+
+        $preferences = $this->notificationPreference()->firstOrCreate([]);
+
+        return (bool) $preferences->{$preferenceField};
     }
 
     public function driverLicence(): HasOne

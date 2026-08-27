@@ -54,4 +54,28 @@ class FaqBotTest extends TestCase
             ->assertJsonPath('matched', false)
             ->assertJsonCount(1, 'suggestions');
     }
+
+    public function test_bot_understands_greetings_and_common_booking_synonyms(): void
+    {
+        $user = User::factory()->create(['email_verified_at' => now()]);
+        Faq::create([
+            'question' => 'How do I find and book a ride?',
+            'answer' => 'Open Find a Ride.',
+            'keywords' => ['booking', 'find ride'],
+            'category' => 'Bookings',
+            'is_active' => true,
+        ]);
+
+        $this->actingAs($user)
+            ->postJson(route('faq-bot.answer'), ['question' => 'Hi'])
+            ->assertOk()
+            ->assertJsonPath('matched', true)
+            ->assertJsonPath('faq.id', 'greeting');
+
+        $this->actingAs($user)
+            ->postJson(route('faq-bot.answer'), ['question' => 'Can I reserve a ride?'])
+            ->assertOk()
+            ->assertJsonPath('matched', true)
+            ->assertJsonPath('faq.answer', 'Open Find a Ride.');
+    }
 }
