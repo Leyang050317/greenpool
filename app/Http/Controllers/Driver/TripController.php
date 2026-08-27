@@ -10,22 +10,32 @@ use App\Http\Requests\Driver\UpdateTripRequest;
 use App\Models\Booking;
 use App\Models\Trip;
 use App\Notifications\BookingStatusNotification;
+use App\Notifications\PaymentDueNotification;
+use App\Notifications\RatingReminderNotification;
+use App\Notifications\TripUpdatedNotification;
+use App\Services\FareRecommendationService;
+use App\Services\NotificationDeliveryService;
+use App\Services\PaymentService;
 use App\Services\Routing\TripDistanceService;
 use App\Services\Routing\TripLocationService;
 use App\Services\Routing\TripRoutingException;
-use App\Services\PaymentService;
-use App\Services\FareRecommendationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Throwable;
 use Illuminate\View\View;
+use Throwable;
 
 class TripController extends Controller
 {
-    public function __construct(private readonly TripDistanceService $tripDistanceService, private readonly TripLocationService $tripLocationService, private readonly PaymentService $paymentService, private readonly FareRecommendationService $fareRecommendationService) {}
+    public function __construct(
+        private readonly TripDistanceService $tripDistanceService,
+        private readonly TripLocationService $tripLocationService,
+        private readonly PaymentService $paymentService,
+        private readonly FareRecommendationService $fareRecommendationService,
+        private readonly NotificationDeliveryService $notificationDelivery,
+    ) {}
 
     public function autocomplete(Request $request): JsonResponse
     {
@@ -158,6 +168,12 @@ class TripController extends Controller
 
         $trip->update($data);
 
+        if ($trip->wasChanged(['departure_location', 'destination', 'departure_at', 'available_seats', 'price_per_passenger', 'vehicle_id'])) {
+            $this->acceptedBookingsFor($trip->refresh())->each(function (Booking $booking): void {
+                $this->notificationDelivery->send($booking->passenger, new TripUpdatedNotification($booking));
+            });
+        }
+
         return $this->response($request, $trip->refresh(), 'Trip updated successfully.', 200, $this->returnRoute($request));
     }
 
@@ -216,6 +232,17 @@ class TripController extends Controller
         });
         $this->notifyPassengers($bookingsToNotify, 'Completed');
         $this->broadcastBookingUpdates($bookingsToNotify, null, 'trip_completed');
+        foreach ($bookingsToNotify as $booking) {
+            $booking->loadMissing(['payment', 'passenger', 'trip.user']);
+            if ($booking->payment) {
+                $this->notificationDelivery->send($booking->passenger, new PaymentDueNotification($booking->payment));
+            }
+
+            $driver = $booking->trip->user;
+            if (! $booking->ratings()->where('reviewer_id', $driver->id)->exists()) {
+                $this->notificationDelivery->send($driver, new RatingReminderNotification($booking));
+            }
+        }
 
         if (! $request->expectsJson()) {
             $bookingToRate = $trip->bookings()
@@ -524,6 +551,7 @@ class TripController extends Controller
             $bookings->get($index)?->update(['pickup_sequence' => $sequence + 1]);
         }
     }
+
     private function notifyPassengers($bookings, string $status): void
     {
         foreach ($bookings as $booking) {
