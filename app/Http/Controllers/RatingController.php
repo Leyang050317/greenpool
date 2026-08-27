@@ -104,19 +104,27 @@ class RatingController extends Controller
             ? round((float) $breakdown->map(fn ($total, $score) => $total * $score)->sum() / $reviewCount, 1)
             : 0.0;
 
-        if ($request->input('sort') === 'highest') $query->orderByDesc('score')->latest();
-        elseif ($request->input('sort') === 'lowest') $query->orderBy('score')->latest();
-        else $query->latest();
+        if ($request->input('sort') === 'highest') {
+            $query->orderByDesc('score')->latest();
+        } elseif ($request->input('sort') === 'lowest') {
+            $query->orderBy('score')->latest();
+        } else {
+            $query->latest();
+        }
 
         $ratings = $query->paginate(8)->withQueryString();
 
         return view('ratings.reviews', compact('ratings', 'targetRole', 'breakdown', 'reviewCount', 'average'));
     }
 
-    public function create(Request $request, Booking $booking): View
+    public function create(Request $request, Booking $booking): View|RedirectResponse
     {
         [$reviewee] = $this->ratingParticipants($request, $booking);
-        abort_if($booking->ratings()->where('reviewer_id', $request->user()->id)->exists(), 409, 'You have already rated this booking.');
+        $existingRating = $booking->ratings()->where('reviewer_id', $request->user()->id)->first();
+        if ($existingRating) {
+            return redirect()->route('ratings.submitted', $existingRating)
+                ->with('success', 'You already rated this booking. Here is your submitted rating.');
+        }
 
         return view('ratings.create', compact('booking', 'reviewee'));
     }
@@ -134,7 +142,11 @@ class RatingController extends Controller
     public function store(StoreRatingRequest $request, Booking $booking): RedirectResponse
     {
         [$reviewee] = $this->ratingParticipants($request, $booking);
-        abort_if($booking->ratings()->where('reviewer_id', $request->user()->id)->exists(), 409, 'You have already rated this booking.');
+        $existingRating = $booking->ratings()->where('reviewer_id', $request->user()->id)->first();
+        if ($existingRating) {
+            return redirect()->route('ratings.submitted', $existingRating)
+                ->with('success', 'You already rated this booking. Your previous rating was kept.');
+        }
         $rating = Rating::create([
             'booking_id' => $booking->id,
             'reviewer_id' => $request->user()->id,
@@ -185,9 +197,13 @@ class RatingController extends Controller
             $query->where(fn ($q) => $q->where('comment', 'like', "%{$search}%")
                 ->orWhereHas('reviewer', fn ($reviewer) => $reviewer->where('name', 'like', "%{$search}%")));
         }
-        if ($request->input('sort') === 'highest') $query->orderByDesc('score')->latest();
-        elseif ($request->input('sort') === 'lowest') $query->orderBy('score')->latest();
-        else $query->latest();
+        if ($request->input('sort') === 'highest') {
+            $query->orderByDesc('score')->latest();
+        } elseif ($request->input('sort') === 'lowest') {
+            $query->orderBy('score')->latest();
+        } else {
+            $query->latest();
+        }
         $ratings = $query->paginate(8)->withQueryString();
         $average = round((float) $user->ratingsReceived()->avg('score'), 1);
 
@@ -209,7 +225,9 @@ class RatingController extends Controller
 
             return [$booking->trip->user];
         }
-        if ($actor->id === $booking->trip->user_id) return [$booking->passenger];
+        if ($actor->id === $booking->trip->user_id) {
+            return [$booking->passenger];
+        }
         abort(403);
     }
 
@@ -238,7 +256,10 @@ class RatingController extends Controller
 
     private function canViewReceivedRatings(Request $request, User $user): bool
     {
-        if ($request->user()->is($user)) return true;
+        if ($request->user()->is($user)) {
+            return true;
+        }
+
         return Booking::where('passenger_id', $request->user()->id)
             ->whereHas('trip', fn ($q) => $q->where('user_id', $user->id))->exists()
             || Booking::where('passenger_id', $user->id)

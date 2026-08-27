@@ -5,11 +5,14 @@
     <div class="min-h-screen bg-[#F8FAFC] px-4 py-8 sm:px-6 lg:px-8">
         <div class="mx-auto max-w-xl">
             <a href="{{ route('payments.index') }}" class="text-sm font-medium text-slate-500 hover:text-slate-700">← Back to Payments</a>
+            @if(request('stripe') === 'cancelled')
+                <div class="mt-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">Stripe Checkout was cancelled. No payment was taken, and you can try again.</div>
+            @endif
             <section class="mt-7 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
                 <div class="text-center">
                     <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-full {{ $isPaid ? 'bg-green-100 text-green-600' : 'bg-amber-100 text-amber-600' }}"><x-icons.lucide :name="$isPaid ? 'circle-check' : 'clock'" class="h-9 w-9" /></div>
-                    <h1 class="mt-4 text-xl font-bold text-slate-900">{{ $isPaid ? 'Payment Successful!' : 'Payment Pending' }}</h1>
-                    <p class="mt-1 text-sm text-slate-500">{{ $isPaid ? 'Your payment has been recorded.' : 'This completed ride is waiting for payment.' }}</p>
+                    <h1 class="mt-4 text-xl font-bold text-slate-900">{{ $isPaid ? (Auth::id() === $payment->payee_id ? 'Payment Received' : 'Payment Successful!') : 'Payment Pending' }}</h1>
+                    <p class="mt-1 text-sm text-slate-500">{{ $isPaid ? (Auth::id() === $payment->payee_id ? 'This payment is included in your Total Earnings.' : 'Your payment has been recorded.') : ($payment->payment_method === 'cash' ? (Auth::id() === $payment->payee_id ? 'Confirm only after you have received the cash from the passenger.' : 'Pay the driver in cash. Your driver will confirm after receiving it.') : 'This completed ride is waiting for payment.') }}</p>
                     <p class="mt-5 text-3xl font-bold text-[#2E7D32]">RM {{ number_format((float) $payment->amount, 2) }}</p>
                 </div>
 
@@ -39,8 +42,26 @@
                     </div>
                 @endif
 
-                @if(Auth::id() === $payment->payer_id && !$isPaid)
-                    <a href="{{ route('payments.checkout', $payment->booking) }}" class="mt-6 block w-full rounded-xl bg-[#22C55E] py-3 text-center text-sm font-bold text-white hover:bg-green-600">Pay Now</a>
+                @if(Auth::id() === $payment->payee_id && !$isPaid && $payment->payment_method === 'cash')
+                    <div id="cash-confirmation" class="mt-6 scroll-mt-24 rounded-2xl border border-amber-200 bg-amber-50 p-4 sm:p-5">
+                        <div class="flex items-start gap-3">
+                            <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700"><x-icons.lucide name="banknote" class="h-5 w-5" /></span>
+                            <div>
+                                <h2 class="font-bold text-slate-900">Cash collection</h2>
+                                <p class="mt-1 text-sm leading-6 text-slate-600">Ask the passenger for RM {{ number_format((float) $payment->amount, 2) }} and confirm only after the cash is in your hand.</p>
+                            </div>
+                        </div>
+                        <form method="POST" action="{{ route('payments.cash.confirm', $payment) }}" class="mt-4">
+                            @csrf
+                            <button type="submit" class="flex w-full items-center justify-center gap-2 rounded-xl bg-[#16803c] py-3 text-sm font-bold text-white shadow-sm hover:bg-[#126b32]">
+                                <x-icons.lucide name="circle-check" class="h-5 w-5" />
+                                Confirm Cash Received
+                            </button>
+                        </form>
+                        <p class="mt-2 text-center text-xs text-amber-800">Confirmation marks this payment as paid and adds it to Total Earnings.</p>
+                    </div>
+                @elseif(Auth::id() === $payment->payer_id && !$isPaid)
+                    <a href="{{ route('payments.checkout', $payment->booking) }}" class="mt-6 block w-full rounded-xl bg-[#22C55E] py-3 text-center text-sm font-bold text-white hover:bg-green-600">{{ $payment->payment_method === 'cash' ? 'Change Payment Method' : 'Pay Now' }}</a>
                 @elseif(Auth::id() === $payment->payer_id && $isPaid && !$payment->booking->ratings->contains('reviewer_id', Auth::id()))
                     <a href="{{ route('ratings.create', $payment->booking) }}" class="mt-6 block w-full rounded-xl bg-[#22C55E] py-3 text-center text-sm font-bold text-white hover:bg-green-600">Rate Driver</a>
                 @endif

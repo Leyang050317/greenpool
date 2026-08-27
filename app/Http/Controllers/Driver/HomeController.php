@@ -4,8 +4,8 @@ namespace App\Http\Controllers\Driver;
 
 use App\Http\Controllers\Controller;
 use App\Models\Booking;
+use App\Models\Payment;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class HomeController extends Controller
@@ -58,12 +58,10 @@ class HomeController extends Controller
             ->oldest('departure_at')
             ->get();
 
-        $totalEarnings = Booking::query()
-            ->join('trips', 'bookings.trip_id', '=', 'trips.trip_id')
-            ->where('trips.user_id', $user->id)
-            ->where('trips.status', 'Completed')
-            ->where('bookings.booking_status', 'Accepted')
-            ->sum(DB::raw('bookings.number_of_seats * trips.price_per_passenger'));
+        $totalEarnings = Payment::query()
+            ->where('payee_id', $user->id)
+            ->where('payment_status', 'Paid')
+            ->sum('amount');
 
         $driverStats = [
             'total_trips' => $user->trips()->count(),

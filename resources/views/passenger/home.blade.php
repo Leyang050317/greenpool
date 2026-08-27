@@ -38,7 +38,7 @@
                             <p class="mt-1 text-sm text-slate-500">{{ $pendingPaymentBooking->trip->departure_location }} to {{ $pendingPaymentBooking->trip->destination }}</p>
                             <p class="mt-2 text-xl font-bold text-[#2E7D32]">RM {{ number_format((float) $pendingPaymentBooking->payment->amount, 2) }}</p>
                         </div>
-                        <a href="{{ route('payments.checkout', $pendingPaymentBooking) }}" class="w-full rounded-lg bg-[#22C55E] px-5 py-3 text-center text-sm font-bold text-white hover:bg-green-600 sm:w-auto">Pay Now</a>
+                        <a href="{{ $pendingPaymentBooking->payment->payment_method === 'cash' ? route('payments.show', $pendingPaymentBooking->payment) : route('payments.checkout', $pendingPaymentBooking) }}" class="w-full rounded-lg bg-[#22C55E] px-5 py-3 text-center text-sm font-bold text-white hover:bg-green-600 sm:w-auto">{{ $pendingPaymentBooking->payment->payment_method === 'cash' ? 'View Cash Status' : 'Pay Now' }}</a>
                     </div>
                 </section>
             @elseif($pendingRatingBooking)

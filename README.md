@@ -34,6 +34,27 @@ python -m venv .venv
 
 Set `OCR_PYTHON_BINARY` in `.env` to the virtual environment's Python executable. The first scan downloads PaddleOCR models and therefore needs network access; later scans use the local model cache. Production deployments should pre-download the models during deployment. Uploaded identity documents are stored on Laravel's private `local` disk, never under `public/storage`.
 
+## Stripe test payments
+
+Passenger `Pay Now` links redirect directly to Stripe Checkout with Card and GrabPay payment options. Stripe's signed webhook, with the authenticated success return as a fallback, is responsible for marking a payment as paid and triggering driver earnings, notifications, ratings, and the E-Receipt.
+
+Install the Stripe PHP SDK and migrate the payment reference fields:
+
+```powershell
+composer update stripe/stripe-php
+php artisan migrate
+```
+
+Configure test credentials in `.env`:
+
+```dotenv
+STRIPE_KEY=pk_test_...
+STRIPE_SECRET=sk_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+```
+
+For local webhook testing, run `stripe listen --forward-to http://127.0.0.1:8000/stripe/webhook`, copy its `whsec_...` value into `.env`, and clear cached configuration with `php artisan optimize:clear`.
+
 ## Learning Laravel
 
 Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
