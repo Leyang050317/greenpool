@@ -8,7 +8,7 @@
             'Refunded' => 'bg-slate-100 text-slate-600',
         ];
     @endphp
-    <div class="min-h-screen bg-[#F8FAFC] px-4 py-8 sm:px-6 lg:px-8">
+    <div class="min-h-screen bg-[#F8FAFC] px-4 py-8 sm:px-6 lg:px-8" data-payments-page>
         <div class="mx-auto max-w-5xl">
             <div>
                 <h1 class="text-2xl font-bold text-slate-900">Payments</h1>
@@ -16,8 +16,8 @@
             </div>
 
             <div class="mt-7 grid gap-4 sm:grid-cols-3">
-                <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><p class="text-sm text-slate-400">Pending</p><p class="mt-2 text-2xl font-bold text-slate-900">{{ $stats['pending'] }}</p></div>
-                <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><p class="text-sm text-slate-400">Paid</p><p class="mt-2 text-2xl font-bold text-slate-900">{{ $stats['paid'] }}</p></div>
+                <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><p class="text-sm text-slate-400">{{ $isDriver ? 'Awaiting payment' : 'Pending payment' }}</p><p class="mt-2 text-2xl font-bold text-slate-900">{{ $stats['pending'] }}</p></div>
+                <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><p class="text-sm text-slate-400">{{ $isDriver ? 'Payments received' : 'Payments completed' }}</p><p class="mt-2 text-2xl font-bold text-slate-900">{{ $stats['paid'] }}</p></div>
                 <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><p class="text-sm text-slate-400">{{ $isDriver ? 'Total received' : 'Total paid' }}</p><p class="mt-2 text-2xl font-bold text-[#2E7D32]">RM {{ number_format($stats['total'], 2) }}</p></div>
             </div>
 
@@ -42,10 +42,15 @@
                             </div>
                             <div class="sm:text-right">
                                 <p class="text-lg font-bold text-slate-900">RM {{ number_format((float) $payment->amount, 2) }}</p>
-                                @if(!$isDriver && $payment->payment_status === 'Pending')
+                                @if($isDriver && $payment->payment_status === 'Pending' && $payment->payment_method === 'cash')
+                                    <a href="{{ route('payments.show', $payment) }}#cash-confirmation" class="mt-2 inline-flex items-center gap-2 rounded-xl bg-amber-500 px-5 py-2.5 text-sm font-bold text-white hover:bg-amber-600">
+                                        <x-icons.lucide name="banknote" class="h-4 w-4" />
+                                        Confirm Cash
+                                    </a>
+                                @elseif(!$isDriver && $payment->payment_status === 'Pending' && $payment->payment_method !== 'cash')
                                     <a href="{{ route('payments.checkout', $payment->booking) }}" class="mt-2 inline-flex rounded-xl bg-[#22C55E] px-5 py-2.5 text-sm font-bold text-white hover:bg-green-600">Pay Now</a>
                                 @else
-                                    <a href="{{ route('payments.show', $payment) }}" class="mt-2 inline-flex rounded-xl border border-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50">View Details</a>
+                                    <a href="{{ route('payments.show', $payment) }}" class="mt-2 inline-flex rounded-xl border border-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50">{{ !$isDriver && $payment->payment_method === 'cash' && !$payment->isPaid() ? 'View Cash Status' : 'View Details' }}</a>
                                 @endif
                             </div>
                         </div>

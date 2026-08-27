@@ -11,6 +11,7 @@ class Payment extends Model
     use HasFactory;
 
     public const METHODS = [
+        'stripe' => 'Stripe Checkout',
         'fpx' => 'Online Banking (FPX)',
         'card' => 'Credit / Debit Card',
         'e_wallet' => 'E-Wallet',
@@ -19,7 +20,8 @@ class Payment extends Model
 
     protected $fillable = [
         'booking_id', 'payer_id', 'payee_id', 'amount', 'payment_method',
-        'payment_status', 'transaction_reference', 'paid_at',
+        'payment_status', 'transaction_reference', 'stripe_checkout_session_id',
+        'stripe_payment_intent_id', 'paid_at',
     ];
 
     protected function casts(): array

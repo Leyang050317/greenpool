@@ -5,7 +5,6 @@ namespace Tests\Feature;
 use App\Events\RatingReceived;
 use App\Models\Booking;
 use App\Models\Rating;
-use App\Models\Trip;
 use App\Models\User;
 use App\Models\Vehicle;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -225,7 +224,16 @@ class RatingModuleTest extends TestCase
 
         $booking->trip->update(['status' => 'Completed']);
         $this->actingAs($passenger)->post(route('ratings.store', $booking), ['score' => 5])->assertRedirect();
-        $this->actingAs($passenger)->post(route('ratings.store', $booking), ['score' => 3])->assertStatus(409);
+        $rating = $passenger->ratingsGiven()->where('booking_id', $booking->id)->firstOrFail();
+        $this->actingAs($passenger)
+            ->post(route('ratings.store', $booking), ['score' => 3])
+            ->assertRedirect(route('ratings.submitted', $rating))
+            ->assertSessionHas('success');
+        $this->actingAs($passenger)
+            ->get(route('ratings.create', $booking))
+            ->assertRedirect(route('ratings.submitted', $rating))
+            ->assertSessionHas('success');
+        $this->assertSame(5, $rating->refresh()->score);
     }
 
     public function test_rating_submission_expires_seven_days_after_trip_completion(): void

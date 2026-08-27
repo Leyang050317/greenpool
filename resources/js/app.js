@@ -125,6 +125,21 @@ const subscribeToPaymentNotifications = () => {
             .listen('PaymentReceived', (notification) => {
                 incrementNotificationBadge();
                 showRealtimeNotification(notification, 'RM');
+
+                const earnings = document.querySelector('[data-driver-total-earnings]');
+                const total = Number.parseFloat(notification.total_earnings);
+
+                if (earnings && Number.isFinite(total)) {
+                    earnings.dataset.amount = total.toFixed(2);
+                    earnings.textContent = `RM ${total.toLocaleString('en-MY', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                    })}`;
+                }
+
+                if (document.querySelector('[data-payments-page]')) {
+                    window.setTimeout(() => window.location.reload(), 500);
+                }
             });
     }
 
@@ -134,6 +149,7 @@ const notificationIcon = (notification) => ({
     'message-square': '✉',
     route: '↗',
     'credit-card': 'RM',
+    banknote: '$',
     'circle-check': '✓',
     star: '★',
 }[notification.icon] || '●');

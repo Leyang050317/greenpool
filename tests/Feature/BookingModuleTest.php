@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Events\BookingStatusUpdated;
 use App\Models\Booking;
+use App\Models\Payment;
 use App\Models\Rating;
 use App\Models\Trip;
 use App\Models\User;
@@ -95,7 +96,17 @@ class BookingModuleTest extends TestCase
 
         $this->createBooking($activePassenger, $activeTrip, 2, 'Accepted');
         $pendingBooking = $this->createBooking($pendingPassenger, $pendingTrip, 1, 'Pending');
-        $this->createBooking(User::factory()->create(['role' => 'passenger']), $completedTrip, 2, 'Accepted');
+        $completedBooking = $this->createBooking(User::factory()->create(['role' => 'passenger']), $completedTrip, 2, 'Accepted');
+        Payment::create([
+            'booking_id' => $completedBooking->id,
+            'payer_id' => $completedBooking->passenger_id,
+            'payee_id' => $driver->id,
+            'amount' => 20,
+            'payment_method' => 'stripe',
+            'payment_status' => 'Paid',
+            'transaction_reference' => 'GP-DASHBOARD-PAID',
+            'paid_at' => now(),
+        ]);
         $driver->notify(new BookingRequestNotification($pendingBooking, 'submitted'));
 
         $this->actingAs($driver)

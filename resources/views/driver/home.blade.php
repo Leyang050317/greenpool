@@ -4,7 +4,7 @@
             ['label' => 'Total Trips', 'value' => $driverStats['total_trips'], 'icon' => 'route', 'tone' => 'bg-slate-100 text-slate-600'],
             ['label' => 'Completed Trips', 'value' => $driverStats['completed_trips'], 'icon' => 'circle-check', 'tone' => 'bg-green-100 text-green-700'],
             ['label' => 'Pending Requests', 'value' => $driverStats['pending_requests'], 'icon' => 'clipboard-list', 'tone' => 'bg-amber-100 text-amber-700'],
-            ['label' => 'Total Earnings', 'value' => 'RM '.number_format((float) $driverStats['total_earnings'], 2), 'icon' => 'dollar-sign', 'tone' => 'bg-emerald-100 text-emerald-700'],
+            ['label' => 'Total Earnings', 'value' => 'RM '.number_format((float) $driverStats['total_earnings'], 2), 'amount' => (float) $driverStats['total_earnings'], 'icon' => 'dollar-sign', 'tone' => 'bg-emerald-100 text-emerald-700', 'hint' => 'Paid passenger payments', 'href' => route('payments.index')],
         ];
         $activePassengerCount = (int) ($activeTrip?->accepted_passengers_count ?? 0);
         $pickedPassengerCount = $activeTrip?->bookings?->whereNotNull('picked_up_at')->sum('number_of_seats') ?? 0;
@@ -29,12 +29,21 @@
                         <div class="flex items-center justify-between gap-4">
                             <div>
                                 <p class="text-sm font-medium text-slate-500">{{ $stat['label'] }}</p>
-                                <p class="mt-2 text-3xl font-bold text-slate-900">{{ $stat['value'] }}</p>
+                                <p class="mt-2 text-3xl font-bold text-slate-900" @isset($stat['amount']) data-driver-total-earnings data-amount="{{ $stat['amount'] }}" @endisset>{{ $stat['value'] }}</p>
+                                @if(isset($stat['hint']))
+                                    <p class="mt-1 text-xs text-slate-400">{{ $stat['hint'] }}</p>
+                                @endif
                             </div>
                             <span class="flex h-11 w-11 items-center justify-center rounded-lg {{ $stat['tone'] }}">
                                 <x-icons.lucide :name="$stat['icon']" class="h-5 w-5" />
                             </span>
                         </div>
+                        @if(isset($stat['href']))
+                            <a href="{{ $stat['href'] }}" class="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-green-700 hover:text-green-800">
+                                View payments
+                                <x-icons.lucide name="arrow-right" class="h-3.5 w-3.5" />
+                            </a>
+                        @endif
                     </div>
                 @endforeach
             </section>

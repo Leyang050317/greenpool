@@ -12,17 +12,20 @@ use App\Http\Controllers\Driver\VehicleController;
 use App\Http\Controllers\EmergencyContactController;
 use App\Http\Controllers\EmergencyController;
 use App\Http\Controllers\FaqBotController;
+use App\Http\Controllers\HelpController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\Passenger\HomeController as PassengerHomeController;
 use App\Http\Controllers\Passenger\PassengerBookingController;
-use App\Http\Controllers\PhoneVerificationController;
 use App\Http\Controllers\PaymentController;
+use App\Http\Controllers\PhoneVerificationController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RatingController;
 use App\Http\Controllers\SettingsController;
-use App\Http\Controllers\HelpController;
+use App\Http\Controllers\StripeWebhookController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
+
+Route::post('/stripe/webhook', StripeWebhookController::class)->name('stripe.webhook');
 
 Route::get('/', function () {
     if (Auth::check()) {
@@ -77,7 +80,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('/payments', [PaymentController::class, 'index'])->name('payments.index');
     Route::get('/payments/bookings/{booking}/checkout', [PaymentController::class, 'checkout'])->name('payments.checkout');
-    Route::post('/payments/{payment}', [PaymentController::class, 'store'])->name('payments.store');
+    Route::post('/payments/bookings/{booking}/checkout', [PaymentController::class, 'initiateCheckout'])->name('payments.checkout.initiate');
+    Route::get('/payments/stripe/success', [PaymentController::class, 'stripeSuccess'])->name('payments.stripe.success');
+    Route::post('/payments/{payment}/cash/confirm', [PaymentController::class, 'confirmCash'])->name('payments.cash.confirm');
     Route::get('/payments/{payment}/receipt', [PaymentController::class, 'receipt'])->name('payments.receipt');
     Route::get('/payments/{payment}', [PaymentController::class, 'show'])->name('payments.show');
 
