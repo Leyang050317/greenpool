@@ -16,8 +16,8 @@
     ];
 
     $bottomNavigation = [
-        ['label' => 'Settings', 'icon' => 'settings', 'href' => '#', 'active' => request()->routeIs('passenger.settings.*')],
-        ['label' => 'Help', 'icon' => 'circle-help', 'href' => '#', 'active' => request()->routeIs('passenger.help.*')],
+        ['label' => 'Settings', 'icon' => 'settings', 'href' => route('settings.index'), 'active' => request()->routeIs('settings.*')],
+        ['label' => 'Help', 'icon' => 'circle-help', 'href' => route('help.index'), 'active' => request()->routeIs('help.*')],
     ];
 
     $initials = collect(preg_split('/\s+/', trim(Auth::user()->name)))

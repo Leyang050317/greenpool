@@ -14,6 +14,8 @@
         request()->routeIs('driver.vehicles.edit') => 'Edit Vehicle',
         request()->routeIs('driver.vehicles.show') => 'Vehicle Details',
         request()->routeIs('driver.profile.*') => 'Profile',
+        request()->routeIs('settings.*') => 'Settings',
+        request()->routeIs('help.*') => 'Help & Support',
         request()->routeIs('notifications.*') => 'Notifications',
         request()->routeIs('messages.*', 'bookings.chat.*') => 'Messages',
         request()->routeIs('payments.*') => 'Payments',
@@ -89,6 +91,7 @@
                         {{ $slot }}
                     </main>
                 </div>
+                <x-faq-bot />
             </div>
         @else
             <div
@@ -114,6 +117,7 @@
                         {{ $slot }}
                     </main>
                 </div>
+                <x-faq-bot />
             </div>
         @endif
     </body>

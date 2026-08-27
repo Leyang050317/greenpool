@@ -10,9 +10,29 @@ class NotificationController extends Controller
 {
     public function index(Request $request): View
     {
-        $notifications = $request->user()->notifications()->paginate(12);
+        $validated = $request->validate([
+            'filter' => ['nullable', 'in:all,unread'],
+            'type' => ['nullable', 'string', 'max:50'],
+        ]);
 
-        return view('notifications.index', compact('notifications'));
+        $baseQuery = $request->user()->notifications();
+        $types = (clone $baseQuery)
+            ->latest()
+            ->get()
+            ->map(fn ($notification) => $notification->data['type'] ?? null)
+            ->filter()
+            ->unique()
+            ->sort()
+            ->values();
+
+        $notifications = $baseQuery
+            ->when(($validated['filter'] ?? 'all') === 'unread', fn ($query) => $query->whereNull('read_at'))
+            ->when($validated['type'] ?? null, fn ($query, $type) => $query->where('data->type', $type))
+            ->latest()
+            ->paginate(12)
+            ->withQueryString();
+
+        return view('notifications.index', compact('notifications', 'types'));
     }
 
     public function open(Request $request, string $notification): RedirectResponse
@@ -28,5 +48,19 @@ class NotificationController extends Controller
         $request->user()->unreadNotifications->markAsRead();
 
         return back()->with('success', 'All notifications marked as read.');
+    }
+
+    public function markRead(Request $request, string $notification): RedirectResponse
+    {
+        $request->user()->notifications()->findOrFail($notification)->markAsRead();
+
+        return back()->with('success', 'Notification marked as read.');
+    }
+
+    public function destroy(Request $request, string $notification): RedirectResponse
+    {
+        $request->user()->notifications()->findOrFail($notification)->delete();
+
+        return back()->with('success', 'Notification removed.');
     }
 }

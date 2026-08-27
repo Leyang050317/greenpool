@@ -4,12 +4,15 @@ namespace App\Http\Controllers;
 
 use App\Events\PaymentReceived;
 use App\Http\Requests\StorePaymentRequest;
+use App\Mail\PaymentReceiptMail;
 use App\Models\Booking;
 use App\Models\Payment;
+use App\Notifications\PaymentCompletedNotification;
 use App\Notifications\PaymentReceivedNotification;
-use App\Mail\PaymentReceiptMail;
-use App\Services\PaymentService;
+use App\Notifications\RatingReminderNotification;
 use App\Services\FareRecommendationService;
+use App\Services\NotificationDeliveryService;
+use App\Services\PaymentService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -19,7 +22,11 @@ use Illuminate\View\View;
 
 class PaymentController extends Controller
 {
-    public function __construct(private readonly PaymentService $paymentService, private readonly FareRecommendationService $fareRecommendationService) {}
+    public function __construct(
+        private readonly PaymentService $paymentService,
+        private readonly FareRecommendationService $fareRecommendationService,
+        private readonly NotificationDeliveryService $notificationDelivery,
+    ) {}
 
     public function index(Request $request): View
     {
@@ -80,6 +87,10 @@ class PaymentController extends Controller
 
         $payment->payee->notify(new PaymentReceivedNotification($payment));
         PaymentReceived::dispatch($payment);
+        $this->notificationDelivery->send($payment->payer, new PaymentCompletedNotification($payment));
+        if (! $payment->booking->ratings()->where('reviewer_id', $payment->payer_id)->exists()) {
+            $this->notificationDelivery->send($payment->payer, new RatingReminderNotification($payment->booking));
+        }
 
         $emailSent = true;
         try {

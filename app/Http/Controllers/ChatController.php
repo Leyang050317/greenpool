@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Events\MessageSent;
 use App\Models\Booking;
+use App\Notifications\MessageReceivedNotification;
+use App\Services\NotificationDeliveryService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -11,6 +13,8 @@ use Illuminate\View\View;
 
 class ChatController extends Controller
 {
+    public function __construct(private readonly NotificationDeliveryService $notificationDelivery) {}
+
     public function index(Request $request): View
     {
         $user = $request->user();
@@ -83,6 +87,7 @@ class ChatController extends Controller
         ]);
 
         MessageSent::dispatch($message);
+        $this->notificationDelivery->send($message->receiver, new MessageReceivedNotification($message));
 
         if ($request->expectsJson()) {
             return response()->json([

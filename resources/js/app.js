@@ -130,6 +130,29 @@ const subscribeToPaymentNotifications = () => {
 
 };
 
+const notificationIcon = (notification) => ({
+    'message-square': '✉',
+    route: '↗',
+    'credit-card': 'RM',
+    'circle-check': '✓',
+    star: '★',
+}[notification.icon] || '●');
+
+const subscribeToInAppNotifications = () => {
+    const userId = document.body.dataset.authId;
+    const userRole = document.body.dataset.authRole;
+
+    if (!userId || !userRole || !window.Echo) {
+        return;
+    }
+
+    window.Echo.private(`${userRole}.${userId}`)
+        .listen('InAppNotificationCreated', (notification) => {
+            incrementNotificationBadge();
+            showRealtimeNotification(notification, notificationIcon(notification));
+        });
+};
+
 const subscribeToBookingUpdates = () => {
     const userId = document.body.dataset.authId;
     const userRole = document.body.dataset.authRole;
@@ -378,6 +401,75 @@ Alpine.data('passengerNavigation', () => ({
     },
 }));
 
+Alpine.data('faqBot', ({ featuredEndpoint, answerEndpoint }) => ({
+    open: false,
+    loading: false,
+    question: '',
+    featured: [],
+    suggestions: [],
+    messages: [],
+    messageId: 0,
+    featuredEndpoint,
+    answerEndpoint,
+
+    async loadFeatured() {
+        try {
+            const response = await fetch(this.featuredEndpoint, {
+                headers: { Accept: 'application/json' },
+            });
+            const data = await response.json();
+            this.featured = response.ok ? (data.data || []) : [];
+        } catch {
+            this.featured = [];
+        }
+    },
+
+    addMessage(role, text) {
+        this.messages.push({ id: ++this.messageId, role, text });
+        this.$nextTick(() => {
+            const conversation = this.$refs.conversation;
+            if (conversation) conversation.scrollTop = conversation.scrollHeight;
+        });
+    },
+
+    async ask(value) {
+        const question = (value || '').trim();
+        if (!question || this.loading) return;
+
+        this.question = '';
+        this.suggestions = [];
+        this.addMessage('user', question);
+        this.loading = true;
+
+        try {
+            const response = await fetch(this.answerEndpoint, {
+                method: 'POST',
+                headers: {
+                    Accept: 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                },
+                body: JSON.stringify({ question }),
+            });
+            const data = await response.json();
+
+            if (!response.ok) throw new Error(data.message || 'Unable to get an answer right now.');
+
+            if (data.matched) {
+                this.addMessage('bot', `${data.faq.question}\n\n${data.faq.answer}`);
+            } else {
+                this.addMessage('bot', `${data.title}\n\n${data.answer}`);
+                this.suggestions = data.suggestions || [];
+            }
+        } catch (error) {
+            this.addMessage('bot', error.message || 'Sorry, GreenPool Help is temporarily unavailable. Please try again.');
+        } finally {
+            this.loading = false;
+            this.$nextTick(() => this.$refs.question?.focus());
+        }
+    },
+}));
+
 Alpine.data('bookingChat', (config) => ({
     bookingId: config.bookingId,
     currentUserId: Number.parseInt(config.currentUserId, 10),
@@ -463,6 +555,7 @@ subscribeToTripLocations();
 startDriverLocationTracking();
 subscribeToRatingNotifications();
 subscribeToPaymentNotifications();
+subscribeToInAppNotifications();
 subscribeToChatListUpdates();
 
 Alpine.start();

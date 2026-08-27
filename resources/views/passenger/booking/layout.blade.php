@@ -62,6 +62,7 @@
                 @endisset
             </main>
         </div>
+        <x-faq-bot />
     </div>
 </body>
 </html>

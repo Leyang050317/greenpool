@@ -11,6 +11,7 @@ use App\Http\Controllers\Driver\TripLocationController;
 use App\Http\Controllers\Driver\VehicleController;
 use App\Http\Controllers\EmergencyContactController;
 use App\Http\Controllers\EmergencyController;
+use App\Http\Controllers\FaqBotController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\Passenger\HomeController as PassengerHomeController;
 use App\Http\Controllers\Passenger\PassengerBookingController;
@@ -18,6 +19,8 @@ use App\Http\Controllers\PhoneVerificationController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RatingController;
+use App\Http\Controllers\SettingsController;
+use App\Http\Controllers\HelpController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
@@ -50,8 +53,15 @@ Route::middleware('auth')->group(function () {
 });
 
 Route::middleware(['auth', 'verified'])->group(function () {
+    Route::get('/faq-bot/featured', [FaqBotController::class, 'featured'])->middleware('throttle:30,1')->name('faq-bot.featured');
+    Route::post('/faq-bot/answer', [FaqBotController::class, 'answer'])->middleware('throttle:30,1')->name('faq-bot.answer');
     Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
+    Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index');
+    Route::put('/settings/notifications', [SettingsController::class, 'updateNotifications'])->name('settings.notifications.update');
+    Route::get('/help', [HelpController::class, 'index'])->name('help.index');
     Route::get('/notifications/{notification}/open', [NotificationController::class, 'open'])->name('notifications.open');
+    Route::patch('/notifications/{notification}/read', [NotificationController::class, 'markRead'])->name('notifications.read');
+    Route::delete('/notifications/{notification}', [NotificationController::class, 'destroy'])->name('notifications.destroy');
     Route::patch('/notifications/read-all', [NotificationController::class, 'markAllRead'])->name('notifications.read-all');
     Route::get('/ratings', [RatingController::class, 'hub'])->name('ratings.index');
     Route::get('/ratings/history', [RatingController::class, 'index'])->name('ratings.history');
