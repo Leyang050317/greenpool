@@ -126,7 +126,7 @@ class VehicleManagementTest extends TestCase
                 'vehicle_image' => UploadedFile::fake()->image('myvi.jpg'),
             ])
             ->assertCreated()
-            ->assertJsonPath('redirect_url', route('driver.vehicles.index', ['created' => 1]))
+            ->assertJsonPath('redirect_url', route('driver.vehicles.index', ['created' => 1], false))
             ->assertSessionHas('success', 'Vehicle added successfully.');
     }
 

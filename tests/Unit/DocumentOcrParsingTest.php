@@ -73,7 +73,7 @@ class DocumentOcrParsingTest extends TestCase
         $this->assertSame('700406015083', $fields['identity_no']['value']);
         $this->assertSame('06/04/1970', $fields['date_of_birth']['value']);
         $this->assertSame('MALAYSIA', $fields['nationality']['value']);
-        $this->assertSame('B2 D', $fields['licence_class']['value']);
+        $this->assertSame('B2, D', $fields['licence_class']['value']);
         $this->assertSame('20/04/2018', $fields['valid_from']['value']);
         $this->assertSame('06/04/2024', $fields['valid_until']['value']);
         $this->assertSame("NO 212\nTAMAN TANGKAK JAYA 2\nTANGKAK\n84900 LEDANG\nJOHOR", $fields['address']['value']);

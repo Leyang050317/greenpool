@@ -112,7 +112,10 @@ class VehicleController extends Controller
             return response()->json([
                 'message' => $successMessage,
                 'data' => $vehicle,
-                'redirect_url' => route('driver.vehicles.index', ['created' => 1]),
+                // Keep the browser on the same host/port that submitted the form.
+                // This matters in local development where APP_URL may be localhost
+                // while the site is opened through 127.0.0.1:8000.
+                'redirect_url' => route('driver.vehicles.index', ['created' => 1], false),
             ], 201);
         }
 
@@ -143,7 +146,7 @@ class VehicleController extends Controller
             return response()->json([
                 'message' => 'Vehicle added successfully.',
                 'data' => $vehicle,
-                'redirect_url' => route('driver.vehicles.index', ['created' => 1]),
+                'redirect_url' => route('driver.vehicles.index', ['created' => 1], false),
             ], 201);
         }
 

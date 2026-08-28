@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Driver;
 
 use App\Support\DocumentIdentity;
+use App\Support\MalaysianDrivingLicenceClass;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Validator;
 
@@ -30,6 +31,7 @@ class UpdateDriverLicenceRequest extends FormRequest
         $this->merge([
             'holder_name' => DocumentIdentity::normalizeName($this->input('holder_name')),
             'identity_no' => trim((string) $this->input('identity_no')),
+            'licence_class' => MalaysianDrivingLicenceClass::normalize($this->input('licence_class')),
         ]);
     }
 
@@ -61,6 +63,10 @@ class UpdateDriverLicenceRequest extends FormRequest
             if (DocumentIdentity::normalizeName($this->input('holder_name')) !== DocumentIdentity::normalizeName($this->user()?->name)) {
                 $validator->errors()->add('holder_name', 'Driving licence holder name must match your driver profile name.');
             }
+
+            if (! MalaysianDrivingLicenceClass::permitsMotorcar($this->input('licence_class'))) {
+                $validator->errors()->add('licence_class', 'A Class D or DA driving licence is required to provide carpool trips.');
+            }
         }];
     }
 
@@ -73,7 +79,9 @@ class UpdateDriverLicenceRequest extends FormRequest
             return "{$matches[3]}-{$matches[2]}-{$matches[1]}";
         }
 
-        return DocumentIdentity::normalizeName($value);
+        return $field === 'licence_class'
+            ? MalaysianDrivingLicenceClass::normalize($value)
+            : DocumentIdentity::normalizeName($value);
     }
 
     public function messages(): array
