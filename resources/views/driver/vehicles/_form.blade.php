@@ -98,7 +98,21 @@
             <div><p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Detected plate preview</p><p class="mt-1 text-lg font-bold" :class="detectedPlatePreview ? 'text-green-700' : 'text-gray-400'" x-text="detectedPlatePreview || 'Waiting for photo/VOC scan'"></p></div>
         </div>
 
-        <div x-show="photosRequired" class="grid gap-4 md:grid-cols-3">
+        <div x-show="revalidationMode === 'model'" class="grid gap-3 rounded-xl border border-green-200 bg-white p-4 sm:grid-cols-[1fr_auto_1fr] sm:items-center">
+            <div><p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Current model</p><p class="mt-1 text-lg font-bold text-gray-900" x-text="original.model"></p></div>
+            <span class="hidden text-gray-400 sm:block">→</span>
+            <div><p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Detected model preview</p><p class="mt-1 text-lg font-bold" :class="detectedModelPreview ? 'text-green-700' : 'text-gray-400'" x-text="detectedModelPreview || 'Waiting for Geran/VOC scan'"></p></div>
+        </div>
+
+        <div x-show="revalidationMode === 'colour'" class="grid gap-3 rounded-xl border border-green-200 bg-white p-4 sm:grid-cols-[1fr_auto_1fr] sm:items-center">
+            <div><p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Current colour</p><p class="mt-1 text-lg font-bold text-gray-900" x-text="original.colour"></p></div>
+            <span class="hidden text-gray-400 sm:block">→</span>
+            <div><p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Detected colour preview</p><p class="mt-1 text-lg font-bold" :class="detectedColourPreview ? 'text-green-700' : 'text-gray-400'" x-text="detectedColourPreview || 'Waiting for all photo scans'"></p></div>
+        </div>
+
+        <div x-show="photosRequired" class="space-y-3">
+            <div class="flex items-center justify-between gap-4"><p class="text-sm text-gray-600">Upload clear front, rear, and side photos of the same vehicle.</p><button type="button" @click="showPhotoExamples=true" class="shrink-0 text-sm font-semibold text-blue-700 underline decoration-blue-300 underline-offset-4 hover:text-blue-900">View photo examples</button></div>
+            <div class="grid gap-4 md:grid-cols-3">
             @foreach(['front_image' => ['Front photo','FRONT'], 'rear_image' => ['Rear photo','REAR'], 'side_image' => ['Side photo','SIDE']] as $field => [$label, $view])
                 <div>
                     <label class="block text-sm font-semibold text-gray-800">{{ $label }} *<span class="relative mt-2 flex aspect-[4/3] cursor-pointer items-center justify-center overflow-hidden rounded-xl border-2 border-dashed border-gray-300 bg-white"><input x-ref="{{ $field }}" name="{{ $field }}" type="file" accept="image/jpeg,image/png,image/webp" class="sr-only" @change="selectEvidence('{{ $field }}', $event.target.files[0])"><img x-cloak x-show="previews.{{ $field }}" :src="previews.{{ $field }}" class="h-full w-full object-cover" alt="{{ $label }} preview"><span x-show="!previews.{{ $field }}" class="p-4 text-center text-sm font-normal text-gray-500">Choose {{ strtolower($label) }}</span></span></label>
@@ -108,9 +122,10 @@
                     @error($field)<p class="mt-1 text-sm text-red-600">{{ $message }}</p>@enderror
                 </div>
             @endforeach
+            </div>
         </div>
 
-        <div x-show="geranRequired"><p class="mb-2 text-sm font-semibold text-gray-800">Vehicle Geran / VOC *</p><div class="grid items-stretch gap-5 lg:grid-cols-2">
+        <div x-show="geranRequired"><div class="mb-2 flex items-center justify-between gap-4"><p class="text-sm font-semibold text-gray-800">Vehicle Geran / VOC *</p><button type="button" @click="showGeranExample=true" class="shrink-0 text-sm font-semibold text-blue-700 underline decoration-blue-300 underline-offset-4 hover:text-blue-900">View Geran example</button></div><div class="grid items-stretch gap-5 lg:grid-cols-2">
             <label class="block h-full min-h-72"><span class="relative flex h-full min-h-72 cursor-pointer items-center justify-center overflow-hidden rounded-xl border-2 border-dashed border-gray-300 bg-white"><input x-ref="vehicle_geran" name="vehicle_geran" type="file" accept="image/jpeg,image/png" class="sr-only" @change="selectEvidence('vehicle_geran', $event.target.files[0])"><img x-cloak x-show="previews.vehicle_geran" :src="previews.vehicle_geran" class="h-full max-h-80 w-full object-contain" alt="Vehicle Geran preview"><span x-show="!previews.vehicle_geran" class="p-6 text-center text-sm font-normal text-gray-500">Choose the latest Geran/VOC image</span></span></label>
             <div class="flex h-full min-h-72 flex-col rounded-xl border border-gray-200 bg-white p-5"><h4 class="font-bold text-gray-900">Document scan</h4><p class="mt-1 text-sm text-gray-500">The extracted owner and manufacturer must match the existing vehicle. The model will be populated from this document.</p><p x-show="scanMessage && !busy.vehicle_geran" x-text="scanMessage" class="mt-4 rounded-lg bg-gray-50 p-3 text-sm text-gray-700"></p><div x-cloak x-show="busy.vehicle_geran" class="mt-5 rounded-lg border border-blue-100 bg-blue-50 px-3 py-3"><div class="mb-2 flex justify-between text-xs font-semibold text-blue-800"><span>Scanning document</span><span>Please wait…</span></div><div class="h-2 overflow-hidden rounded-full bg-blue-100"><div class="scan-progress-bar h-full w-full rounded-full"></div></div></div><button x-show="!busy.vehicle_geran" type="button" @click="scanGeran" :disabled="evidenceBusy || !previews.vehicle_geran" class="mt-auto rounded-xl bg-green-700 px-4 py-3 text-sm font-bold text-white disabled:bg-gray-300" x-text="geranScanned ? 'Scanned ✓' : 'Scan & prefill'"></button></div>
         </div></div>

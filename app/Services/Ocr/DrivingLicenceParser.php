@@ -2,6 +2,8 @@
 
 namespace App\Services\Ocr;
 
+use App\Support\MalaysianDrivingLicenceClass;
+
 class DrivingLicenceParser extends DocumentParser
 {
     public function parse(array $lines): array
@@ -68,6 +70,10 @@ class DrivingLicenceParser extends DocumentParser
 
         if ($fields['date_of_birth']['value'] === null) {
             $fields['date_of_birth'] = $this->dateOfBirthFromIdentity($fields['identity_no']);
+        }
+
+        if ($fields['licence_class']['value'] !== null) {
+            $fields['licence_class']['value'] = MalaysianDrivingLicenceClass::normalize($fields['licence_class']['value']);
         }
 
         return $fields;
