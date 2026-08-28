@@ -83,6 +83,10 @@ class PassengerBookingController extends Controller
             ->where('status', 'Scheduled')
             ->where('available_seats', '>', 0)
             ->where('departure_at', '>=', now())
+            ->whereHas('user.driverLicence', fn ($licence) => $licence
+                ->where('verification_status', 'Verified')
+                ->whereDate('valid_until', '>=', today())
+                ->whereRaw('DATE(valid_until) >= DATE(trips.departure_at)'))
             ->where('user_id', '!=', $request->user()->id)
             ->whereDoesntHave('bookings', fn ($booking) => $booking
                 ->where('passenger_id', $request->user()->id)
@@ -129,6 +133,10 @@ class PassengerBookingController extends Controller
                 ])
                 ->where('status', 'Scheduled')
                 ->where('available_seats', '>', 0)
+                ->whereHas('user.driverLicence', fn ($licence) => $licence
+                    ->where('verification_status', 'Verified')
+                    ->whereDate('valid_until', '>=', today())
+                    ->whereRaw('DATE(valid_until) >= DATE(trips.departure_at)'))
                 ->findOrFail($request->integer('trip_id'));
         }
 
@@ -152,6 +160,13 @@ class PassengerBookingController extends Controller
             if ($trip->status !== 'Scheduled' || $trip->departure_at->isPast()) {
                 throw ValidationException::withMessages([
                     'trip_id' => 'This trip is no longer available for booking.',
+                ]);
+            }
+
+            $licence = $trip->user->driverLicence;
+            if (! $licence || ! $licence->isValidOn(now()) || ! $licence->isValidOn($trip->departure_at)) {
+                throw ValidationException::withMessages([
+                    'trip_id' => 'This trip is unavailable because the driver does not have a valid licence for the departure date.',
                 ]);
             }
 

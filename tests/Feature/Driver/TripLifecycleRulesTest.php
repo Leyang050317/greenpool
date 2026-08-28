@@ -19,7 +19,7 @@ class TripLifecycleRulesTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_trip_creation_only_requires_an_uploaded_driving_licence(): void
+    public function test_trip_creation_requires_a_valid_licence_covering_the_departure_date(): void
     {
         $driver = User::factory()->create(['role' => 'driver']);
         $vehicle = $this->vehicle($driver);
@@ -40,7 +40,31 @@ class TripLifecycleRulesTest extends TestCase
 
         $this->actingAs($driver)
             ->post(route('driver.trips.store'), $this->requestData($vehicle, $departureAt))
-            ->assertSessionDoesntHaveErrors('driver_licence');
+            ->assertSessionHasErrors('departure_date');
+
+        $driver->driverLicence()->update(['valid_until' => now()->addDays(15)]);
+        $this->fakeGoogle();
+
+        $this->actingAs($driver)
+            ->post(route('driver.trips.store'), $this->requestData($vehicle, $departureAt))
+            ->assertSessionHasNoErrors();
+    }
+
+    public function test_expired_licence_cannot_create_or_update_a_trip(): void
+    {
+        $driver = $this->driver();
+        $driver->driverLicence()->update(['valid_until' => now()->subDay()]);
+        $vehicle = $this->vehicle($driver);
+        $departureAt = now()->addDay()->setTime(10, 0);
+
+        $this->actingAs($driver)
+            ->post(route('driver.trips.store'), $this->requestData($vehicle, $departureAt))
+            ->assertSessionHasErrors('driver_licence');
+
+        $trip = $this->trip($driver, ['vehicle_id' => $vehicle->vehicle_id, 'departure_at' => $departureAt]);
+        $this->actingAs($driver)
+            ->patch(route('driver.trips.update', $trip), $this->requestData($vehicle, $departureAt->copy()->addHour()))
+            ->assertSessionHasErrors('driver_licence');
     }
 
     public function test_create_trip_page_redirects_to_profile_when_driving_licence_is_missing(): void

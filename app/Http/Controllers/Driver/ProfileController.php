@@ -87,7 +87,7 @@ class ProfileController extends Controller
             Storage::disk('local')->delete($oldPath);
         }
 
-        $request->session()->forget('driver_licence_ocr_hash');
+        $request->session()->forget('driver_licence_ocr');
 
         return Redirect::route('driver.profile.edit', ['section' => 'licence'])
             ->with('status', 'driver-licence-updated');

@@ -166,10 +166,16 @@
 
             <div class="mt-6 flex flex-wrap gap-3">
                 @if($booking->booking_status === 'Pending')
-                    <button type="button" @click="acceptOpen = true" class="inline-flex items-center gap-2 rounded-xl bg-[#2E7D32] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#256b29]">
-                        <x-icons.lucide name="check" class="h-4 w-4" />
-                        Accept Booking
-                    </button>
+                    @if($canAcceptBooking)
+                        <button type="button" @click="acceptOpen = true" class="inline-flex items-center gap-2 rounded-xl bg-[#2E7D32] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#256b29]">
+                            <x-icons.lucide name="check" class="h-4 w-4" />
+                            Accept Booking
+                        </button>
+                    @else
+                        <a href="{{ route('driver.profile.edit', ['section' => 'licence']) }}" class="inline-flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-5 py-2.5 text-sm font-semibold text-amber-800 hover:bg-amber-100">
+                            Renew licence to accept
+                        </a>
+                    @endif
                     <button type="button" @click="rejectOpen = true" class="inline-flex items-center gap-2 rounded-xl bg-red-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-red-700">
                         <x-icons.lucide name="x" class="h-4 w-4" />
                         Reject Booking

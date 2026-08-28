@@ -87,7 +87,16 @@ class DriverProfileControllerTest extends TestCase
         $licenceImage = UploadedFile::fake()->image('licence.jpg', 800, 500);
 
         $this->actingAs($driver)
-            ->withSession(['driver_licence_ocr_hash' => hash_file('sha256', $licenceImage->getRealPath())])
+            ->withSession(['driver_licence_ocr' => [
+                'hash' => hash_file('sha256', $licenceImage->getRealPath()),
+                'fields' => [
+                    'name' => 'ER KIM WEN',
+                    'identity_no' => '991109040290',
+                    'licence_class' => 'D',
+                    'valid_from' => now()->subYear()->toDateString(),
+                    'valid_until' => now()->addYear()->toDateString(),
+                ],
+            ]])
             ->put(route('driver.profile.driving-licence.update'), [
             'driving_licence' => $licenceImage,
             'holder_name' => ' er   kim wen ',
@@ -121,6 +130,39 @@ class DriverProfileControllerTest extends TestCase
         ])->assertSessionHasErrors('driving_licence');
 
         $this->assertDatabaseCount('driver_licences', 0);
+    }
+
+    public function test_driver_cannot_change_details_extracted_from_the_licence_scan(): void
+    {
+        Storage::fake('local');
+        $driver = User::factory()->create(['role' => 'driver', 'name' => 'ER KIM WEN']);
+        $licenceImage = UploadedFile::fake()->image('licence.jpg', 800, 500);
+        $validFrom = now()->subYear()->toDateString();
+        $validUntil = now()->addYear()->toDateString();
+
+        $this->actingAs($driver)
+            ->withSession(['driver_licence_ocr' => [
+                'hash' => hash_file('sha256', $licenceImage->getRealPath()),
+                'fields' => [
+                    'name' => 'ER KIM WEN',
+                    'identity_no' => '991109040290',
+                    'licence_class' => 'D',
+                    'valid_from' => $validFrom,
+                    'valid_until' => $validUntil,
+                ],
+            ]])
+            ->put(route('driver.profile.driving-licence.update'), [
+                'driving_licence' => $licenceImage,
+                'holder_name' => 'ER KIM WEN',
+                'identity_no' => '991109040290',
+                'licence_class' => 'B2',
+                'valid_from' => $validFrom,
+                'valid_until' => $validUntil,
+            ])
+            ->assertSessionHasErrors('licence_class');
+
+        $this->assertDatabaseCount('driver_licences', 0);
+        $this->assertSame([], Storage::disk('local')->allFiles());
     }
 
     public function test_expired_or_mismatched_driving_licence_is_rejected(): void

@@ -431,6 +431,41 @@ class VehicleManagementTest extends TestCase
         $this->assertSame('Verified', $vehicle->refresh()->verification_status);
     }
 
+    public function test_model_edit_rejects_a_geran_with_another_vehicle_plate(): void
+    {
+        Storage::fake('local');
+        $driver = User::factory()->create(['role' => 'driver', 'name' => 'TEST DRIVER']);
+        $vehicle = Vehicle::factory()->verified()->create([
+            'user_id' => $driver->id,
+            'plate_number' => 'VNU 8601',
+            'model' => 'SAGA',
+        ]);
+        $data = $this->revalidationData($driver, $vehicle, [
+            'plate_number' => $vehicle->plate_number,
+            'model' => 'PERSONA',
+            'model_name' => 'PERSONA',
+        ]);
+        $data['geran_plate_number'] = 'VNU 860';
+        $this->withSession(['vehicle_geran_ocr' => [
+            'hash' => hash_file('sha256', $data['vehicle_geran']->getRealPath()),
+            'fields' => [
+                'registered_owner_name' => $data['registered_owner_name'],
+                'owner_identity_no' => $data['owner_identity_no'],
+                'manufacturer' => $data['manufacturer'],
+                'model_name' => $data['model_name'],
+                'registration_no' => 'VNU 860',
+            ],
+        ]]);
+
+        $this->actingAs($driver)
+            ->put(route('driver.vehicles.update', $vehicle), $data)
+            ->assertSessionHasErrors('plate_number');
+
+        $vehicle->refresh();
+        $this->assertSame('SAGA', $vehicle->model);
+        $this->assertSame('VNU 8601', $vehicle->plate_number);
+    }
+
     public function test_vehicle_brand_cannot_be_updated(): void
     {
         $driver = User::factory()->create(['role' => 'driver']);

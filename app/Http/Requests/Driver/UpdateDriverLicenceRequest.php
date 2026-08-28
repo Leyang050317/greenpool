@@ -37,16 +37,43 @@ class UpdateDriverLicenceRequest extends FormRequest
     {
         return [function (Validator $validator): void {
             $uploadedLicence = $this->file('driving_licence');
-            $scannedHash = $this->session()->get('driver_licence_ocr_hash');
+            $scan = $this->session()->get('driver_licence_ocr');
+            $scannedHash = is_array($scan) ? ($scan['hash'] ?? null) : null;
 
             if ($uploadedLicence && (! $scannedHash || ! hash_equals($scannedHash, hash_file('sha256', $uploadedLicence->getRealPath())))) {
                 $validator->errors()->add('driving_licence', 'Scan the newly selected driving licence before saving.');
+            } elseif (is_array($scan)) {
+                $fieldMap = [
+                    'holder_name' => 'name',
+                    'identity_no' => 'identity_no',
+                    'licence_class' => 'licence_class',
+                    'valid_from' => 'valid_from',
+                    'valid_until' => 'valid_until',
+                ];
+
+                foreach ($fieldMap as $inputField => $scanField) {
+                    if ($this->normalizeScannedValue($inputField, $this->input($inputField)) !== $this->normalizeScannedValue($inputField, $scan['fields'][$scanField] ?? null)) {
+                        $validator->errors()->add($inputField, 'Driving licence details cannot be changed after scanning.');
+                    }
+                }
             }
 
             if (DocumentIdentity::normalizeName($this->input('holder_name')) !== DocumentIdentity::normalizeName($this->user()?->name)) {
                 $validator->errors()->add('holder_name', 'Driving licence holder name must match your driver profile name.');
             }
         }];
+    }
+
+    private function normalizeScannedValue(string $field, mixed $value): string
+    {
+        $value = trim((string) $value);
+
+        if (in_array($field, ['valid_from', 'valid_until'], true)
+            && preg_match('/^(\d{2})[\/.\-](\d{2})[\/.\-](\d{4})$/', $value, $matches)) {
+            return "{$matches[3]}-{$matches[2]}-{$matches[1]}";
+        }
+
+        return DocumentIdentity::normalizeName($value);
     }
 
     public function messages(): array

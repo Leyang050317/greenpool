@@ -38,6 +38,11 @@ class StoreBookingRequest extends FormRequest
                 $validator->errors()->add('trip_id', 'This trip is no longer available for booking.');
             }
 
+            $licence = $trip->user->driverLicence;
+            if (! $licence || ! $licence->isValidOn(now()) || ! $licence->isValidOn($trip->departure_at)) {
+                $validator->errors()->add('trip_id', 'This trip is unavailable because the driver does not have a valid licence for the departure date.');
+            }
+
             if ($trip->user_id === $this->user()->id) {
                 $validator->errors()->add('trip_id', 'You cannot book your own trip.');
             }

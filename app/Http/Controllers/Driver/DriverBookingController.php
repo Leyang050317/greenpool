@@ -44,8 +44,12 @@ class DriverBookingController extends Controller
             'trip.vehicle',
         ]);
         $this->ensureDriverOwnsTrip($request, $booking->trip);
+        $licence = $request->user()->driverLicence;
+        $canAcceptBooking = $licence
+            && $licence->isValidOn(now())
+            && $licence->isValidOn($booking->trip->departure_at);
 
-        return view('driver.booking.show', compact('booking'));
+        return view('driver.booking.show', compact('booking', 'canAcceptBooking'));
     }
 
     public function accept(Request $request, Booking $booking): RedirectResponse
@@ -67,6 +71,13 @@ class DriverBookingController extends Controller
             if ($trip->status !== 'Scheduled') {
                 throw ValidationException::withMessages([
                     'booking' => 'Only scheduled trips can accept booking requests.',
+                ]);
+            }
+
+            $licence = $request->user()->driverLicence;
+            if (! $licence || ! $licence->isValidOn(now()) || ! $licence->isValidOn($trip->departure_at)) {
+                throw ValidationException::withMessages([
+                    'booking' => 'Renew and verify your driving licence before accepting booking requests for this trip.',
                 ]);
             }
 
