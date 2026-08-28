@@ -697,6 +697,41 @@ class BookingModuleTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_passenger_cannot_find_or_book_a_trip_without_a_valid_driver_licence(): void
+    {
+        $passenger = User::factory()->create(['role' => 'passenger']);
+        $trip = $this->createTrip(['destination' => 'Licence Restricted Destination']);
+        $trip->user->driverLicence()->update(['valid_until' => now()->subDay()]);
+
+        $this->actingAs($passenger)
+            ->get(route('passenger.booking'))
+            ->assertDontSee('Licence Restricted Destination');
+
+        $this->actingAs($passenger)
+            ->post(route('passenger.bookings.store'), [
+                'trip_id' => $trip->trip_id,
+                'pickup_point' => 'Library',
+                'pickup_place_id' => 'library',
+                'number_of_seats' => 1,
+            ])
+            ->assertSessionHasErrors('trip_id');
+    }
+
+    public function test_driver_with_an_expired_licence_cannot_accept_a_booking_request(): void
+    {
+        $driver = User::factory()->create(['role' => 'driver']);
+        $passenger = User::factory()->create(['role' => 'passenger']);
+        $trip = $this->createTrip(['user_id' => $driver->id]);
+        $booking = $this->createBooking($passenger, $trip);
+        $driver->driverLicence()->update(['valid_until' => now()->subDay()]);
+
+        $this->actingAs($driver)
+            ->patch(route('driver.booking-requests.accept', $booking))
+            ->assertSessionHasErrors('booking');
+
+        $this->assertSame('Pending', $booking->refresh()->booking_status);
+    }
+
     private function createTrip(array $attributes = []): Trip
     {
         $driver = isset($attributes['user_id'])
@@ -720,6 +755,18 @@ class BookingModuleTest extends TestCase
             'status' => 'Scheduled',
             ...$attributes,
         ];
+
+        if (! $driver->driverLicence()->exists()) {
+            $driver->driverLicence()->create([
+                'image_path' => 'driver-licences/test.jpg',
+                'holder_name' => $driver->name,
+                'identity_no' => '991109040290',
+                'licence_class' => 'D',
+                'valid_until' => now()->addYear(),
+                'verification_status' => 'Verified',
+                'verified_at' => now(),
+            ]);
+        }
 
         unset($tripAttributes['user_id']);
 

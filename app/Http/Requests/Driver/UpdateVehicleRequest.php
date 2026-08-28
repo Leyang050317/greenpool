@@ -130,6 +130,12 @@ class UpdateVehicleRequest extends StoreVehicleRequest
                             $validator->errors()->add($field, 'Vehicle Geran details must use the values extracted by the document scan.');
                         }
                     }
+
+                    $submittedGeranPlate = preg_replace('/[^A-Z0-9]/', '', mb_strtoupper((string) $this->input('geran_plate_number')));
+                    $scannedGeranPlate = preg_replace('/[^A-Z0-9]/', '', mb_strtoupper((string) ($scan['fields']['registration_no'] ?? '')));
+                    if ($submittedGeranPlate === '' || $scannedGeranPlate === '' || $submittedGeranPlate !== $scannedGeranPlate) {
+                        $validator->errors()->add('geran_plate_number', 'Vehicle Geran registration number must use the value extracted by the document scan.');
+                    }
                 }
 
                 if (DocumentIdentity::normalizeName($this->input('registered_owner_name')) !== DocumentIdentity::normalizeName($this->user()?->name)) {
@@ -142,12 +148,10 @@ class UpdateVehicleRequest extends StoreVehicleRequest
                 if (mb_strtoupper(trim((string) $this->input('model_name'))) !== mb_strtoupper(trim((string) $this->input('model')))) {
                     $validator->errors()->add('model', 'Vehicle model must match the model extracted from the Geran.');
                 }
-                if ($this->fieldChanged($vehicle, 'plate_number')) {
-                    $geranPlate = preg_replace('/[^A-Z0-9]/', '', mb_strtoupper((string) $this->input('geran_plate_number')));
-                    $submittedPlate = preg_replace('/[^A-Z0-9]/', '', mb_strtoupper((string) $this->input('plate_number')));
-                    if ($geranPlate === '' || $geranPlate !== $submittedPlate) {
-                        $validator->errors()->add('plate_number', 'Plate number must match the registration number extracted from the Vehicle Geran/VOC.');
-                    }
+                $geranPlate = preg_replace('/[^A-Z0-9]/', '', mb_strtoupper((string) $this->input('geran_plate_number')));
+                $submittedPlate = preg_replace('/[^A-Z0-9]/', '', mb_strtoupper((string) $this->input('plate_number')));
+                if ($geranPlate === '' || $geranPlate !== $submittedPlate) {
+                    $validator->errors()->add('plate_number', 'Plate number must match the registration number extracted from the Vehicle Geran/VOC.');
                 }
             }
         }];

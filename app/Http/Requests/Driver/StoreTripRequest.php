@@ -32,8 +32,12 @@ class StoreTripRequest extends FormRequest
     public function after(): array
     {
         return [function (Validator $validator): void {
-            if (! $this->user()->driverLicence()->exists()) {
+            $licence = $this->user()->driverLicence()->first();
+
+            if (! $licence) {
                 $validator->errors()->add('driver_licence', 'Upload your driving licence in My Profile before creating a trip.');
+            } elseif (! $licence->isValidOn(now())) {
+                $validator->errors()->add('driver_licence', 'Renew and verify your driving licence before creating or updating a trip.');
             }
 
             $vehicle = Vehicle::find($this->integer('vehicle_id'));
@@ -52,6 +56,14 @@ class StoreTripRequest extends FormRequest
 
             if ($this->filled('departure_date') && $this->filled('departure_time') && ! $validator->errors()->has('departure_time')) {
                 $departureAt = Carbon::parse($this->input('departure_date').' '.$this->input('departure_time'));
+
+                if ($licence && $departureAt->copy()->startOfDay()->gt($licence->valid_until->copy()->startOfDay())) {
+                    $validator->errors()->add(
+                        'departure_date',
+                        'Trip departure cannot be scheduled after your driving licence expires on '.$licence->valid_until->format('d M Y').'.'
+                    );
+                }
+
                 $trip = $this->route('trip');
                 $conflicts = Trip::query()
                     ->where('user_id', $this->user()->id)

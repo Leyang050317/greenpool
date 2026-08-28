@@ -56,7 +56,8 @@
             <div class="grid gap-5 sm:grid-cols-2">
                 <div>
                     <label for="departure_date" class="mb-1.5 flex items-center gap-1.5 text-sm font-medium text-gray-700"><x-icons.lucide name="calendar" class="h-4 w-4 text-gray-400" />Departure date</label>
-                    <input id="departure_date" type="date" name="departure_date" min="{{ now()->toDateString() }}" value="{{ $value('departure_date', isset($trip) ? $trip->departure_at->toDateString() : '') }}" required class="block w-full rounded-xl border-gray-200 text-sm focus:border-[#16A34A] focus:ring-[#16A34A]" />
+                    <input id="departure_date" type="date" name="departure_date" min="{{ now()->toDateString() }}" max="{{ $licence?->valid_until?->toDateString() }}" value="{{ $value('departure_date', isset($trip) ? $trip->departure_at->toDateString() : '') }}" required class="block w-full rounded-xl border-gray-200 text-sm focus:border-[#16A34A] focus:ring-[#16A34A]" />
+                    @if($licence)<p class="mt-1 text-xs text-gray-400">Your licence permits trips through {{ $licence->valid_until->format('d M Y') }}.</p>@endif
                     <x-input-error :messages="$errors->get('departure_date')" class="mt-1.5" />
                 </div>
                 <div>

@@ -164,7 +164,10 @@ class VehicleController extends Controller
             $result = $this->documentOcr->process($validated['document'], $validated['expected_document_type']);
 
             if ($validated['expected_document_type'] === 'DRIVING_LICENCE') {
-                $request->session()->put('driver_licence_ocr_hash', hash_file('sha256', $validated['document']->getRealPath()));
+                $request->session()->put('driver_licence_ocr', [
+                    'hash' => hash_file('sha256', $validated['document']->getRealPath()),
+                    'fields' => collect($result['fields'] ?? [])->mapWithKeys(fn (array $field, string $name) => [$name => $field['value'] ?? null])->all(),
+                ]);
             } elseif ($validated['expected_document_type'] === 'VEHICLE_GERAN') {
                 $request->session()->put('vehicle_geran_ocr', [
                     'hash' => hash_file('sha256', $validated['document']->getRealPath()),

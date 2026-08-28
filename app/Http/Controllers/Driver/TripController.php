@@ -94,15 +94,23 @@ class TripController extends Controller
 
     public function create(Request $request): View|RedirectResponse
     {
-        if (! $request->user()->driverLicence()->exists()) {
+        $licence = $request->user()->driverLicence;
+
+        if (! $licence) {
             return redirect()
                 ->route('driver.profile.edit', ['section' => 'licence'])
                 ->with('error', 'Upload your driving licence before creating a trip.');
         }
 
+        if (! $licence->isValidOn(now())) {
+            return redirect()
+                ->route('driver.profile.edit', ['section' => 'licence'])
+                ->with('error', 'Renew and verify your driving licence before creating a trip.');
+        }
+
         $vehicles = $request->user()->vehicles()->orderByDesc('vehicle_id')->get();
 
-        return view('driver.trips.create', compact('vehicles'));
+        return view('driver.trips.create', compact('vehicles', 'licence'));
     }
 
     public function store(StoreTripRequest $request): RedirectResponse|JsonResponse
@@ -149,7 +157,9 @@ class TripController extends Controller
         $vehicles = $request->user()->vehicles()->orderByDesc('vehicle_id')->get();
         $returnTo = $this->returnRoute($request);
 
-        return view('driver.trips.edit', compact('trip', 'vehicles', 'returnTo'));
+        $licence = $request->user()->driverLicence;
+
+        return view('driver.trips.edit', compact('trip', 'vehicles', 'returnTo', 'licence'));
     }
 
     public function update(UpdateTripRequest $request, Trip $trip): RedirectResponse|JsonResponse
