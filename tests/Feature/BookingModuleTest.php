@@ -183,6 +183,23 @@ class BookingModuleTest extends TestCase
             ->assertSee('Quiet');
     }
 
+    public function test_current_location_autofill_is_only_used_for_booking_pickup_point(): void
+    {
+        $passenger = User::factory()->create(['role' => 'passenger']);
+        $trip = $this->createTrip();
+
+        $this->actingAs($passenger)
+            ->get(route('passenger.booking'))
+            ->assertOk()
+            ->assertDontSee('navigator.geolocation', false);
+
+        $this->actingAs($passenger)
+            ->get(route('passenger.bookings.create', ['trip_id' => $trip->trip_id]))
+            ->assertOk()
+            ->assertSee('navigator.geolocation', false)
+            ->assertSee('currentLocationEndpoint', false);
+    }
+
     public function test_available_trip_card_shows_driver_photo_and_preferences(): void
     {
         $passenger = User::factory()->create(['role' => 'passenger']);
@@ -330,6 +347,35 @@ class BookingModuleTest extends TestCase
             'number_of_seats' => 2,
             'pickup_point' => 'Main Gate',
             'pickup_place_id' => 'main-gate-place',
+        ]);
+    }
+
+    public function test_passenger_can_submit_booking_request_with_detected_pickup_coordinates(): void
+    {
+        $passenger = User::factory()->create(['role' => 'passenger']);
+        $trip = $this->createTrip(['available_seats' => 3]);
+
+        $this->actingAs($passenger)
+            ->post(route('passenger.bookings.store'), [
+                'trip_id' => $trip->trip_id,
+                'pickup_point' => 'Taman Danau Kota, Kuala Lumpur, Malaysia',
+                'pickup_latitude' => 3.20025,
+                'pickup_longitude' => 101.71394,
+                'number_of_seats' => 1,
+                'number_of_luggage' => 1,
+            ])
+            ->assertRedirect(route('passenger.bookings.history'))
+            ->assertSessionHas('success');
+
+        $this->assertDatabaseHas('bookings', [
+            'trip_id' => $trip->trip_id,
+            'passenger_id' => $passenger->id,
+            'booking_status' => 'Pending',
+            'pickup_point' => 'Taman Danau Kota, Kuala Lumpur, Malaysia',
+            'pickup_place_id' => null,
+            'pickup_latitude' => 3.20025,
+            'pickup_longitude' => 101.71394,
+            'number_of_luggage' => 1,
         ]);
     }
 

@@ -1,7 +1,10 @@
 @php
 
     $unreadNotificationCount = Auth::user()->unreadNotifications()->count();
-    $unreadMessageCount = Auth::user()->receivedMessages()->whereNull('read_at')->count();
+    $unreadMessageCount = Auth::user()->receivedMessages()
+        ->whereNull('read_at')
+        ->whereHas('booking', fn ($booking) => $booking->where('booking_status', '!=', 'Rejected'))
+        ->count();
     $mainNavigation = [
 
         ['label' => 'Dashboard', 'icon' => 'layout-dashboard', 'href' => route('passenger.home'), 'active' => request()->routeIs('passenger.home')],

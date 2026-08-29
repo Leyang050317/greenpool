@@ -64,6 +64,8 @@ class PassengerBookingController extends Controller
             'data' => [
                 'text' => $location['display'],
                 'place_id' => $location['place_id'],
+                'latitude' => $location['latitude'],
+                'longitude' => $location['longitude'],
             ],
         ]);
     }
@@ -145,10 +147,18 @@ class PassengerBookingController extends Controller
 
     public function store(StoreBookingRequest $request): RedirectResponse
     {
-        try {
-            $pickup = $this->tripLocationService->resolve($request->string('pickup_place_id')->toString(), 'pickup_place_id');
-        } catch (TripRoutingException $exception) {
-            return back()->withInput()->withErrors(['pickup_place_id' => $exception->getMessage()]);
+        if ($request->filled('pickup_place_id')) {
+            try {
+                $pickup = $this->tripLocationService->resolve($request->string('pickup_place_id')->toString(), 'pickup_place_id');
+            } catch (TripRoutingException $exception) {
+                return back()->withInput()->withErrors(['pickup_place_id' => $exception->getMessage()]);
+            }
+        } else {
+            $pickup = [
+                'display' => $request->string('pickup_point')->trim()->toString(),
+                'latitude' => $request->float('pickup_latitude'),
+                'longitude' => $request->float('pickup_longitude'),
+            ];
         }
 
         $booking = DB::transaction(function () use ($request, $pickup) {
@@ -197,7 +207,7 @@ class PassengerBookingController extends Controller
             $bookingData = [
                 ...$request->bookingData(),
                 'pickup_point' => $pickup['display'],
-                'pickup_place_id' => $request->string('pickup_place_id')->toString(),
+                'pickup_place_id' => $request->filled('pickup_place_id') ? $request->string('pickup_place_id')->toString() : null,
                 'pickup_latitude' => $pickup['latitude'],
                 'pickup_longitude' => $pickup['longitude'],
             ];
