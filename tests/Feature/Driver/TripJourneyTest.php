@@ -3,6 +3,7 @@
 namespace Tests\Feature\Driver;
 
 use App\Models\Booking;
+use App\Events\BookingStatusUpdated;
 use App\Models\Emergency;
 use App\Models\Trip;
 use App\Models\TripLocation;
@@ -10,6 +11,7 @@ use App\Models\User;
 use App\Models\Vehicle;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Event;
 use Tests\TestCase;
 
 class TripJourneyTest extends TestCase
@@ -44,10 +46,13 @@ class TripJourneyTest extends TestCase
             ->assertSee('Estimated Arrival')
             ->assertSee('25.40 km')
             ->assertSee('35 min')
-            ->assertSee('Report an Issue')
-            ->assertSee('Inform accepted passengers about an issue during this trip')
+            ->assertSee('Report Emergency')
+            ->assertSee('Use this only for a genuine emergency')
+            ->assertSee('Confirm Emergency')
+            ->assertSee('tel:999', false)
+            ->assertSee('Call Emergency Contact')
             ->assertSee(route('trips.emergencies.store', $trip), false)
-            ->assertSee('name="issue_type" value="traffic_delay"', false);
+            ->assertSee('name="issue_type" value="safety_risk"', false);
     }
 
     public function test_active_journey_shows_the_latest_live_driver_location_state(): void
@@ -62,7 +67,23 @@ class TripJourneyTest extends TestCase
             ->assertSee('Live location updated');
     }
 
-    public function test_active_journey_displays_an_active_issue_report_and_acknowledgement_control(): void
+    public function test_live_map_uses_pickup_sequence_statuses_and_static_focus_points(): void
+    {
+        config()->set('services.google_maps.browser_key', 'browser-key');
+        $driver = $this->driver();
+        $trip = $this->trip($driver);
+        $this->booking($trip, ['pickup_sequence' => 2, 'picked_up_at' => now()->subMinute()]);
+        $this->booking($trip, ['pickup_sequence' => 1]);
+
+        $this->actingAs($driver)->get(route('driver.trips.journey'))
+            ->assertOk()
+            ->assertSee('data-focus-points', false)
+            ->assertSee('"sequence":2', false)
+            ->assertSee('"status":"Picked Up"', false)
+            ->assertSee('"status":"Next Pickup"', false);
+    }
+
+    public function test_active_journey_shows_one_emergency_action_without_a_persistent_report_list(): void
     {
         $driver = $this->driver();
         $trip = $this->trip($driver);
@@ -79,18 +100,17 @@ class TripJourneyTest extends TestCase
 
         $this->actingAs($driver)->get(route('driver.trips.journey'))
             ->assertOk()
-            ->assertSee('Report an Issue')
-            ->assertSee('Traffic Delay')
-            ->assertSee('Active')
-            ->assertSee('Reported by')
-            ->assertSee($driver->name)
+            ->assertSee('Report Emergency')
+            ->assertSee('Report Emergency')
+            ->assertSee('Confirm Emergency')
+            ->assertSee('Call 999')
             ->assertDontSee('Acknowledge')
-            ->assertDontSee('Resolve');
+            ->assertDontSee('Reported by');
 
         $this->assertSame('Active', $emergency->fresh()->status);
     }
 
-    public function test_acknowledged_issue_report_has_no_resolve_control(): void
+    public function test_acknowledged_emergency_does_not_create_a_second_persistent_ui_panel(): void
     {
         $driver = $this->driver();
         $trip = $this->trip($driver);
@@ -109,13 +129,13 @@ class TripJourneyTest extends TestCase
 
         $this->actingAs($driver)->get(route('driver.trips.journey'))
             ->assertOk()
-            ->assertSee('Road Hazard')
-            ->assertSee('Acknowledged')
-            ->assertDontSee('Resolve');
+            ->assertSee('Report Emergency')
+            ->assertDontSee('Reported by');
     }
 
     public function test_picking_up_a_booking_advances_the_timeline_without_changing_trip_lifecycle_times(): void
     {
+        Event::fake([BookingStatusUpdated::class]);
         $driver = $this->driver();
         $startedAt = now()->subMinutes(10);
         $trip = $this->trip($driver, ['started_at' => $startedAt]);
@@ -128,6 +148,11 @@ class TripJourneyTest extends TestCase
 
         $this->assertNotNull($first->refresh()->picked_up_at);
         $this->assertSame('In Progress', $trip->refresh()->status);
+        Event::assertDispatched(BookingStatusUpdated::class, function (BookingStatusUpdated $event) use ($first) {
+            $payload = $event->broadcastWith();
+            return $event->pickedUpBookingId === $first->id
+                && collect($payload['pickup_progress'])->firstWhere('booking_id', $first->id)['picked_up_at'] !== null;
+        });
         $this->assertSame($startedAt->format('Y-m-d H:i:s'), $trip->started_at->format('Y-m-d H:i:s'));
         $this->assertNull($trip->completed_at);
         $this->actingAs($driver)->get(route('driver.trips.journey'))
@@ -207,7 +232,11 @@ class TripJourneyTest extends TestCase
             ->get(route('driver.trips.journey'))
             ->assertOk()
             ->assertSee('Expired')
-            ->assertSee('This trip has expired and can no longer be started.');
+            ->assertSee('data-journey-expiry-card', false)
+            ->assertSee('data-journey-expiry-actions', false)
+            ->assertSee('The scheduled departure time has passed. Edit this trip to choose a future time, or cancel it.')
+            ->assertSee('Edit Trip')
+            ->assertSee('Cancel Trip');
 
         $this->actingAs($driver)
             ->patch(route('driver.trips.start', $trip))

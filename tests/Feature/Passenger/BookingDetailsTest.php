@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Models\Vehicle;
 use App\Notifications\BookingStatusNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Tests\TestCase;
 
 class BookingDetailsTest extends TestCase
@@ -27,6 +28,41 @@ class BookingDetailsTest extends TestCase
             ->assertSee($booking->pickup_point)
             ->assertSee('Upcoming trip')
             ->assertDontSee('Trip map');
+    }
+
+    public function test_scheduled_booking_after_the_departure_minute_displays_the_derived_expired_status(): void
+    {
+        [$passenger, $trip] = $this->passengerAndTrip();
+        $trip->update(['departure_at' => now()->subMinute()]);
+        $booking = $this->booking($passenger, $trip, 'Accepted');
+
+        $this->actingAs($passenger)->get(route('passenger.bookings.show', $booking))
+            ->assertOk()
+            ->assertSee('Expired');
+        $this->actingAs($passenger)->get(route('passenger.bookings.history'))
+            ->assertOk()
+            ->assertSee('Expired');
+        $this->assertSame('Scheduled', $trip->refresh()->status);
+    }
+
+    public function test_my_trips_keeps_the_full_departure_minute_scheduled_before_expiring(): void
+    {
+        $departureAt = Carbon::parse('2026-08-30 01:28:00');
+        Carbon::setTestNow($departureAt);
+        [$passenger, $trip] = $this->passengerAndTrip();
+        $trip->update(['departure_at' => $departureAt]);
+        $this->booking($passenger, $trip, 'Accepted');
+
+        foreach ([0, 30, 59] as $second) {
+            Carbon::setTestNow($departureAt->copy()->addSeconds($second));
+            $this->actingAs($passenger)->get(route('passenger.bookings.history'))
+                ->assertOk()->assertSee('Scheduled')->assertDontSee('Expired');
+        }
+
+        Carbon::setTestNow($departureAt->copy()->addMinute());
+        $this->actingAs($passenger)->get(route('passenger.bookings.history'))
+            ->assertOk()->assertSee('Expired');
+        Carbon::setTestNow();
     }
 
     public function test_passenger_cannot_view_another_passengers_booking(): void

@@ -22,6 +22,7 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RatingController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\StripeWebhookController;
+use App\Http\Controllers\TripUpdateController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
@@ -130,6 +131,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::patch('/passenger/booking/{booking}/cancel', [PassengerBookingController::class, 'cancel'])
         ->name('passenger.bookings.cancel');
     Route::post('/trips/{trip}/emergencies', [EmergencyController::class, 'store'])->name('trips.emergencies.store');
+    Route::post('/trips/{trip}/updates', [TripUpdateController::class, 'store'])->name('trips.updates.store');
     Route::patch('/emergencies/{emergency}/acknowledge', [EmergencyController::class, 'acknowledge'])->name('emergencies.acknowledge');
 
     Route::middleware('driver')->prefix('driver')->name('driver.')->group(function () {

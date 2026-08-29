@@ -12,6 +12,53 @@ const refreshBookingPage = () => {
     window.location.reload();
 };
 
+const startDerivedTripExpiryBadges = () => {
+    document.querySelectorAll('[data-trip-expiry-badge]').forEach((badge) => {
+        const departureAt = new Date(badge.dataset.departureAt);
+        if (Number.isNaN(departureAt.getTime())) return;
+
+        const update = () => {
+            if (Math.floor(Date.now() / 60000) <= Math.floor(departureAt.getTime() / 60000)) return;
+            if (badge.textContent.trim() !== 'Scheduled') return;
+            badge.textContent = 'Expired';
+            badge.className = `inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${badge.dataset.expiredClass}`;
+        };
+
+        update();
+        const delay = Math.max(1, (Math.floor(departureAt.getTime() / 60000) + 1) * 60000 - Date.now());
+        window.setTimeout(update, delay);
+    });
+};
+
+const startJourneyExpiryCards = () => {
+    document.querySelectorAll('[data-journey-expiry-card]').forEach((card) => {
+        const departureAt = new Date(card.dataset.departureAt);
+        if (Number.isNaN(departureAt.getTime())) return;
+
+        const expire = () => {
+            if (Math.floor(Date.now() / 60000) <= Math.floor(departureAt.getTime() / 60000) || card.dataset.expired === 'true') return;
+            card.dataset.expired = 'true';
+            const badge = card.querySelector('[data-journey-expiry-badge]');
+            if (badge) {
+                badge.textContent = 'Expired';
+                badge.className = 'rounded-full bg-red-50 px-2.5 py-1 text-xs font-medium text-red-700';
+            }
+            card.querySelector('[data-journey-expiry-message]')?.classList.remove('hidden');
+            card.querySelector('[data-journey-expiry-actions]')?.classList.remove('hidden');
+            const startButton = card.querySelector('[data-journey-start-control] button');
+            if (startButton) {
+                startButton.disabled = true;
+                startButton.title = 'The scheduled departure time has passed. Edit this trip to choose a future time, or cancel it.';
+                startButton.classList.remove('bg-[#16A34A]', 'text-white', 'hover:bg-[#15803D]');
+                startButton.classList.add('cursor-not-allowed', 'bg-gray-100', 'text-gray-400');
+            }
+        };
+
+        expire();
+        window.setTimeout(expire, Math.max(1, (Math.floor(departureAt.getTime() / 60000) + 1) * 60000 - Date.now()));
+    });
+};
+
 const updateNotificationBadge = (count) => {
     const notificationLink = document.querySelector('[data-notification-link]');
     const notificationBadge = document.querySelector('[data-notification-badge]');
@@ -180,6 +227,40 @@ const subscribeToInAppNotifications = () => {
             if (paymentsPage && ['payment_due', 'payment_completed'].includes(notification.type)) {
                 window.setTimeout(() => window.location.reload(), 400);
             }
+
+            if (notification.type === 'trip_updated' && notification.departure_at_label) {
+                document.querySelectorAll('[data-trip-departure-at]').forEach((element) => {
+                    element.textContent = notification.departure_at_label;
+                });
+                document.querySelectorAll('[data-trip-upcoming-departure]').forEach((element) => {
+                    element.textContent = `Your booking is confirmed for ${notification.departure_at_label}.`;
+                });
+            }
+
+            if (notification.type === 'trip_updated' && notification.trip_details) {
+                const details = notification.trip_details;
+                document.querySelectorAll('[data-trip-route-summary]').forEach((element) => {
+                    element.textContent = `${details.departure_location} to ${details.destination}`;
+                });
+                document.querySelectorAll('[data-trip-departure-location]').forEach((element) => {
+                    element.textContent = details.departure_location;
+                });
+                document.querySelectorAll('[data-trip-destination]').forEach((element) => {
+                    element.textContent = details.destination;
+                });
+                document.querySelectorAll('[data-trip-driver-vehicle]').forEach((element) => {
+                    element.textContent = details.vehicle_label;
+                });
+
+                if (notification.locations_changed && document.querySelector('[data-trip-static-map]')) {
+                    window.setTimeout(() => window.location.reload(), 400);
+                }
+            }
+
+            if (notification.type === 'trip_auto_cancelled'
+                && (window.location.pathname.startsWith('/driver/trips') || window.location.pathname === '/driver/home')) {
+                window.setTimeout(() => window.location.reload(), 400);
+            }
         });
 };
 
@@ -195,7 +276,10 @@ const subscribeToBookingUpdates = () => {
     if (userRole === 'driver' && (path.startsWith('/driver/booking') || path === '/driver/home')) {
         window.Echo.private(`driver.${userId}`)
             .listen('BookingCreated', refreshBookingPage)
-            .listen('BookingStatusUpdated', refreshBookingPage);
+            .listen('BookingStatusUpdated', (event) => {
+                if (event.picked_up_booking_id) updatePickupProgress(event);
+                else refreshBookingPage();
+            });
     }
 
     if (userRole === 'driver') {
@@ -209,6 +293,10 @@ const subscribeToBookingUpdates = () => {
                 }, '★');
             })
             .listen('BookingStatusUpdated', (event) => {
+                if (event.picked_up_booking_id) {
+                    updatePickupProgress(event);
+                    return;
+                }
                 if (event.driver_notification_type === 'booking_request_cancelled') {
                     incrementNotificationBadge();
                     const notification = bookingUpdateNotification(event, 'driver');
@@ -219,7 +307,10 @@ const subscribeToBookingUpdates = () => {
 
     if (userRole === 'passenger' && (path.startsWith('/passenger/booking') || path === '/passenger/home')) {
         window.Echo.private(`passenger.${userId}`)
-            .listen('BookingStatusUpdated', refreshBookingPage);
+            .listen('BookingStatusUpdated', (event) => {
+                if (event.picked_up_booking_id) updatePickupProgress(event);
+                else refreshBookingPage();
+            });
     }
 
     if (userRole === 'passenger') {
@@ -237,6 +328,25 @@ const subscribeToBookingUpdates = () => {
         window.Echo.channel('trips')
             .listen('TripCreated', refreshBookingPage);
     }
+};
+
+const updatePickupProgress = (event) => {
+    const progress = event.pickup_progress || [];
+    const nextBookingId = progress.find((pickup) => !pickup.picked_up_at)?.booking_id;
+    progress.forEach((pickup) => {
+        document.querySelectorAll(`[data-pickup-progress-item="${pickup.booking_id}"]`).forEach((item) => {
+            const icon = item.querySelector('[data-pickup-progress-icon]');
+            const text = item.querySelector('[data-pickup-progress-text]');
+            const isPickedUp = Boolean(pickup.picked_up_at);
+            const isNext = pickup.booking_id === nextBookingId;
+            if (icon) {
+                icon.textContent = isPickedUp ? '✓' : (isNext ? '→' : '○');
+                icon.className = `flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold ${isPickedUp ? 'bg-green-600 text-white' : (isNext ? 'bg-orange-100 text-orange-700' : 'bg-slate-100 text-slate-500')}`;
+            }
+            if (text) text.textContent = isPickedUp ? `Picked up ${new Date(pickup.picked_up_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : (isNext ? 'Current / waiting' : 'Upcoming');
+        });
+    });
+    window.GreenPoolStaticMaps?.updatePickups(event.trip_id, progress);
 };
 
 const subscribeToTripReminders = () => {
@@ -264,9 +374,87 @@ const subscribeToEmergencyAlerts = () => {
 
     window.Echo.private(`${userRole}.${userId}`)
         .listen('EmergencyTriggered', (notification) => {
-            incrementNotificationBadge();
             showRealtimeNotification(notification, '⚠');
         });
+};
+
+const updateEmergencyAcknowledgement = (event) => {
+    document.querySelectorAll(`[data-emergency-status-for="${event.emergency_id}"]`).forEach((status) => {
+        status.textContent = event.status;
+        status.className = 'rounded-full bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-700';
+    });
+    document.querySelectorAll(`[data-emergency-acknowledge-for="${event.emergency_id}"]`).forEach((form) => form.remove());
+};
+
+const subscribeToEmergencyAcknowledgements = () => {
+    const tripIds = [...document.querySelectorAll('[data-emergency-panel]')]
+        .map((element) => element.dataset.tripId)
+        .filter(Boolean);
+
+    if (!window.Echo) return;
+
+    [...new Set(tripIds)].forEach((tripId) => {
+        window.Echo.private(`trip.${tripId}`)
+            .listen('EmergencyAcknowledged', updateEmergencyAcknowledgement);
+    });
+};
+
+const prepareEmergencyLocation = () => {
+    document.querySelectorAll('[data-emergency-report-form]').forEach((form) => {
+        form.addEventListener('submit', (event) => {
+            event.preventDefault();
+
+            if (form.dataset.locationPrepared === 'true') return;
+            form.dataset.locationPrepared = 'true';
+
+            const submitButton = form.querySelector('button[type="submit"], button:not([type])');
+            if (submitButton) {
+                submitButton.disabled = true;
+                submitButton.textContent = 'Reporting…';
+            }
+
+            const submit = async (position = null) => {
+                const latitude = form.querySelector('[name="latitude"]');
+                const longitude = form.querySelector('[name="longitude"]');
+                const source = form.querySelector('[name="location_source"]');
+                if (position) {
+                    latitude.value = position.coords.latitude;
+                    longitude.value = position.coords.longitude;
+                    source.value = 'device';
+                } else {
+                    source.value = 'unavailable';
+                }
+                try {
+                    const response = await fetch(form.action, {
+                        method: form.method,
+                        headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                        body: new FormData(form),
+                    });
+                    if (!response.ok) {
+                        const data = await response.json().catch(() => ({}));
+                        throw new Error(data.message || 'We could not submit the emergency report. Please try again.');
+                    }
+                    window.dispatchEvent(new CustomEvent('greenpool:emergency-reported', { detail: await response.json() }));
+                } catch (error) {
+                    form.dataset.locationPrepared = '';
+                    if (submitButton) {
+                        submitButton.disabled = false;
+                        submitButton.textContent = 'Report Emergency';
+                    }
+                    window.dispatchEvent(new CustomEvent('greenpool:emergency-report-failed', {
+                        detail: { message: error.message },
+                    }));
+                }
+            };
+
+            if (!navigator.geolocation) return submit();
+            navigator.geolocation.getCurrentPosition(
+                (position) => submit(position),
+                () => submit(),
+                { enableHighAccuracy: true, maximumAge: 0, timeout: 8000 },
+            );
+        });
+    });
 };
 
 const dispatchTripLocation = (location) => {
@@ -591,6 +779,10 @@ Alpine.data('bookingChat', (config) => ({
 subscribeToBookingUpdates();
 subscribeToTripReminders();
 subscribeToEmergencyAlerts();
+subscribeToEmergencyAcknowledgements();
+prepareEmergencyLocation();
+startDerivedTripExpiryBadges();
+startJourneyExpiryCards();
 subscribeToTripLocations();
 startDriverLocationTracking();
 subscribeToRatingNotifications();

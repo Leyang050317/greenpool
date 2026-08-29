@@ -11,7 +11,7 @@ class Emergency extends Model
     use HasFactory;
 
     protected $fillable = [
-        'trip_id', 'user_id', 'role', 'issue_type', 'latitude', 'longitude', 'description', 'status',
+        'trip_id', 'user_id', 'role', 'issue_type', 'latitude', 'longitude', 'location_source', 'description', 'status',
         'triggered_at', 'acknowledged_at', 'acknowledged_by', 'resolved_at', 'resolved_by',
     ];
 
@@ -51,6 +51,9 @@ class Emergency extends Model
             'road_hazard' => 'Road Hazard',
             'personal_emergency' => 'Personal Emergency',
             'medical_emergency' => 'Medical Emergency',
+            'safety_risk' => 'Immediate Safety Risk',
+            'accident_road_danger' => 'Accident / Road Danger',
+            'other_emergency' => 'Other Emergency',
             'other' => 'Other',
         ][$this->issue_type] ?? 'Issue';
     }
@@ -62,8 +65,22 @@ class Emergency extends Model
             'vehicle_problem' => 'Driver reported a vehicle problem for your trip.',
             'road_hazard' => 'Driver reported a road hazard.',
             'personal_emergency' => 'Passenger reported a personal emergency.',
-            'medical_emergency' => 'Passenger reported a medical emergency during the trip.',
+            'medical_emergency' => 'A trip participant reported a medical emergency.',
+            'safety_risk' => 'A trip participant reported an immediate safety risk.',
+            'accident_road_danger' => 'A trip participant reported an accident or road danger.',
+            'other_emergency' => 'A trip participant reported an emergency.',
             default => $this->role === 'driver' ? 'Driver reported an issue.' : 'Passenger reported an issue.',
+        };
+    }
+
+    public function locationStatusLabel(): string
+    {
+        return match ($this->location_source) {
+            'device' => 'Current device location',
+            'pickup' => 'Pickup location fallback',
+            'departure' => 'Departure location fallback',
+            'unavailable' => 'Location unavailable',
+            default => 'Location source not confirmed',
         };
     }
 }

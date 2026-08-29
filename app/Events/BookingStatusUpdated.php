@@ -19,6 +19,7 @@ class BookingStatusUpdated implements ShouldBroadcastNow
         public Booking $booking,
         public ?string $driverNotificationType = null,
         public ?string $passengerNotificationType = null,
+        public ?int $pickedUpBookingId = null,
     )
     {
         $this->booking->loadMissing(['trip']);
@@ -34,6 +35,17 @@ class BookingStatusUpdated implements ShouldBroadcastNow
 
     public function broadcastWith(): array
     {
+        $pickupProgress = $this->booking->trip->bookings()
+            ->where('booking_status', 'Accepted')
+            ->orderByRaw('case when pickup_sequence is null then 1 else 0 end')
+            ->orderBy('pickup_sequence')
+            ->oldest()
+            ->get(['id', 'pickup_sequence', 'picked_up_at'])
+            ->map(fn (Booking $booking) => [
+                'booking_id' => $booking->id,
+                'pickup_sequence' => $booking->pickup_sequence,
+                'picked_up_at' => $booking->picked_up_at?->toIso8601String(),
+            ])->all();
         return [
             'booking_id' => $this->booking->id,
             'status' => $this->booking->booking_status,
@@ -46,6 +58,8 @@ class BookingStatusUpdated implements ShouldBroadcastNow
             'driver_notification_type' => $this->driverNotificationType,
             'passenger_notification_type' => $this->passengerNotificationType,
             'updated_at' => $this->booking->updated_at?->toIso8601String(),
+            'pickup_progress' => $pickupProgress,
+            'picked_up_booking_id' => $this->pickedUpBookingId,
         ];
     }
 }

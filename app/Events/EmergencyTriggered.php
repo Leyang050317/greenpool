@@ -30,7 +30,7 @@ class EmergencyTriggered implements ShouldBroadcastNow
             'emergency_id' => $this->emergency->id,
             'trip_id' => $trip->trip_id,
             'booking_id' => $this->booking?->id,
-            'title' => 'Issue Report',
+            'title' => 'Emergency Alert',
             'message' => $this->emergency->notificationMessage(),
             'url' => $this->booking ? route('passenger.bookings.show', $this->booking) : route('driver.trips.show', $trip),
         ];

@@ -3,11 +3,14 @@
 namespace Tests\Feature\Driver;
 
 use App\Events\BookingStatusUpdated;
+use App\Events\InAppNotificationCreated;
 use App\Models\Booking;
 use App\Models\Trip;
 use App\Models\User;
 use App\Models\Vehicle;
 use App\Notifications\BookingStatusNotification;
+use App\Notifications\TripUpdatedNotification;
+use App\Notifications\TripAutoCancelledNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Artisan;
@@ -119,6 +122,137 @@ class TripLifecycleRulesTest extends TestCase
 
         Artisan::call('trips:cancel-unbooked-departed');
         $this->assertSame('Scheduled', $trip->refresh()->status);
+    }
+
+    public function test_departure_boundary_keeps_a_scheduled_trip_startable_for_the_full_departure_minute(): void
+    {
+        $departureAt = Carbon::parse('2026-08-29 20:00:00');
+        Carbon::setTestNow($departureAt->copy()->subSecond());
+        $driver = $this->driver();
+        $trip = $this->trip($driver, ['departure_at' => $departureAt]);
+        $this->fakeGoogle();
+
+        $this->actingAs($driver)->patch(route('driver.trips.start', $trip))->assertSessionHasNoErrors();
+        $this->assertSame('In Progress', $trip->refresh()->status);
+
+        $trip->update(['status' => 'Scheduled', 'started_at' => null]);
+        Carbon::setTestNow($departureAt);
+        $this->actingAs($driver)->patch(route('driver.trips.start', $trip))->assertSessionHasNoErrors();
+        $this->assertSame('In Progress', $trip->refresh()->status);
+
+        $trip->update(['status' => 'Scheduled', 'started_at' => null]);
+        Carbon::setTestNow($departureAt->copy()->addSeconds(30));
+        $this->actingAs($driver)->patch(route('driver.trips.start', $trip))->assertSessionHasNoErrors();
+        $this->assertSame('In Progress', $trip->refresh()->status);
+
+        $trip->update(['status' => 'Scheduled', 'started_at' => null]);
+        Carbon::setTestNow($departureAt->copy()->addSeconds(59));
+        $this->actingAs($driver)->patch(route('driver.trips.start', $trip))->assertSessionHasNoErrors();
+        $this->assertSame('In Progress', $trip->refresh()->status);
+
+        $trip->update(['status' => 'Scheduled', 'started_at' => null]);
+        Carbon::setTestNow($departureAt->copy()->addMinute());
+        $this->actingAs($driver)->patch(route('driver.trips.start', $trip))->assertStatus(422);
+        $this->assertSame('Scheduled', $trip->refresh()->status);
+        Carbon::setTestNow();
+    }
+
+    public function test_my_trips_displays_expired_after_the_departure_minute_and_exposes_the_realtime_badge(): void
+    {
+        $departureAt = Carbon::parse('2026-08-29 01:28:00');
+        Carbon::setTestNow($departureAt->copy()->addSeconds(59));
+        $driver = $this->driver();
+        $trip = $this->trip($driver, ['departure_at' => $departureAt]);
+
+        $this->actingAs($driver)
+            ->get(route('driver.trips.index'))
+            ->assertOk()
+            ->assertSee('Scheduled')
+            ->assertSee('data-trip-expiry-badge', false)
+            ->assertSee($departureAt->toIso8601String(), false);
+
+        Carbon::setTestNow($departureAt->copy()->addMinute());
+        $this->actingAs($driver)
+            ->get(route('driver.trips.index'))
+            ->assertOk()
+            ->assertSee('Expired');
+
+        $this->assertSame('Scheduled', $trip->refresh()->status);
+        Carbon::setTestNow();
+    }
+
+    public function test_automatic_cancellation_waits_until_after_the_exact_departure_time(): void
+    {
+        $departureAt = Carbon::parse('2026-08-29 20:00:00');
+        Carbon::setTestNow($departureAt);
+        $trip = $this->trip($this->driver(), ['departure_at' => $departureAt]);
+
+        Artisan::call('trips:cancel-unbooked-departed');
+        $this->assertSame('Scheduled', $trip->refresh()->status);
+
+        Carbon::setTestNow($departureAt->copy()->addSeconds(30));
+        Artisan::call('trips:cancel-unbooked-departed');
+        $this->assertSame('Scheduled', $trip->refresh()->status);
+
+        Carbon::setTestNow($departureAt->copy()->addSeconds(59));
+        Artisan::call('trips:cancel-unbooked-departed');
+        $this->assertSame('Scheduled', $trip->refresh()->status);
+
+        Carbon::setTestNow($departureAt->copy()->addMinute());
+        Artisan::call('trips:cancel-unbooked-departed');
+        $this->assertSame('Cancelled', $trip->refresh()->status);
+        Carbon::setTestNow();
+    }
+
+    public function test_automatic_cancellation_notifies_the_driver_in_real_time(): void
+    {
+        Event::fake([InAppNotificationCreated::class]);
+        $driver = $this->driver();
+        $trip = $this->trip($driver, ['departure_at' => now()->subMinute()]);
+
+        Artisan::call('trips:cancel-unbooked-departed');
+
+        $this->assertSame('Cancelled', $trip->refresh()->status);
+        $notification = $driver->notifications()->where('type', TripAutoCancelledNotification::class)->firstOrFail();
+        $this->assertSame($trip->trip_id, $notification->data['trip_id']);
+        Event::assertDispatched(InAppNotificationCreated::class, fn (InAppNotificationCreated $event) => $event->recipient->is($driver) && $event->notification['type'] === 'trip_auto_cancelled');
+    }
+
+    public function test_expired_trip_recovery_only_requires_a_future_departure_time_and_notifies_accepted_passengers(): void
+    {
+        Event::fake([InAppNotificationCreated::class]);
+        $driver = $this->driver();
+        $vehicle = $this->vehicle($driver);
+        $trip = $this->trip($driver, ['vehicle_id' => $vehicle->vehicle_id, 'departure_at' => now()->subMinute(), 'available_seats' => 3, 'price_per_passenger' => 17]);
+        $passenger = $this->passenger();
+        $booking = Booking::create(['trip_id' => $trip->trip_id, 'passenger_id' => $passenger->id, 'booking_status' => 'Accepted', 'number_of_seats' => 1, 'pickup_point' => 'Main Gate']);
+        $newDeparture = now()->addHour()->startOfMinute();
+        $this->actingAs($driver)->get(route('driver.trips.edit', $trip))->assertOk()->assertSee('Edit Departure Time')->assertDontSee('Available seats');
+        $this->actingAs($driver)->patch(route('driver.trips.update', $trip), ['departure_date' => $newDeparture->toDateString(), 'departure_time' => $newDeparture->format('H:i')])->assertSessionHasNoErrors();
+
+        $this->assertSame('Scheduled', $trip->refresh()->status);
+        $this->assertSame(3, $trip->available_seats);
+        $this->assertSame(17.0, (float) $trip->price_per_passenger);
+        $notification = $passenger->notifications()->where('type', TripUpdatedNotification::class)->firstOrFail();
+        $this->assertSame('Trip Departure Time Updated', $notification->data['title']);
+        $this->assertSame($newDeparture->format('d M Y, g:i A'), $notification->data['departure_at_label']);
+        Event::assertDispatched(InAppNotificationCreated::class, fn (InAppNotificationCreated $event) => $event->recipient->is($passenger) && $event->notification['booking_id'] === $booking->id);
+    }
+
+    public function test_trip_update_notification_includes_the_visible_route_and_vehicle_details(): void
+    {
+        $driver = $this->driver();
+        $vehicle = $this->vehicle($driver);
+        $trip = $this->trip($driver, ['vehicle_id' => $vehicle->vehicle_id, 'departure_location' => 'KL Sentral', 'destination' => 'KLIA']);
+        $passenger = $this->passenger();
+        $booking = Booking::create(['trip_id' => $trip->trip_id, 'passenger_id' => $passenger->id, 'booking_status' => 'Accepted', 'number_of_seats' => 1, 'pickup_point' => 'Main Gate']);
+
+        $payload = (new TripUpdatedNotification($booking, false, ['destination']))->toArray($passenger);
+
+        $this->assertTrue($payload['locations_changed']);
+        $this->assertSame('KL Sentral', $payload['trip_details']['departure_location']);
+        $this->assertSame('KLIA', $payload['trip_details']['destination']);
+        $this->assertSame(trim($vehicle->brand.' '.$vehicle->model), $payload['trip_details']['vehicle_label']);
     }
 
     public function test_driver_cannot_create_a_second_scheduled_trip_at_the_same_time_but_other_drivers_and_cancelled_trips_do_not_conflict(): void

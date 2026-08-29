@@ -163,10 +163,11 @@ class TripController extends Controller
         $this->ensureEditable($request, $trip);
         $vehicles = $request->user()->vehicles()->orderByDesc('vehicle_id')->get();
         $returnTo = $this->returnRoute($request);
+        $isExpiredRecovery = $trip->status === 'Scheduled' && $trip->hasExpiredDeparture();
 
         $licence = $request->user()->driverLicence;
 
-        return view('driver.trips.edit', compact('trip', 'vehicles', 'returnTo', 'licence'));
+        return view('driver.trips.edit', compact('trip', 'vehicles', 'returnTo', 'licence', 'isExpiredRecovery'));
     }
 
     public function update(UpdateTripRequest $request, Trip $trip): RedirectResponse|JsonResponse
@@ -185,9 +186,12 @@ class TripController extends Controller
 
         $trip->update($data);
 
-        if ($trip->wasChanged(['departure_location', 'destination', 'departure_at', 'available_seats', 'price_per_passenger', 'vehicle_id'])) {
-            $this->acceptedBookingsFor($trip->refresh())->each(function (Booking $booking): void {
-                $this->notificationDelivery->send($booking->passenger, new TripUpdatedNotification($booking));
+        $changedAttributes = array_keys($trip->getChanges());
+        $tripChanged = (bool) array_intersect($changedAttributes, ['departure_location', 'destination', 'departure_at', 'available_seats', 'price_per_passenger', 'vehicle_id']);
+        $departureTimeChanged = $trip->wasChanged('departure_at');
+        if ($tripChanged) {
+            $this->acceptedBookingsFor($trip->refresh())->each(function (Booking $booking) use ($departureTimeChanged, $changedAttributes): void {
+                $this->notificationDelivery->send($booking->passenger, new TripUpdatedNotification($booking, $departureTimeChanged, $changedAttributes));
             });
         }
 
@@ -197,7 +201,7 @@ class TripController extends Controller
     public function start(Request $request, Trip $trip): RedirectResponse|JsonResponse
     {
         $this->ensureStatus($request, $trip, ['Scheduled']);
-        abort_if($trip->departure_at->isPast(), 422, 'This trip has expired and can no longer be started.');
+        abort_if($trip->hasExpiredDeparture(), 422, 'This trip has expired and can no longer be started.');
         abort_unless(
             $request->user()->driverLicence?->isValidOn(now()) ?? false,
             422,
@@ -314,6 +318,8 @@ class TripController extends Controller
         } catch (TripRoutingException $exception) {
             return $this->routingError($request, $exception);
         }
+
+        BookingStatusUpdated::dispatch($booking, pickedUpBookingId: $booking->id);
 
         if ($request->expectsJson()) {
             return response()->json(['message' => 'Passenger marked as picked up.', 'data' => $booking]);

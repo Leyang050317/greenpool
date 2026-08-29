@@ -15,14 +15,26 @@
         'heading' => $liveLocation->heading === null ? null : (float) $liveLocation->heading,
         'recorded_at' => $liveLocation->recorded_at?->toIso8601String(),
     ] : null;
+    $isDriverView = auth()->id() === $trip->user_id;
+    $nextPickup = $bookings->firstWhere('picked_up_at', null);
+    $pickupMarkers = $bookings->filter(fn ($booking) => $validCoordinate($booking->pickup_latitude, $booking->pickup_longitude))->values()->map(function ($booking, $index) use ($nextPickup, $isDriverView) {
+        $sequence = $booking->pickup_sequence ?? ($index + 1);
+        $status = $booking->picked_up_at ? 'Picked Up' : ($nextPickup?->is($booking) ? 'Next Pickup' : 'Upcoming');
+        $title = 'Pickup '.$sequence.': '.$status;
+        if ($isDriverView && $booking->passenger) $title = 'Pickup '.$sequence.': '.$booking->passenger->name.' — '.$status;
+        return ['booking_id' => $booking->id, 'position' => ['lat' => (float) $booking->pickup_latitude, 'lng' => (float) $booking->pickup_longitude], 'label' => 'P'.$sequence, 'title' => $title, 'kind' => 'pickup', 'status' => $status, 'sequence' => $sequence];
+    })->all();
     $markers = $hasTripCoordinates ? [
-        ['position' => ['lat' => (float) $trip->departure_latitude, 'lng' => (float) $trip->departure_longitude], 'label' => 'D', 'title' => 'Departure: '.$trip->departure_location],
-        ...$bookings->filter(fn ($booking) => $validCoordinate($booking->pickup_latitude, $booking->pickup_longitude))->values()->map(fn ($booking, $index) => [
-            'position' => ['lat' => (float) $booking->pickup_latitude, 'lng' => (float) $booking->pickup_longitude],
-            'label' => 'P'.($index + 1), 'title' => 'Pickup '.($index + 1),
-        ])->all(),
-        ['position' => ['lat' => (float) $trip->destination_latitude, 'lng' => (float) $trip->destination_longitude], 'label' => 'F', 'title' => 'Destination: '.$trip->destination],
+        ['position' => ['lat' => (float) $trip->departure_latitude, 'lng' => (float) $trip->departure_longitude], 'label' => 'D', 'title' => 'Departure: '.$trip->departure_location, 'kind' => 'departure'],
+        ...$pickupMarkers,
+        ['position' => ['lat' => (float) $trip->destination_latitude, 'lng' => (float) $trip->destination_longitude], 'label' => 'F', 'title' => 'Destination: '.$trip->destination, 'kind' => 'destination'],
     ] : [];
+    $nextPickupMarker = collect($pickupMarkers)->firstWhere('status', 'Next Pickup');
+    $focusPoints = $driverLocation ? array_values(array_filter([
+        ['lat' => $driverLocation['latitude'], 'lng' => $driverLocation['longitude']],
+        $nextPickupMarker['position'] ?? null,
+        $markers ? $markers[array_key_last($markers)]['position'] : null,
+    ])) : collect($markers)->pluck('position')->all();
 @endphp
 
 <section class="overflow-hidden rounded-2xl border border-gray-100 bg-white p-5">
@@ -36,7 +48,7 @@
     @elseif(blank($browserKey))
         <div class="flex min-h-56 items-center justify-center rounded-xl bg-slate-50 px-5 text-center text-sm text-slate-500">Map will be available once Google Maps is configured.</div>
     @else
-        <div id="{{ $mapId }}" data-trip-static-map data-trip-id="{{ $trip->trip_id }}" data-live-tracking="{{ $liveTracking ? 'true' : 'false' }}" data-live-location='@json($driverLocation)' data-markers='@json($markers)' data-polyline='@json(data_get($route, "encoded_polyline"))' class="h-72 rounded-xl bg-slate-100 sm:h-96" aria-label="Map for {{ $trip->departure_location }} to {{ $trip->destination }}"></div>
+        <div id="{{ $mapId }}" data-trip-static-map data-trip-id="{{ $trip->trip_id }}" data-live-tracking="{{ $liveTracking ? 'true' : 'false' }}" data-live-location='@json($driverLocation)' data-markers='@json($markers)' data-focus-points='@json($focusPoints)' data-polyline='@json(data_get($route, "encoded_polyline"))' class="h-72 rounded-xl bg-slate-100 sm:h-96" aria-label="Map for {{ $trip->departure_location }} to {{ $trip->destination }}"></div>
         <p data-map-error-for="{{ $mapId }}" class="mt-3 hidden text-sm text-slate-500">Map is currently unavailable for this trip.</p>
     @endif
 </section>
@@ -62,23 +74,48 @@
                 },
                 init(element) {
                     const markers = JSON.parse(element.dataset.markers || '[]');
+                    const focusPoints = JSON.parse(element.dataset.focusPoints || '[]');
                     if (!markers.length) throw new Error('No map markers available.');
                     const map = new google.maps.Map(element, { mapTypeControl: false, streetViewControl: false, fullscreenControl: false });
                     const bounds = new google.maps.LatLngBounds();
+                    const pickupMarkers = {};
                     markers.forEach((marker) => {
-                        new google.maps.Marker({ map, position: marker.position, label: marker.label, title: marker.title });
+                        const googleMarker = new google.maps.Marker({ map, position: marker.position, label: marker.label, title: marker.title, icon: this.markerIcon(marker) });
+                        if (marker.booking_id) pickupMarkers[marker.booking_id] = { marker: googleMarker, data: marker };
                         bounds.extend(marker.position);
                     });
                     const encodedPolyline = JSON.parse(element.dataset.polyline || 'null');
                     if (encodedPolyline && google.maps.geometry?.encoding) {
                         new google.maps.Polyline({ map, path: google.maps.geometry.encoding.decodePath(encodedPolyline), strokeColor: '#16A34A', strokeOpacity: 0.9, strokeWeight: 5 });
                     }
-                    map.fitBounds(bounds, 48);
-                    if (markers.length === 1) map.setZoom(14);
-                    const instance = { map, tripId: String(element.dataset.tripId), driverMarker: null, status: document.querySelector(`[data-live-location-status-for="${element.id}"]`) };
+                    const focusBounds = new google.maps.LatLngBounds();
+                    (focusPoints.length ? focusPoints : markers.map((marker) => marker.position)).forEach((point) => focusBounds.extend(point));
+                    map.fitBounds(focusBounds.isEmpty() ? bounds : focusBounds, 48);
+                    if ((focusPoints.length || markers.length) === 1) map.setZoom(14);
+                    const instance = { map, tripId: String(element.dataset.tripId), driverMarker: null, pickupMarkers, status: document.querySelector(`[data-live-location-status-for="${element.id}"]`) };
                     this.instances[element.id] = instance;
                     const liveLocation = this.pendingLocations[instance.tripId] || JSON.parse(element.dataset.liveLocation || 'null');
                     if (liveLocation) this.updateDriver(instance.tripId, liveLocation);
+                },
+                markerIcon(marker) {
+                    if (marker.kind !== 'pickup') return undefined;
+                    const color = marker.status === 'Picked Up' ? '#16A34A' : (marker.status === 'Next Pickup' ? '#F97316' : '#64748B');
+                    return { path: google.maps.SymbolPath.CIRCLE, fillColor: color, fillOpacity: 1, strokeColor: '#FFFFFF', strokeWeight: 2, scale: 11 };
+                },
+                driverIcon(heading) {
+                    return { path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW, fillColor: '#2563EB', fillOpacity: 1, strokeColor: '#FFFFFF', strokeWeight: 2, rotation: Number.isFinite(Number(heading)) ? Number(heading) : 0, scale: 5 };
+                },
+                updatePickups(tripId, progress) {
+                    const next = progress.find((pickup) => !pickup.picked_up_at)?.booking_id;
+                    Object.values(this.instances).filter((instance) => instance.tripId === String(tripId)).forEach((instance) => {
+                        progress.forEach((pickup) => {
+                            const entry = instance.pickupMarkers[pickup.booking_id];
+                            if (!entry) return;
+                            entry.data.status = pickup.picked_up_at ? 'Picked Up' : (pickup.booking_id === next ? 'Next Pickup' : 'Upcoming');
+                            entry.marker.setIcon(this.markerIcon(entry.data));
+                            entry.marker.setTitle(`Pickup ${entry.data.sequence}: ${entry.data.status}`);
+                        });
+                    });
                 },
                 updateDriver(tripId, location) {
                     const latitude = Number(location.latitude);
@@ -87,8 +124,8 @@
                     this.pendingLocations[String(tripId)] = location;
                     Object.values(this.instances).filter((instance) => instance.tripId === String(tripId)).forEach((instance) => {
                         const position = { lat: latitude, lng: longitude };
-                        if (instance.driverMarker) instance.driverMarker.setPosition(position);
-                        else instance.driverMarker = new google.maps.Marker({ map: instance.map, position, label: 'D', title: 'Live driver location', zIndex: 10 });
+                        if (instance.driverMarker) { instance.driverMarker.setPosition(position); instance.driverMarker.setIcon(this.driverIcon(location.heading)); }
+                        else instance.driverMarker = new google.maps.Marker({ map: instance.map, position, title: 'Live driver location', icon: this.driverIcon(location.heading), zIndex: 10 });
                         if (instance.status) instance.status.textContent = `Live location updated ${new Date(location.recorded_at || Date.now()).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}.`;
                     });
                 },

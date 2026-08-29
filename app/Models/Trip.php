@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Carbon;
 
 class Trip extends Model
 {
@@ -82,5 +83,14 @@ class Trip extends Model
         $remainingMinutes = $minutes % 60;
 
         return $hours > 0 ? "{$hours}h {$remainingMinutes}m" : "{$remainingMinutes}m";
+    }
+
+    /**
+     * Departure expiry is a minute-level rule: the scheduled minute remains valid.
+     */
+    public function hasExpiredDeparture(?Carbon $currentTime = null): bool
+    {
+        return ($currentTime ?? now())->copy()->startOfMinute()
+            ->gt($this->departure_at->copy()->startOfMinute());
     }
 }
