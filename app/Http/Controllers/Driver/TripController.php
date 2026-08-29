@@ -190,6 +190,7 @@ class TripController extends Controller
     public function start(Request $request, Trip $trip): RedirectResponse|JsonResponse
     {
         $this->ensureStatus($request, $trip, ['Scheduled']);
+        abort_if($trip->departure_at->isPast(), 422, 'This trip has expired and can no longer be started.');
         abort_unless(
             $request->user()->driverLicence?->isValidOn(now()) ?? false,
             422,

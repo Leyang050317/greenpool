@@ -7,6 +7,7 @@ use App\Models\Booking;
 use App\Notifications\MessageReceivedNotification;
 use App\Services\NotificationDeliveryService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -30,6 +31,7 @@ class ChatController extends Controller
                 ->where('receiver_id', $user->id)
                 ->whereNull('read_at')])
             ->withMax('messages', 'created_at')
+            ->where('booking_status', '!=', 'Rejected')
             ->when(
                 $user->role === 'driver',
                 fn ($query) => $query->whereHas('trip', fn ($trip) => $trip->where('user_id', $user->id)),
@@ -37,7 +39,31 @@ class ChatController extends Controller
             )
             ->orderByDesc('messages_max_created_at')
             ->latest('created_at')
-            ->paginate(10);
+            ->get()
+            ->groupBy(fn (Booking $booking) => $this->otherUserFor($request, $booking)->id)
+            ->map(function ($conversationBookings) {
+                $conversation = $conversationBookings
+                    ->sortByDesc(fn (Booking $booking) => $this->conversationTimestamp($booking))
+                    ->first();
+
+                $conversation->setAttribute(
+                    'unread_messages_count',
+                    $conversationBookings->sum(fn (Booking $booking) => (int) $booking->unread_messages_count)
+                );
+
+                return $conversation;
+            })
+            ->sortByDesc(fn (Booking $booking) => $this->conversationTimestamp($booking))
+            ->values();
+
+        $page = LengthAwarePaginator::resolveCurrentPage();
+        $bookings = new LengthAwarePaginator(
+            $bookings->forPage($page, 10)->values(),
+            $bookings->count(),
+            10,
+            $page,
+            ['path' => $request->url(), 'query' => $request->query()]
+        );
 
         return view('bookings.messages', compact('bookings'));
     }
@@ -119,6 +145,15 @@ class ChatController extends Controller
         return $request->user()->id === $booking->passenger_id
             ? $booking->trip->user
             : $booking->passenger;
+    }
+
+    private function conversationTimestamp(Booking $booking): int
+    {
+        $latestMessageAt = $booking->messages_max_created_at
+            ?? $booking->latestMessage?->created_at
+            ?? $booking->created_at;
+
+        return (($latestMessageAt ? strtotime((string) $latestMessageAt) : 0) * 1000000) + $booking->id;
     }
 
     private function messagePayload($message): array

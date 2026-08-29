@@ -121,7 +121,8 @@
                         method="POST"
                         action="{{ route('passenger.bookings.store') }}"
                         class="rounded-xl border border-gray-100 bg-white p-5"
-                        x-data="pickupPointForm({{ Js::from(route('passenger.bookings.locations.autocomplete')) }}, {{ Js::from(old('pickup_point', '')) }}, {{ Js::from(old('pickup_place_id', '')) }})"
+                        x-data="pickupPointForm({{ Js::from(route('passenger.bookings.locations.autocomplete')) }}, {{ Js::from(route('passenger.bookings.locations.current')) }}, {{ Js::from(old('pickup_point', '')) }}, {{ Js::from(old('pickup_place_id', '')) }}, {{ Js::from(old('pickup_latitude', '')) }}, {{ Js::from(old('pickup_longitude', '')) }})"
+                        x-init="init()"
                         @submit.prevent="submitForm($event)"
                     >
                         @csrf
@@ -136,6 +137,8 @@
                                 <label for="pickup_point" class="mb-1.5 block text-xs font-semibold text-gray-500">Pickup Point</label>
                                 <input id="pickup_point" name="pickup_point" x-model="pickup.text" @input="search()" @focus="pickup.open = true" autocomplete="off" required maxlength="255" class="block w-full rounded-xl border-gray-200 text-sm focus:border-[#16A34A] focus:ring-[#16A34A]" placeholder="Search a Malaysian address or place" />
                                 <input type="hidden" name="pickup_place_id" :value="pickup.placeId" />
+                                <input type="hidden" name="pickup_latitude" :value="pickup.latitude" />
+                                <input type="hidden" name="pickup_longitude" :value="pickup.longitude" />
                                 <div x-cloak x-show="pickup.open && pickup.suggestions.length" class="absolute z-20 mt-1 w-full overflow-hidden rounded-xl border border-gray-200 bg-white py-1 shadow-lg">
                                     <template x-for="suggestion in pickup.suggestions" :key="suggestion.place_id">
                                         <button type="button" @click="select(suggestion)" class="block w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50" x-text="suggestion.text"></button>
@@ -165,11 +168,93 @@
     </div>
 
     <script>
-        window.pickupPointForm = (endpoint, pickupText, pickupPlaceId) => ({
+        window.pickupPointForm = (endpoint, currentLocationEndpoint, pickupText, pickupPlaceId, pickupLatitude, pickupLongitude) => ({
             timer: null,
-            pickup: { text: pickupText, placeId: pickupPlaceId, suggestions: [], open: false, error: '' },
+            pickup: { text: pickupText, placeId: pickupPlaceId, latitude: pickupLatitude, longitude: pickupLongitude, suggestions: [], open: false, error: '' },
+            async browserReverseGeocode(position) {
+                const params = new URLSearchParams({
+                    format: 'jsonv2',
+                    lat: position.coords.latitude,
+                    lon: position.coords.longitude,
+                    zoom: 18,
+                    addressdetails: 1,
+                });
+
+                try {
+                    const response = await fetch(`https://nominatim.openstreetmap.org/reverse?${params.toString()}`, {
+                        headers: { Accept: 'application/json' },
+                    });
+
+                    if (!response.ok) {
+                        return null;
+                    }
+
+                    const data = await response.json();
+                    const address = data.address || {};
+                    const parts = [
+                        address.road || address.neighbourhood || address.suburb,
+                        address.city || address.town || address.village || address.state,
+                        address.country,
+                    ].filter(Boolean);
+
+                    return data.display_name || parts.join(', ') || null;
+                } catch (_) {
+                    return null;
+                }
+            },
+            init() {
+                if (this.pickup.text.trim() !== '' || !navigator.geolocation) {
+                    return;
+                }
+
+                navigator.geolocation.getCurrentPosition(
+                    async (position) => {
+                        if (this.pickup.text.trim() !== '') {
+                            return;
+                        }
+
+                        try {
+                            const response = await window.axios.get(currentLocationEndpoint, {
+                                params: {
+                                    latitude: position.coords.latitude,
+                                    longitude: position.coords.longitude,
+                                },
+                            });
+                            const location = response.data.data;
+
+                            if (!location || !location.text || this.pickup.text.trim() !== '') {
+                                return;
+                            }
+
+                            this.pickup.text = location.text;
+                            this.pickup.placeId = location.place_id || '';
+                            this.pickup.latitude = location.latitude || position.coords.latitude;
+                            this.pickup.longitude = location.longitude || position.coords.longitude;
+                            this.pickup.suggestions = [];
+                            this.pickup.open = false;
+                            this.pickup.error = '';
+                        } catch (_) {
+                            this.pickup.placeId = '';
+                        }
+
+                        if (!this.pickup.placeId && this.pickup.text.trim() === '') {
+                            const browserAddress = await this.browserReverseGeocode(position);
+                            if (browserAddress && this.pickup.text.trim() === '') {
+                                this.pickup.text = browserAddress;
+                                this.pickup.latitude = position.coords.latitude;
+                                this.pickup.longitude = position.coords.longitude;
+                                this.pickup.suggestions = [];
+                                this.pickup.open = false;
+                                this.pickup.error = '';
+                            }
+                        }
+                    },
+                    () => {},
+                    { enableHighAccuracy: false, timeout: 15000, maximumAge: 300000 },
+                );
+            },
             submitForm(event) {
-                if (!this.pickup.placeId) {
+                if (!this.pickup.placeId && (!this.pickup.latitude || !this.pickup.longitude)) {
                     this.pickup.error = 'Please select your pickup point from the location suggestions.';
                     return;
                 }
@@ -179,6 +264,8 @@
             },
             async search() {
                 this.pickup.placeId = '';
+                this.pickup.latitude = '';
+                this.pickup.longitude = '';
                 this.pickup.suggestions = [];
                 this.pickup.error = '';
                 this.pickup.open = true;
@@ -200,6 +287,8 @@
             select(suggestion) {
                 this.pickup.text = suggestion.text;
                 this.pickup.placeId = suggestion.place_id;
+                this.pickup.latitude = '';
+                this.pickup.longitude = '';
                 this.pickup.suggestions = [];
                 this.pickup.open = false;
             },

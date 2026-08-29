@@ -19,7 +19,9 @@ class StoreBookingRequest extends FormRequest
         return [
             'trip_id' => ['required', 'integer', 'exists:trips,trip_id'],
             'pickup_point' => ['required', 'string', 'max:255'],
-            'pickup_place_id' => ['required', 'string', 'max:255'],
+            'pickup_place_id' => ['nullable', 'string', 'max:255', 'required_without_all:pickup_latitude,pickup_longitude'],
+            'pickup_latitude' => ['nullable', 'numeric', 'between:-90,90', 'required_without:pickup_place_id'],
+            'pickup_longitude' => ['nullable', 'numeric', 'between:-180,180', 'required_without:pickup_place_id'],
             'number_of_seats' => ['required', 'integer', 'min:1'],
             'number_of_luggage' => ['nullable', 'integer', 'min:0'],
         ];

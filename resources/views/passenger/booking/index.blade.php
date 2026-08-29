@@ -28,8 +28,7 @@
                 method="GET"
                 action="{{ route('passenger.booking') }}"
                 class="mb-6 rounded-xl border border-gray-100 bg-white p-5"
-                x-data="rideSearchForm({{ Js::from(route('passenger.bookings.locations.autocomplete')) }}, {{ Js::from(route('passenger.bookings.locations.current')) }}, {{ Js::from(request('destination', '')) }}, {{ Js::from(request('destination_place_id', '')) }})"
-                x-init="init()"
+                x-data="rideSearchForm({{ Js::from(route('passenger.bookings.locations.autocomplete')) }}, {{ Js::from(request('destination', '')) }}, {{ Js::from(request('destination_place_id', '')) }})"
             >
                 <div class="grid gap-4 md:grid-cols-3">
                     <div class="relative">
@@ -141,93 +140,11 @@
     </div>
 
     <script>
-        window.rideSearchForm = (endpoint, currentLocationEndpoint, destinationText, destinationPlaceId) => ({
+        window.rideSearchForm = (endpoint, destinationText, destinationPlaceId) => ({
             timer: null,
-            destination: { text: destinationText, placeId: destinationPlaceId, suggestions: [], open: false, autoFilled: false },
-            async browserReverseGeocode(position) {
-                const params = new URLSearchParams({
-                    format: 'jsonv2',
-                    lat: position.coords.latitude,
-                    lon: position.coords.longitude,
-                    zoom: 18,
-                    addressdetails: 1,
-                });
-
-                try {
-                    const response = await fetch(`https://nominatim.openstreetmap.org/reverse?${params.toString()}`, {
-                        headers: { Accept: 'application/json' },
-                    });
-
-                    if (!response.ok) {
-                        return null;
-                    }
-
-                    const data = await response.json();
-                    const address = data.address || {};
-                    const parts = [
-                        address.road || address.neighbourhood || address.suburb,
-                        address.city || address.town || address.village || address.state,
-                        address.country,
-                    ].filter(Boolean);
-
-                    return data.display_name || parts.join(', ') || null;
-                } catch (_) {
-                    return null;
-                }
-            },
-            init() {
-                if (this.destination.text.trim() !== '' || !navigator.geolocation) {
-                    return;
-                }
-
-                navigator.geolocation.getCurrentPosition(
-                    async (position) => {
-                        if (this.destination.text.trim() !== '') {
-                            return;
-                        }
-
-                        try {
-                            const response = await window.axios.get(currentLocationEndpoint, {
-                                params: {
-                                    latitude: position.coords.latitude,
-                                    longitude: position.coords.longitude,
-                                },
-                            });
-                            const location = response.data.data;
-                            if (!location || !location.text) {
-                                return;
-                            }
-
-                            if (this.destination.text.trim() !== '') {
-                                return;
-                            }
-
-                            this.destination.text = location.text;
-                            this.destination.placeId = location.place_id || '';
-                            this.destination.autoFilled = true;
-                            this.destination.suggestions = [];
-                            this.destination.open = false;
-                        } catch (_) {
-                            this.destination.placeId = '';
-                        }
-
-                        if (!this.destination.placeId && this.destination.text.trim() === '') {
-                            const browserAddress = await this.browserReverseGeocode(position);
-                            if (browserAddress && this.destination.text.trim() === '') {
-                                this.destination.text = browserAddress;
-                                this.destination.autoFilled = true;
-                                this.destination.suggestions = [];
-                                this.destination.open = false;
-                            }
-                        }
-                    },
-                    () => {},
-                    { enableHighAccuracy: false, timeout: 15000, maximumAge: 300000 },
-                );
-            },
+            destination: { text: destinationText, placeId: destinationPlaceId, suggestions: [], open: false },
             async search() {
                 this.destination.placeId = '';
-                this.destination.autoFilled = false;
                 this.destination.suggestions = [];
                 this.destination.open = true;
 

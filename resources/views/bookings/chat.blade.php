@@ -12,7 +12,7 @@
         <div class="mx-auto flex max-w-4xl flex-col">
             <div class="mb-6 flex items-center justify-between gap-4">
                 <a
-                    href="{{ Auth::user()->role === 'driver' ? route('driver.booking-requests.show', $booking) : route('passenger.bookings.history') }}"
+                    href="{{ route('messages.index') }}"
                     class="inline-flex items-center gap-2 text-sm font-medium text-gray-500 hover:text-gray-800"
                 >
                     <x-icons.lucide name="arrow-left" class="h-4 w-4" />

@@ -171,6 +171,57 @@ class TripJourneyTest extends TestCase
         Http::assertSentCount(1);
     }
 
+    public function test_expired_scheduled_trip_cannot_be_started_from_journey(): void
+    {
+        $driver = $this->driver();
+        $trip = $this->trip($driver, [
+            'status' => 'Scheduled',
+            'started_at' => null,
+            'departure_location' => 'Batu Pahat',
+            'destination' => 'Johor Bahru',
+            'departure_at' => now()->subDay(),
+        ]);
+
+        $this->booking($trip);
+        Http::fake();
+
+        $this->actingAs($driver)
+            ->get(route('driver.trips.journey'))
+            ->assertOk()
+            ->assertSee('Expired')
+            ->assertSee('This trip has expired and can no longer be started.');
+
+        $this->actingAs($driver)
+            ->patch(route('driver.trips.start', $trip))
+            ->assertStatus(422);
+
+        $this->assertSame('Scheduled', $trip->refresh()->status);
+        $this->assertNull($trip->started_at);
+        Http::assertNothingSent();
+    }
+
+    public function test_journey_lists_expired_scheduled_trips_after_upcoming_trips(): void
+    {
+        $driver = $this->driver();
+        $expiredTrip = $this->trip($driver, [
+            'status' => 'Scheduled',
+            'started_at' => null,
+            'destination' => 'Expired Johor Trip',
+            'departure_at' => now()->subDay(),
+        ]);
+        $upcomingTrip = $this->trip($driver, [
+            'status' => 'Scheduled',
+            'started_at' => null,
+            'destination' => 'Upcoming KL Trip',
+            'departure_at' => now()->addHour(),
+        ]);
+
+        $this->actingAs($driver)
+            ->get(route('driver.trips.journey'))
+            ->assertOk()
+            ->assertSeeInOrder([$upcomingTrip->destination, $expiredTrip->destination]);
+    }
+
     public function test_passenger_booking_persists_resolved_pickup_coordinates_and_place_id_without_routes_call(): void
     {
         $driver = $this->driver();
