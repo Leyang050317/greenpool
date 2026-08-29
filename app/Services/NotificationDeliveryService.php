@@ -10,6 +10,10 @@ class NotificationDeliveryService
 {
     public function send(User $recipient, Notification $notification): void
     {
+        if (! $recipient->allowsInAppNotification($notification)) {
+            return;
+        }
+
         $recipient->notify($notification);
 
         InAppNotificationCreated::dispatch($recipient, $notification->toArray($recipient));

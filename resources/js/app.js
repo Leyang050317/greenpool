@@ -412,6 +412,16 @@ Alpine.data('faqBot', ({ featuredEndpoint, answerEndpoint }) => ({
     featuredEndpoint,
     answerEndpoint,
 
+    openBot(event = null) {
+        this.open = true;
+        if (!this.featured.length) this.loadFeatured();
+        const suggestedQuestion = event?.detail?.question;
+        this.$nextTick(() => {
+            this.$refs.question?.focus();
+            if (suggestedQuestion) this.ask(suggestedQuestion);
+        });
+    },
+
     async loadFeatured() {
         try {
             const response = await fetch(this.featuredEndpoint, {
