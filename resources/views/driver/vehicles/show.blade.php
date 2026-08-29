@@ -69,7 +69,7 @@
                             <button type="button" disabled class="inline-flex min-h-[44px] cursor-not-allowed items-center justify-center rounded-xl px-4 py-2.5 text-sm font-semibold text-gray-400">
                                 Archive vehicle
                             </button>
-                            <p class="max-w-xs text-xs text-gray-500">Cancel or complete the assigned trip before deleting this vehicle.</p>
+                            <p class="max-w-xs text-xs text-gray-500">Cancel or complete the assigned trip before archiving this vehicle.</p>
                         </div>
                     @else
                         <button type="button" @click="confirmDelete = true" class="ml-auto inline-flex min-h-[44px] items-center justify-center rounded-xl px-4 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600">
