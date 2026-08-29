@@ -346,7 +346,7 @@ class VehicleController extends Controller
     {
         $this->ensureOwnership($request, $vehicle);
         if ($vehicle->trips()->whereIn('status', ['Scheduled', 'In Progress'])->exists()) {
-            $message = 'This vehicle cannot be deleted while it is assigned to an active or upcoming trip. Cancel or complete the trip first.';
+            $message = 'This vehicle cannot be archived while it is assigned to a scheduled or in-progress trip. Cancel or complete the trip first.';
 
             if ($request->expectsJson()) {
                 return response()->json(['message' => $message], 422);
