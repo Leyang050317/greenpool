@@ -1,7 +1,7 @@
 @php
     $suggestions = $rating->reviewee->role === 'driver' ? [
-        1 => ['Unsafe driving', 'Very late pickup', 'Vehicle was not clean', 'Poor route communication'],
-        2 => ['Driving needs improvement', 'Pickup was late', 'Vehicle could be cleaner', 'Communication could be better'],
+        1 => ['Unsafe driving', 'Very late pickup', 'Smoke smell in vehicle', 'Vehicle was dirty', 'Poor route communication'],
+        2 => ['Driving needs improvement', 'Pickup was late', 'Smoke smell in vehicle', 'Vehicle was dirty', 'Communication could be better'],
         3 => ['Average driving', 'Pickup was acceptable', 'Vehicle was okay', 'Route was acceptable'],
         4 => ['Safe driving', 'Arrived on time', 'Clean vehicle', 'Good route communication'],
         5 => ['Excellent and safe driving', 'Very punctual', 'Spotless vehicle', 'Outstanding communication'],

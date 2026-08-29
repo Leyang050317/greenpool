@@ -41,7 +41,7 @@ class PaymentCompletionService
                 'paid_at' => now(),
             ]);
 
-            return $lockedPayment->refresh()->load(['payer', 'payee', 'booking.trip']);
+            return $lockedPayment->refresh()->load(['payer', 'payee', 'booking.trip.vehicle']);
         });
 
         if (! $completedPayment) {
@@ -73,7 +73,10 @@ class PaymentCompletionService
 
         return $distance === null ? null : [
             'distance_km' => (float) $distance,
-            ...$this->fareRecommendationService->recommend((float) $distance),
+            ...$this->fareRecommendationService->recommend(
+                (float) $distance,
+                $payment->booking->trip->vehicle,
+            ),
         ];
     }
 }

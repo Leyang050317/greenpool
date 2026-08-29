@@ -166,6 +166,20 @@ const subscribeToInAppNotifications = () => {
         .listen('InAppNotificationCreated', (notification) => {
             incrementNotificationBadge();
             showRealtimeNotification(notification, notificationIcon(notification));
+
+            const paymentDetail = document.querySelector('[data-payment-detail]');
+            const isCurrentPayment = paymentDetail
+                && String(notification.payment_id) === paymentDetail.dataset.paymentId;
+
+            if (notification.type === 'payment_completed' && isCurrentPayment
+                && paymentDetail.dataset.paymentStatus !== 'Paid') {
+                window.setTimeout(() => window.location.reload(), 400);
+            }
+
+            const paymentsPage = document.querySelector('[data-payments-page]');
+            if (paymentsPage && ['payment_due', 'payment_completed'].includes(notification.type)) {
+                window.setTimeout(() => window.location.reload(), 400);
+            }
         });
 };
 

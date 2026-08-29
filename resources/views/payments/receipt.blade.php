@@ -9,9 +9,8 @@
 <body class="min-h-screen bg-[#F4F7F5] text-slate-900">
 <main class="px-4 py-8 sm:px-6 sm:py-12">
     <div class="mx-auto max-w-2xl">
-        <nav class="mb-5 flex flex-wrap items-center justify-between gap-3 text-sm">
+        <nav class="mb-5 text-sm">
             <a href="{{ route('payments.show', $payment) }}" class="font-medium text-slate-500 hover:text-slate-800">← Back to Payment</a>
-            <a href="{{ route(Auth::user()->role === 'driver' ? 'driver.home' : 'passenger.home') }}" class="rounded-xl border border-slate-200 bg-white px-4 py-2.5 font-bold text-slate-700 shadow-sm hover:bg-slate-50">Back to Dashboard</a>
         </nav>
 
         <article class="overflow-hidden rounded-3xl border border-emerald-100 bg-white shadow-xl shadow-emerald-950/5">
@@ -44,6 +43,11 @@
 
                 <section class="mt-7">
                     <h2 class="text-sm font-bold uppercase tracking-wide text-slate-400">Your journey</h2>
+                    @if($mapRoute)
+                        <div class="mt-3">
+                            <x-trip-static-map :trip="$payment->booking->trip" :route="$mapRoute" />
+                        </div>
+                    @endif
                     <div class="mt-3 rounded-2xl border border-slate-200 p-5">
                         <div class="grid grid-cols-[20px_1fr] gap-x-3 gap-y-1">
                             <span class="mt-1.5 h-3 w-3 rounded-full border-4 border-green-200 bg-green-600"></span><div><p class="text-xs text-slate-400">From</p><p class="font-semibold text-slate-800">{{ $payment->booking->trip->departure_location }}</p></div>
@@ -71,6 +75,7 @@
                 </section>
 
                 <p class="mt-8 text-center text-xs text-slate-400">Thank you for riding with GreenPool.</p>
+                <a href="{{ route(Auth::user()->role === 'driver' ? 'driver.home' : 'passenger.home') }}" class="mt-4 flex w-full items-center justify-center rounded-xl bg-[#22C55E] px-5 py-3 text-sm font-bold text-white shadow-sm hover:bg-green-600">Back to Dashboard</a>
             </div>
         </article>
     </div>

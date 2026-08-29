@@ -9,6 +9,8 @@ use App\Services\FareRecommendationService;
 use App\Services\NotificationDeliveryService;
 use App\Services\PaymentCompletionService;
 use App\Services\PaymentService;
+use App\Services\Routing\TripDistanceService;
+use App\Services\Routing\TripRoutingException;
 use App\Services\StripeCheckoutService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -22,6 +24,7 @@ class PaymentController extends Controller
         private readonly FareRecommendationService $fareRecommendationService,
         private readonly StripeCheckoutService $stripeCheckoutService,
         private readonly NotificationDeliveryService $notificationDelivery,
+        private readonly TripDistanceService $tripDistanceService,
     ) {}
 
     public function index(Request $request): View
@@ -143,20 +146,20 @@ class PaymentController extends Controller
     public function show(Request $request, Payment $payment): View
     {
         abort_unless(in_array($request->user()->id, [$payment->payer_id, $payment->payee_id], true), 403);
-        $payment->loadMissing(['payer', 'payee', 'booking.trip', 'booking.ratings']);
-        $fareBreakdown = $this->fareBreakdown($payment);
+        $payment->loadMissing(['payer', 'payee', 'booking.trip.vehicle', 'booking.ratings']);
 
-        return view('payments.show', compact('payment', 'fareBreakdown'));
+        return view('payments.show', compact('payment'));
     }
 
     public function receipt(Request $request, Payment $payment): View
     {
         abort_unless(in_array($request->user()->id, [$payment->payer_id, $payment->payee_id], true), 403);
         abort_unless($payment->isPaid(), 404);
-        $payment->loadMissing(['payer', 'payee', 'booking.trip']);
+        $payment->loadMissing(['payer', 'payee', 'booking.trip.vehicle']);
         $fareBreakdown = $this->fareBreakdown($payment);
+        $mapRoute = $this->receiptMapRoute($payment);
 
-        return view('payments.receipt', compact('payment', 'fareBreakdown'));
+        return view('payments.receipt', compact('payment', 'fareBreakdown', 'mapRoute'));
     }
 
     private function fareBreakdown(Payment $payment): ?array
@@ -165,7 +168,35 @@ class PaymentController extends Controller
 
         return $distance === null ? null : [
             'distance_km' => (float) $distance,
-            ...$this->fareRecommendationService->recommend((float) $distance),
+            ...$this->fareRecommendationService->recommend(
+                (float) $distance,
+                $payment->booking->trip->vehicle,
+            ),
         ];
+    }
+
+    private function receiptMapRoute(Payment $payment): ?array
+    {
+        $trip = $payment->booking->trip;
+        $coordinates = [
+            $trip->departure_latitude,
+            $trip->departure_longitude,
+            $trip->destination_latitude,
+            $trip->destination_longitude,
+        ];
+
+        if (blank(config('services.google_maps.browser_key'))
+            || collect($coordinates)->contains(fn ($coordinate) => ! is_numeric($coordinate))) {
+            return null;
+        }
+
+        try {
+            return $this->tripDistanceService->calculate(
+                ['latitude' => $trip->departure_latitude, 'longitude' => $trip->departure_longitude],
+                ['latitude' => $trip->destination_latitude, 'longitude' => $trip->destination_longitude],
+            );
+        } catch (TripRoutingException) {
+            return null;
+        }
     }
 }

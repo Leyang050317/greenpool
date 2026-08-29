@@ -18,7 +18,7 @@ class StripeCheckoutService
 
         $session = $this->client()->checkout->sessions->create([
             'mode' => 'payment',
-            'payment_method_types' => ['card', 'grabpay', 'alipay'],
+            'payment_method_types' => ['card'],
             'customer_email' => $payment->payer->email,
             'line_items' => [[
                 'quantity' => 1,

@@ -27,7 +27,7 @@
         <div class="space-y-5">
             <div>
                 <label for="vehicle_id" class="mb-1.5 flex items-center gap-1.5 text-sm font-medium text-gray-700"><x-icons.lucide name="car-front" class="h-4 w-4 text-gray-400" />Vehicle</label>
-                <select id="vehicle_id" name="vehicle_id" class="w-full rounded-xl border-gray-200 text-sm text-gray-700 focus:border-[#16A34A] focus:ring-[#16A34A]" required>
+                <select id="vehicle_id" name="vehicle_id" @change="updateFareEstimate()" class="w-full rounded-xl border-gray-200 text-sm text-gray-700 focus:border-[#16A34A] focus:ring-[#16A34A]" required>
                     <option value="">Select an active vehicle</option>
                     @foreach($vehicles as $vehicle)
                         <option value="{{ $vehicle->vehicle_id }}" @selected((string) $value('vehicle_id', $trip->vehicle_id ?? '') === (string) $vehicle->vehicle_id)>
@@ -35,6 +35,7 @@
                         </option>
                     @endforeach
                 </select>
+                <p class="mt-1 text-xs text-gray-400">The suggestion uses the vehicle's engine size and RON95 as a consistent fuel-price reference.</p>
                 <x-input-error :messages="$errors->get('vehicle_id')" class="mt-1.5" />
             </div>
             <div class="grid gap-5 sm:grid-cols-2">
@@ -79,7 +80,7 @@
                     <div x-cloak x-show="fareEstimate && !estimating" class="mt-2 rounded-lg bg-green-50 px-3 py-2 text-xs leading-5 text-green-800">
                         <strong>Suggested: RM <span x-text="Number(fareEstimate?.recommended_price || 0).toFixed(2)"></span></strong>
                         <span> · <span x-text="fareEstimate?.estimated_distance_km"></span> km · about <span x-text="Math.max(1, Math.round((fareEstimate?.estimated_duration_seconds || 0) / 60))"></span> min</span>
-                        <span class="block text-green-700">Recommended range RM <span x-text="Number(fareEstimate?.minimum_price || 0).toFixed(2)"></span>–RM <span x-text="Number(fareEstimate?.maximum_price || 0).toFixed(2)"></span>. You may adjust it.</span>
+                        <span class="block text-green-700">Based on the route and estimated driving cost. You may adjust it.</span>
                     </div>
                     <div x-cloak x-show="fareError" class="mt-2 flex items-center justify-between gap-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
                         <span x-text="fareError"></span>
@@ -132,9 +133,11 @@
         select(field, suggestion) { this[field].text = suggestion.text; this[field].placeId = suggestion.place_id; this[field].suggestions = []; this[field].open = false; this.updateFareEstimate(); },
         async updateFareEstimate() {
             if (!this.departure.placeId || !this.destination.placeId) return;
+            const vehicleId = this.$refs.tripForm.querySelector('[name="vehicle_id"]').value;
+            if (!vehicleId) return;
             this.estimating = true; this.fareError = '';
             try {
-                const response = await window.axios.get(fareEndpoint, { params: { departure_place_id: this.departure.placeId, destination_place_id: this.destination.placeId } });
+                const response = await window.axios.get(fareEndpoint, { params: { departure_place_id: this.departure.placeId, destination_place_id: this.destination.placeId, vehicle_id: vehicleId } });
                 this.fareEstimate = response.data.data;
                 if (!this.priceManuallyEdited) this.price = Number(this.fareEstimate.recommended_price).toFixed(2);
             } catch (error) {

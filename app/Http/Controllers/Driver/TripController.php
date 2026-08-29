@@ -53,7 +53,13 @@ class TripController extends Controller
         $validated = $request->validate([
             'departure_place_id' => ['required', 'string', 'max:255'],
             'destination_place_id' => ['required', 'string', 'max:255'],
+            'vehicle_id' => ['required', 'integer'],
         ]);
+
+        $vehicle = $request->user()->vehicles()->whereKey($validated['vehicle_id'])->first();
+        if (! $vehicle) {
+            return response()->json(['message' => 'Please select one of your vehicles.'], 422);
+        }
 
         try {
             $departure = $this->tripLocationService->resolve($validated['departure_place_id'], 'departure_place_id');
@@ -65,7 +71,7 @@ class TripController extends Controller
 
         return response()->json(['data' => [
             ...$route,
-            ...$this->fareRecommendationService->recommend($route['estimated_distance_km']),
+            ...$this->fareRecommendationService->recommend($route['estimated_distance_km'], $vehicle),
         ]]);
     }
 
@@ -124,8 +130,9 @@ class TripController extends Controller
         $routingData = $this->routingDataOrEmpty($locations);
         $tripData = $request->tripData();
         if (blank($request->input('price_per_passenger')) && isset($routingData['estimated_distance_km'])) {
+            $vehicle = $request->user()->vehicles()->whereKey($request->integer('vehicle_id'))->firstOrFail();
             $tripData['price_per_passenger'] = $this->fareRecommendationService
-                ->recommend((float) $routingData['estimated_distance_km'])['recommended_price'];
+                ->recommend((float) $routingData['estimated_distance_km'], $vehicle)['recommended_price'];
         }
         $trip = $request->user()->trips()->create([...$tripData, ...$locations['attributes'], ...$routingData]);
         TripCreated::dispatch($trip);
@@ -209,7 +216,7 @@ class TripController extends Controller
                     $bookings->map(fn (Booking $booking) => $this->bookingPickup($booking))->all(),
                     true,
                 );
-                $this->persistPickupSequence($bookings, $route['optimized_intermediate_waypoint_index']);
+                $this->persistPickupSequence($bookings, $route['optimized_intermediate_waypoint_index'] ?? []);
                 $startedAt = now();
                 $lockedTrip->update([
                     'status' => 'In Progress',
