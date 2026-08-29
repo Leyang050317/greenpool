@@ -19,6 +19,7 @@
 /storage/*.key
 /storage/pail
 /vendor
+/tmp/
 /.venv*
 /python-*-amd64.exe
 Homestead.json
