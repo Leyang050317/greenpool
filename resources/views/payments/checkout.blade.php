@@ -17,7 +17,7 @@
                             Ride completed
                         </div>
                         <h1 class="mt-6 text-3xl font-bold leading-tight">Complete your ride payment</h1>
-                        <p class="mt-3 text-sm leading-6 text-green-100">Choose a secure online payment or pay your driver directly in cash.</p>
+                        <p class="mt-3 text-sm leading-6 text-green-100">Pay securely by card or pay your driver directly in cash.</p>
 
                         <div class="mt-8 rounded-2xl bg-white/10 p-5 ring-1 ring-white/15 backdrop-blur-sm">
                             <div class="flex gap-4">
@@ -70,15 +70,10 @@
                                 <span class="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-green-600 text-white shadow-sm"><x-icons.lucide name="credit-card" class="h-6 w-6" /></span>
                                 <span class="min-w-0 flex-1">
                                     <span class="flex items-center gap-2">
-                                        <span class="text-base font-bold text-slate-900">Pay Online</span>
+                                        <span class="text-base font-bold text-slate-900">Pay by Card</span>
                                         <span class="rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-green-700">Secure</span>
                                     </span>
-                                    <span class="mt-1 block text-sm leading-5 text-slate-500">Continue to Stripe Checkout</span>
-                                    <span class="mt-3 flex flex-wrap gap-2">
-                                        @foreach(['Cards', 'GrabPay', 'Alipay'] as $method)
-                                            <span class="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-600">{{ $method }}</span>
-                                        @endforeach
-                                    </span>
+                                    <span class="mt-1 block text-sm leading-5 text-slate-500">Credit or debit card via Stripe Checkout</span>
                                 </span>
                                 <x-icons.lucide name="arrow-right" class="h-5 w-5 text-slate-300 transition group-hover:translate-x-1 group-hover:text-green-600" />
                             </button>
@@ -101,7 +96,7 @@
 
                     <div class="mt-7 flex items-start gap-3 rounded-2xl bg-slate-50 p-4 text-sm leading-6 text-slate-500">
                         <span class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-green-700 shadow-sm"><x-icons.lucide name="shield-check" class="h-4 w-4" /></span>
-                        <p><strong class="font-semibold text-slate-700">Protected payment flow.</strong> Online payments are verified by Stripe. Cash only becomes paid after your driver confirms receipt.</p>
+                        <p><strong class="font-semibold text-slate-700">Protected payment flow.</strong> Card payments are verified by Stripe. Cash only becomes paid after your driver confirms receipt.</p>
                     </div>
                 </div>
             </section>

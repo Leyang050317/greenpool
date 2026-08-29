@@ -171,6 +171,24 @@ class TripJourneyTest extends TestCase
         Http::assertSentCount(1);
     }
 
+    public function test_start_without_accepted_bookings_does_not_require_an_optimized_waypoint_order(): void
+    {
+        $driver = $this->driver();
+        $trip = $this->trip($driver, ['status' => 'Scheduled', 'started_at' => null]);
+        Http::fake(['https://routes.googleapis.com/directions/v2:computeRoutes' => Http::response(['routes' => [[
+            'distanceMeters' => 35000,
+            'duration' => '2400s',
+        ]]])]);
+
+        $this->actingAs($driver)
+            ->patch(route('driver.trips.start', $trip))
+            ->assertRedirect(route('driver.trips.journey'));
+
+        $this->assertSame('In Progress', $trip->refresh()->status);
+        $this->assertSame(35.0, (float) $trip->estimated_distance_km);
+        Http::assertSent(fn ($request) => ! isset($request['intermediates']) && ! isset($request['optimizeWaypointOrder']));
+    }
+
     public function test_expired_scheduled_trip_cannot_be_started_from_journey(): void
     {
         $driver = $this->driver();

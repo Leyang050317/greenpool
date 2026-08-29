@@ -2,7 +2,7 @@
     @php
         $isPaid = $payment->isPaid();
     @endphp
-    <div class="min-h-screen bg-[#F8FAFC] px-4 py-8 sm:px-6 lg:px-8">
+    <div class="min-h-screen bg-[#F8FAFC] px-4 py-8 sm:px-6 lg:px-8" data-payment-detail data-payment-id="{{ $payment->id }}" data-payment-status="{{ $payment->payment_status }}">
         <div class="mx-auto max-w-xl">
             <a href="{{ route('payments.index') }}" class="text-sm font-medium text-slate-500 hover:text-slate-700">← Back to Payments</a>
             @if(request('stripe') === 'cancelled')
@@ -30,25 +30,22 @@
                     @endforeach
                 </dl>
 
-                @if($fareBreakdown)
-                    <div class="mt-5 rounded-xl border border-slate-200 p-4">
-                        <h2 class="text-sm font-bold text-slate-800">Fare breakdown</h2>
-                        <dl class="mt-3 space-y-2 text-sm">
-                            <div class="flex justify-between"><dt class="text-slate-500">Distance</dt><dd class="font-semibold">{{ number_format($fareBreakdown['distance_km'], 2) }} km</dd></div>
-                            <div class="flex justify-between"><dt class="text-slate-500">Suggested per passenger</dt><dd class="font-semibold">RM {{ number_format($fareBreakdown['recommended_price'], 2) }}</dd></div>
-                            <div class="flex justify-between"><dt class="text-slate-500">Actual per passenger</dt><dd class="font-semibold">RM {{ number_format((float) $payment->booking->trip->price_per_passenger, 2) }}</dd></div>
-                            <div class="flex justify-between"><dt class="text-slate-500">Seats</dt><dd class="font-semibold">{{ $payment->booking->number_of_seats }}</dd></div>
-                        </dl>
-                    </div>
-                @endif
+                <div class="mt-5 rounded-xl border border-slate-200 px-4 py-3">
+                    <h2 class="text-sm font-bold text-slate-800">Payment summary</h2>
+                    <dl class="mt-2 space-y-2 text-sm">
+                        <div class="flex justify-between gap-4"><dt class="text-slate-500">Price per passenger</dt><dd class="font-semibold text-slate-700">RM {{ number_format((float) $payment->booking->trip->price_per_passenger, 2) }}</dd></div>
+                        <div class="flex justify-between gap-4"><dt class="text-slate-500">Seats</dt><dd class="font-semibold text-slate-700">{{ $payment->booking->number_of_seats }}</dd></div>
+                        <div class="flex justify-between gap-4 border-t border-slate-100 pt-2"><dt class="font-bold text-slate-800">Total</dt><dd class="font-bold text-[#2E7D32]">RM {{ number_format((float) $payment->amount, 2) }}</dd></div>
+                    </dl>
+                </div>
 
                 @if(Auth::id() === $payment->payee_id && !$isPaid && $payment->payment_method === 'cash')
                     <div id="cash-confirmation" class="mt-6 scroll-mt-24 rounded-2xl border border-amber-200 bg-amber-50 p-4 sm:p-5">
                         <div class="flex items-start gap-3">
                             <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700"><x-icons.lucide name="banknote" class="h-5 w-5" /></span>
                             <div>
-                                <h2 class="font-bold text-slate-900">Cash collection</h2>
-                                <p class="mt-1 text-sm leading-6 text-slate-600">Ask the passenger for RM {{ number_format((float) $payment->amount, 2) }} and confirm only after the cash is in your hand.</p>
+                                <h2 class="font-bold text-slate-900">Cash payment</h2>
+                                <p class="mt-1 text-sm text-slate-600">Collect RM {{ number_format((float) $payment->amount, 2) }} and confirm when received.</p>
                             </div>
                         </div>
                         <form method="POST" action="{{ route('payments.cash.confirm', $payment) }}" class="mt-4">
@@ -58,7 +55,6 @@
                                 Confirm Cash Received
                             </button>
                         </form>
-                        <p class="mt-2 text-center text-xs text-amber-800">Confirmation marks this payment as paid and adds it to Total Earnings.</p>
                     </div>
                 @elseif(Auth::id() === $payment->payer_id && !$isPaid)
                     <a href="{{ route('payments.checkout', $payment->booking) }}" class="mt-6 block w-full rounded-xl bg-[#22C55E] py-3 text-center text-sm font-bold text-white hover:bg-green-600">{{ $payment->payment_method === 'cash' ? 'Change Payment Method' : 'Pay Now' }}</a>

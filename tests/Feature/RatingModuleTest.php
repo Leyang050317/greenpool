@@ -185,6 +185,8 @@ class RatingModuleTest extends TestCase
             ->assertSee('select one or more')
             ->assertSee('toggleFeedback(suggestion)', false)
             ->assertSee('Unsafe driving')
+            ->assertSee('Smoke smell in vehicle')
+            ->assertSee('Vehicle was dirty')
             ->assertSee('Average driving')
             ->assertSee('Excellent and safe driving')
             ->assertDontSee('Passenger was very late')
@@ -213,7 +215,9 @@ class RatingModuleTest extends TestCase
             ->assertSee('Passenger was very late')
             ->assertSee('Average passenger')
             ->assertSee('Excellent and respectful passenger')
-            ->assertDontSee('Unsafe driving');
+            ->assertDontSee('Unsafe driving')
+            ->assertDontSee('Smoke smell in vehicle')
+            ->assertDontSee('Vehicle was dirty');
     }
 
     public function test_rating_requires_a_completed_trip_and_cannot_be_duplicated(): void
@@ -346,7 +350,9 @@ class RatingModuleTest extends TestCase
             ->get(route('ratings.edit', $rating))
             ->assertOk()
             ->assertSee('Update Rating')
-            ->assertSee('Original feedback.');
+            ->assertSee('Original feedback.')
+            ->assertSee('Smoke smell in vehicle')
+            ->assertSee('Vehicle was dirty');
 
         $this->actingAs($passenger)
             ->patch(route('ratings.update', $rating), [

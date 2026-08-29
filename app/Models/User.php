@@ -3,8 +3,8 @@
 namespace App\Models;
 
 use App\Models\Concerns\HasProfileCompleteness;
-use App\Notifications\GreenPoolVerifyEmail;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Notifications\GreenPoolVerifyEmail;
 use Database\Factories\UserFactory;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -110,7 +110,14 @@ class User extends Authenticatable implements MustVerifyEmail
             return true;
         }
 
-        $preferences = $this->notificationPreference()->firstOrCreate([]);
+        $preferences = $this->notificationPreference()->firstOrCreate([], [
+            'trip_updates' => true,
+            'booking_updates' => true,
+            'payment_updates' => true,
+            'message_alerts' => true,
+            'rating_reminders' => true,
+            'attraction_updates' => true,
+        ]);
 
         return (bool) $preferences->{$preferenceField};
     }

@@ -11,7 +11,7 @@ class Payment extends Model
     use HasFactory;
 
     public const METHODS = [
-        'stripe' => 'Stripe Checkout',
+        'stripe' => 'Credit / Debit Card',
         'fpx' => 'Online Banking (FPX)',
         'card' => 'Credit / Debit Card',
         'e_wallet' => 'E-Wallet',

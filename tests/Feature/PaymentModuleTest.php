@@ -15,6 +15,7 @@ use App\Services\PaymentService;
 use App\Services\StripeCheckoutService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Mockery\MockInterface;
 use Tests\TestCase;
@@ -40,8 +41,10 @@ class PaymentModuleTest extends TestCase
         $this->actingAs($passenger)->get(route('payments.checkout', $booking))
             ->assertOk()
             ->assertSee('How would you like to pay?')
-            ->assertSee('Pay Online')
-            ->assertSee('Pay Cash');
+            ->assertSee('Pay by Card')
+            ->assertSee('Pay Cash')
+            ->assertDontSee('GrabPay')
+            ->assertDontSee('Alipay');
 
         $this->actingAs($passenger)->post(route('payments.checkout.initiate', $booking), ['method' => 'stripe'])
             ->assertRedirect('https://checkout.stripe.com/c/pay_test_greenpool');
@@ -72,6 +75,10 @@ class PaymentModuleTest extends TestCase
         $this->actingAs($passenger)->get(route('payments.show', $payment))
             ->assertOk()
             ->assertSee('Your driver will confirm after receiving it.')
+            ->assertSee('Payment summary')
+            ->assertSee('Price per passenger')
+            ->assertSee('data-payment-detail', false)
+            ->assertSee('data-payment-id="'.$payment->id.'"', false)
             ->assertDontSee('Confirm Cash Received');
 
         $this->actingAs($driver)->post(route('payments.cash.confirm', $payment))
@@ -166,13 +173,21 @@ class PaymentModuleTest extends TestCase
 
     public function test_paid_payment_receipt_contains_fare_details_and_is_private(): void
     {
-        [, $passenger, $booking] = $this->completedBooking(price: 7.50, seats: 2);
+        [$driver, $passenger, $booking] = $this->completedBooking(price: 7.50, seats: 2);
         $payment = app(PaymentService::class)->createPendingForBooking($booking);
         app(PaymentCompletionService::class)->complete($payment, 'stripe', 'pi_receipt');
 
         $this->actingAs($passenger)->get(route('payments.receipt', $payment))
             ->assertOk()->assertSee('E-Receipt')->assertSee('RM 15.00')
             ->assertSee('12.35 km')->assertSee($payment->refresh()->transaction_reference);
+
+        $this->actingAs($driver)->get(route('payments.index'))
+            ->assertOk()
+            ->assertSee('View E-Receipt')
+            ->assertSee(route('payments.receipt', $payment), false);
+        $this->actingAs($driver)->get(route('payments.receipt', $payment))
+            ->assertOk()
+            ->assertSee('GreenPool E-Receipt');
 
         $outsider = User::factory()->create(['role' => 'passenger', 'email_verified_at' => now()]);
         $this->actingAs($outsider)->get(route('payments.receipt', $payment))->assertForbidden();
@@ -186,6 +201,33 @@ class PaymentModuleTest extends TestCase
 
         Mail::assertSent(PaymentReceiptMail::class, fn (PaymentReceiptMail $mail) => $mail->hasTo($passenger->email) && $mail->payment->is($payment)
         );
+    }
+
+    public function test_e_receipt_shows_the_trip_route_map_when_google_maps_is_configured(): void
+    {
+        [, $passenger, $booking] = $this->completedBooking();
+        $booking->trip->update([
+            'departure_latitude' => 3.1390,
+            'departure_longitude' => 101.6869,
+            'destination_latitude' => 2.9264,
+            'destination_longitude' => 101.6964,
+        ]);
+        config()->set('services.google_maps.key', 'server-test-key');
+        config()->set('services.google_maps.browser_key', 'browser-test-key');
+        Http::fake(['https://routes.googleapis.com/directions/v2:computeRoutes' => Http::response(['routes' => [[
+            'distanceMeters' => 30000,
+            'duration' => '1800s',
+            'polyline' => ['encodedPolyline' => 'test-polyline'],
+        ]]])]);
+        $payment = app(PaymentService::class)->createPendingForBooking($booking);
+        app(PaymentCompletionService::class)->complete($payment, 'stripe', 'pi_map');
+
+        $this->actingAs($passenger)->get(route('payments.receipt', $payment))
+            ->assertOk()
+            ->assertSee('Trip map')
+            ->assertSee('data-trip-static-map', false);
+
+        Http::assertSentCount(1);
     }
 
     public function test_stripe_success_return_verifies_the_session_for_its_passenger(): void
