@@ -26,7 +26,7 @@ class EmergencyAlertNotification extends Notification
             'trip_id' => $trip->trip_id,
             'booking_id' => $this->booking?->id,
             'type' => 'emergency_alert',
-            'title' => 'Issue Report',
+            'title' => 'Emergency Alert',
             'icon' => 'triangle-alert',
             'message' => $this->emergency->notificationMessage(),
             'url' => $this->booking

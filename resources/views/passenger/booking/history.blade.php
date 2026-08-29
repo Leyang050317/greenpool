@@ -6,11 +6,13 @@
     @php
         $badge = [
             'Pending' => 'bg-amber-50 text-amber-700',
+            'Scheduled' => 'bg-blue-50 text-blue-700',
             'Accepted' => 'bg-green-50 text-green-700',
             'In Progress' => 'bg-orange-50 text-orange-700',
             'Completed' => 'bg-gray-100 text-gray-700',
             'Rejected' => 'bg-red-50 text-red-700',
             'Cancelled' => 'bg-gray-100 text-gray-600',
+            'Expired' => 'bg-red-50 text-red-700',
         ];
     @endphp
 
@@ -54,9 +56,9 @@
                             <tbody class="divide-y divide-gray-50">
                                 @foreach($bookings as $booking)
                                     @php
-                                        $displayStatus = $booking->booking_status === 'Accepted' && $booking->trip->status !== 'Scheduled'
-                                            ? $booking->trip->status
-                                            : $booking->booking_status; 
+                                        $displayStatus = $booking->booking_status === 'Accepted' && $booking->trip->status === 'Scheduled'
+                                            ? ($booking->trip->hasExpiredDeparture() ? 'Expired' : 'Scheduled')
+                                            : ($booking->booking_status === 'Accepted' && $booking->trip->status !== 'Scheduled' ? $booking->trip->status : $booking->booking_status);
                                     @endphp
                                     <tr x-data data-booking-url="{{ route('passenger.bookings.show', $booking) }}" tabindex="0" role="link" @click="window.location.href = $el.dataset.bookingUrl" @keydown.enter="window.location.href = $el.dataset.bookingUrl" class="cursor-pointer transition hover:bg-green-50/50 focus:outline-none focus-visible:bg-green-50">
                                         <td class="px-4 py-3 text-sm">
@@ -74,7 +76,7 @@
                                         <td class="whitespace-nowrap px-4 py-3 text-sm text-gray-700">{{ $booking->number_of_seats }}</td>
                                         <td class="px-4 py-3 text-sm text-gray-700">{{ $booking->pickup_point }}</td>
                                         <td class="whitespace-nowrap px-4 py-3">
-                                            <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-medium {{ $badge[$displayStatus] }}">{{ $displayStatus }}</span>
+                                            <span data-trip-expiry-badge data-departure-at="{{ $booking->trip->departure_at->toIso8601String() }}" data-scheduled-class="{{ $badge['Scheduled'] }}" data-expired-class="{{ $badge['Expired'] }}" class="inline-flex rounded-full px-2.5 py-1 text-xs font-medium {{ $badge[$displayStatus] }}">{{ $displayStatus }}</span>
                                         </td>
                                         <td class="whitespace-nowrap px-4 py-3" @click.stop>
                                             <div class="flex items-center gap-2">

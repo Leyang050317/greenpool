@@ -3,6 +3,8 @@
 namespace App\Console\Commands;
 
 use App\Models\Trip;
+use App\Notifications\TripAutoCancelledNotification;
+use App\Services\NotificationDeliveryService;
 use Illuminate\Console\Command;
 
 class CancelUnbookedDepartedTrips extends Command
@@ -13,14 +15,20 @@ class CancelUnbookedDepartedTrips extends Command
 
     public function handle(): int
     {
-        $cancelled = Trip::query()
+        $trips = Trip::query()
             ->where('status', 'Scheduled')
-            ->where('departure_at', '<=', now())
+            ->where('departure_at', '<', now()->startOfMinute())
             ->whereDoesntHave('bookings')
-            ->update([
-                'status' => 'Cancelled',
-                'cancelled_at' => now(),
-            ]);
+            ->with('user')
+            ->get();
+
+        $delivery = app(NotificationDeliveryService::class);
+        foreach ($trips as $trip) {
+            $trip->update(['status' => 'Cancelled', 'cancelled_at' => now()]);
+            $delivery->send($trip->user, new TripAutoCancelledNotification($trip));
+        }
+
+        $cancelled = $trips->count();
 
         $this->info("Cancelled {$cancelled} unbooked departed trip(s).");
 

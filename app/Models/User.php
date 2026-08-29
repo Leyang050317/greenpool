@@ -93,6 +93,7 @@ class User extends Authenticatable implements MustVerifyEmail
     {
         $preferenceField = match ($notification::class) {
             \App\Notifications\TripUpdatedNotification::class,
+            \App\Notifications\TripUpdateNotification::class,
             \App\Notifications\TripReminderNotification::class => 'trip_updates',
             \App\Notifications\BookingRequestNotification::class,
             \App\Notifications\BookingStatusNotification::class => 'booking_updates',

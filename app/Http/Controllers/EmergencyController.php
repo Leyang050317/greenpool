@@ -3,10 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Events\EmergencyTriggered;
+use App\Events\EmergencyAcknowledged;
 use App\Models\Booking;
 use App\Models\Emergency;
 use App\Models\Trip;
 use App\Notifications\EmergencyAlertNotification;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -16,23 +18,39 @@ use Throwable;
 
 class EmergencyController extends Controller
 {
-    public function store(Request $request, Trip $trip): RedirectResponse
+    public function store(Request $request, Trip $trip): RedirectResponse|JsonResponse
     {
         $participant = $this->participantBooking($request, $trip);
-        abort_unless($trip->status === 'In Progress', 422, 'Issue reports are available only during an active trip.');
+        abort_unless($trip->status === 'In Progress', 422, 'Emergency reports are available only during an active trip.');
         $role = $request->user()->role;
-        $issueTypes = $role === 'driver'
-            ? ['traffic_delay', 'vehicle_problem', 'road_hazard', 'other']
-            : ['personal_emergency', 'medical_emergency', 'other'];
+        $issueTypes = ['medical_emergency', 'safety_risk', 'accident_road_danger', 'other_emergency'];
         $validated = $request->validate([
             'issue_type' => ['required', 'string', Rule::in($issueTypes)],
             'description' => ['nullable', 'string', 'max:1000'],
+            'latitude' => ['nullable', 'numeric', 'between:-90,90', 'required_with:longitude'],
+            'longitude' => ['nullable', 'numeric', 'between:-180,180', 'required_with:latitude'],
+            'location_source' => ['nullable', 'string', Rule::in(['device', 'unavailable'])],
         ]);
 
+        // Prevent duplicate emergencies from double-click / AJAX-then-fallback.
+        $recent = Emergency::query()
+            ->where('trip_id', $trip->trip_id)
+            ->where('user_id', $request->user()->id)
+            ->where('issue_type', $validated['issue_type'])
+            ->where('status', 'Active')
+            ->where('triggered_at', '>=', now()->subMinute())
+            ->first();
+
+        if ($recent) {
+            if ($request->expectsJson()) {
+                return response()->json(['message' => 'Emergency reported successfully.', 'emergency_id' => $recent->id]);
+            }
+
+            return back()->with('success', 'Emergency reported successfully.');
+        }
+
         $emergency = DB::transaction(function () use ($request, $trip, $participant, $validated) {
-            [$latitude, $longitude] = $participant
-                ? [$participant->pickup_latitude, $participant->pickup_longitude]
-                : [$trip->departure_latitude, $trip->departure_longitude];
+            [$latitude, $longitude, $locationSource] = $this->emergencyLocation($validated, $trip, $participant);
 
             return Emergency::create([
                 'trip_id' => $trip->trip_id,
@@ -41,6 +59,7 @@ class EmergencyController extends Controller
                 'issue_type' => $validated['issue_type'],
                 'latitude' => $latitude,
                 'longitude' => $longitude,
+                'location_source' => $locationSource,
                 'description' => $validated['description'] ?? null,
                 'status' => 'Active',
                 'triggered_at' => now(),
@@ -49,7 +68,14 @@ class EmergencyController extends Controller
 
         $this->notifyParticipants($emergency, $trip);
 
-        return back()->with('success', 'Issue reported successfully.');
+        if ($request->expectsJson()) {
+            return response()->json([
+                'message' => 'Emergency reported successfully.',
+                'emergency_id' => $emergency->id,
+            ]);
+        }
+
+        return back()->with('success', 'Emergency reported successfully.');
     }
 
     public function acknowledge(Request $request, Emergency $emergency): RedirectResponse
@@ -58,6 +84,7 @@ class EmergencyController extends Controller
         abort_unless($emergency->user_id !== $request->user()->id, 403);
         abort_unless($emergency->status === 'Active', 422);
         $emergency->update(['status' => 'Acknowledged', 'acknowledged_at' => now(), 'acknowledged_by' => $request->user()->id]);
+        EmergencyAcknowledged::dispatch($emergency->fresh());
 
         return back()->with('success', 'Issue report acknowledged.');
     }
@@ -77,6 +104,25 @@ class EmergencyController extends Controller
         abort_unless($booking, 403);
 
         return $booking;
+    }
+
+    private function emergencyLocation(array $validated, Trip $trip, ?Booking $participant): array
+    {
+        if (($validated['location_source'] ?? null) === 'device'
+            && array_key_exists('latitude', $validated) && array_key_exists('longitude', $validated)
+            && $validated['latitude'] !== null && $validated['longitude'] !== null) {
+            return [(float) $validated['latitude'], (float) $validated['longitude'], 'device'];
+        }
+
+        if ($participant && is_numeric($participant->pickup_latitude) && is_numeric($participant->pickup_longitude)) {
+            return [(float) $participant->pickup_latitude, (float) $participant->pickup_longitude, 'pickup'];
+        }
+
+        if (is_numeric($trip->departure_latitude) && is_numeric($trip->departure_longitude)) {
+            return [(float) $trip->departure_latitude, (float) $trip->departure_longitude, 'departure'];
+        }
+
+        return [null, null, 'unavailable'];
     }
 
     private function notifyParticipants(Emergency $emergency, Trip $trip): void
