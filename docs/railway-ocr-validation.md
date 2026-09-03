@@ -5,9 +5,9 @@ must import its native libraries, load the models and perform a prediction.
 
 ## Build and runtime
 
-- `railpack.json` preserves Railpack's generated runtime Apt list with `...`.
-  Build Apt packages are added automatically by Railpack 0.38.0; do not put a
-  literal `...` in `buildAptPackages` (that version passes it to apt).
+- Apt entries are explicit package names. Railpack 0.38.0 passes a literal `...`
+  in Apt lists to apt during the build; only use the extender in step commands.
+  CI validates the generated image instead of assuming documented list semantics.
 - OpenCV needs `libgl1` and GLib (`libglib2.0-0`, which provides libgthread).
   Paddle's CPU runtime needs `libgomp1`. These are installed in both build and runtime.
 - Python packages live under `/app/.venv-ocr`, not the builder's global Python.
