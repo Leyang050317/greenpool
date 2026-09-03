@@ -27,7 +27,8 @@
 
             <div class="mb-6"><x-profile-completeness-card :profile-completeness="$profileCompleteness" /></div>
 
-            <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex items-center justify-between mb-6">
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-8">
+                <div class="p-6 flex items-center justify-between border-b border-gray-100">
                 <div class="flex items-center">
                     @if($user->photo)
                         <img src="{{ asset('storage/'.$user->photo) }}" alt="Profile" class="w-16 h-16 rounded-full mr-5 object-cover border border-gray-200">
@@ -51,10 +52,7 @@
                     <svg class="w-4 h-4 mr-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
                     Edit
                 </button>
-            </div>
-
-            <h4 class="text-sm font-bold text-gray-700 mb-3">Personal Information</h4>
-            <div class="bg-white rounded-xl shadow-sm border border-gray-200 mb-8">
+                </div>
                 <div class="px-6 py-4 border-b border-gray-100">
                     <p class="text-xs text-gray-400 mb-1">Name</p>
                     <p class="text-sm font-medium text-gray-900">{{ $user->name }}</p>
