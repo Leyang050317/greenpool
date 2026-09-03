@@ -1,0 +1,44 @@
+name: OCR Linux runtime check
+
+on:
+  push:
+    branches: [codex/ocr-deployment-validation]
+  pull_request:
+    paths:
+      - 'ocr/**'
+      - 'railpack.json'
+      - 'app/Services/Ocr/**'
+      - '.github/workflows/ocr-runtime.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ocr-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  scan:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install the runtime libraries declared in Railpack
+        run: |
+          sudo apt-get update
+          python -c 'import json,subprocess; p=json.load(open("railpack.json"))["deploy"]["aptPackages"]; subprocess.run(["sudo","apt-get","install","-y","--no-install-recommends"]+[x for x in p if x != "..."],check=True)'
+      - name: Install OCR dependencies
+        run: |
+          python -m venv .venv-ocr
+          .venv-ocr/bin/python -m pip install --no-cache-dir -r ocr/requirements.txt
+      - name: Exercise actual OCR with synthetic data
+        run: .venv-ocr/bin/python ocr/smoke_test.py
+      - name: Verify another fresh process can reuse downloaded models
+        run: .venv-ocr/bin/python ocr/smoke_test.py
+      - name: Report resolved dependency versions
+        if: always()
+        run: .venv-ocr/bin/python -m pip freeze

@@ -1,6 +1,7 @@
 {
     "$schema": "https://schema.railpack.com",
     "provider": "php",
+    "buildAptPackages": ["...", "libgomp1", "libgl1", "libglib2.0-0"],
     "packages": {
         "python": "3.12"
     },
@@ -9,14 +10,18 @@
             "commands": [
                 "...",
                 "python -m venv .venv-ocr",
-                ".venv-ocr/bin/python -m pip install --no-cache-dir -r ocr/requirements.txt"
+                ".venv-ocr/bin/python -m pip install --no-cache-dir -r ocr/requirements.txt",
+                ".venv-ocr/bin/python ocr/smoke_test.py",
+                ".venv-ocr/bin/python -m pip freeze > ocr/runtime-packages.txt"
             ]
         }
     },
     "deploy": {
         "aptPackages": [
+            "...",
             "libgomp1",
-            "libgl1"
+            "libgl1",
+            "libglib2.0-0"
         ]
     }
 }

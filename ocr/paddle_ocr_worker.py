@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import os
 import sys
@@ -12,10 +13,15 @@ from pathlib import Path
 # PaddlePaddle 3.x can select an unsupported oneDNN PIR path on Windows.
 os.environ.setdefault("FLAGS_use_mkldnn", "0")
 os.environ.setdefault("PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK", "True")
+if sys.platform != "win32":
+    # Keep downloaded models in the application layer, not the builder's HOME.
+    os.environ.setdefault("PADDLE_PDX_CACHE_HOME", str(Path(__file__).resolve().parent / ".models"))
 
-import cv2
-import numpy as np
-from PIL import Image, ImageEnhance, ImageOps
+# Third-party libraries may print startup messages. stdout is reserved for JSON.
+with contextlib.redirect_stdout(sys.stderr):
+    import cv2
+    import numpy as np
+    from PIL import Image, ImageEnhance, ImageOps
 
 
 def preprocess(source: Path) -> Path:
@@ -67,6 +73,26 @@ def as_lines(result: object) -> list[dict]:
     return lines
 
 
+def scan(source: Path) -> dict:
+    prepared = preprocess(source)
+    try:
+        from paddleocr import PaddleOCR
+
+        engine = PaddleOCR(
+            lang="en",
+            device="cpu",
+            cpu_threads=2,
+            enable_mkldnn=False,
+            use_doc_orientation_classify=True,
+            use_doc_unwarping=False,
+            use_textline_orientation=True,
+        )
+        lines = as_lines(engine.predict(str(prepared)))
+        return {"full_text": "\n".join(line["text"] for line in lines), "lines": lines}
+    finally:
+        prepared.unlink(missing_ok=True)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("image")
@@ -75,25 +101,10 @@ def main() -> int:
     if not source.is_file():
         raise ValueError("Uploaded document is not available.")
 
-    prepared = preprocess(source)
-    try:
-        from paddleocr import PaddleOCR
-
-        engine = PaddleOCR(
-            lang="en",
-            enable_mkldnn=False,
-            use_doc_orientation_classify=True,
-            use_doc_unwarping=False,
-            use_textline_orientation=True,
-        )
-        lines = as_lines(engine.predict(str(prepared)))
-        print(json.dumps({"full_text": "\n".join(line["text"] for line in lines), "lines": lines}))
-        return 0
-    finally:
-        try:
-            os.unlink(prepared)
-        except FileNotFoundError:
-            pass
+    with contextlib.redirect_stdout(sys.stderr):
+        payload = scan(source)
+    print(json.dumps(payload))
+    return 0
 
 
 if __name__ == "__main__":
