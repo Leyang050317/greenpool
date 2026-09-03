@@ -136,8 +136,11 @@ class ChatController extends Controller
 
     private function canSendMessage(Booking $booking): bool
     {
-        return in_array($booking->booking_status, ['Pending', 'Accepted'], true)
-            && ! in_array($booking->trip->status, ['Completed', 'Cancelled'], true);
+        $booking->loadMissing('payment');
+
+        return (in_array($booking->booking_status, ['Pending', 'Accepted'], true)
+                && ! in_array($booking->trip->status, ['Completed', 'Cancelled'], true))
+            || $booking->payment?->isUnderReview();
     }
 
     private function otherUserFor(Request $request, Booking $booking)

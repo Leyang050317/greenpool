@@ -126,7 +126,7 @@ class BookingModuleTest extends TestCase
             ->assertSee("Today's schedule", false);
     }
 
-    public function test_passenger_does_not_see_trips_they_already_requested(): void
+    public function test_passenger_sees_trips_they_already_requested_with_booking_status(): void
     {
         $passenger = User::factory()->create(['role' => 'passenger']);
         $requestedTrip = $this->createTrip(['destination' => 'Mid Valley Megamall']);
@@ -137,7 +137,9 @@ class BookingModuleTest extends TestCase
         $this->actingAs($passenger)
             ->get(route('passenger.booking'))
             ->assertOk()
-            ->assertDontSee($requestedTrip->destination)
+            ->assertSee($requestedTrip->destination)
+            ->assertSee('Booking pending')
+            ->assertSee('View booking')
             ->assertSee($availableTrip->destination);
     }
 
@@ -520,13 +522,14 @@ class BookingModuleTest extends TestCase
         ]);
     }
 
-    public function test_passenger_can_cancel_only_pending_booking(): void
+    public function test_passenger_can_cancel_pending_or_confirmed_booking_before_trip_starts(): void
     {
         Event::fake([BookingStatusUpdated::class]);
 
         $passenger = User::factory()->create(['role' => 'passenger']);
         $pendingBooking = $this->createBooking($passenger, bookingStatus: 'Pending');
-        $acceptedBooking = $this->createBooking($passenger, bookingStatus: 'Accepted');
+        $confirmedTrip = $this->createTrip(['available_seats' => 1]);
+        $acceptedBooking = $this->createBooking($passenger, $confirmedTrip, bookingStatus: 'Accepted');
 
         $this->actingAs($passenger)
             ->patch(route('passenger.bookings.cancel', $pendingBooking))
@@ -546,12 +549,14 @@ class BookingModuleTest extends TestCase
 
         $this->actingAs($passenger)
             ->patch(route('passenger.bookings.cancel', $acceptedBooking))
-            ->assertSessionHas('error');
+            ->assertRedirect(route('passenger.bookings.history'))
+            ->assertSessionHas('success');
 
         $this->assertDatabaseHas('bookings', [
             'id' => $acceptedBooking->id,
-            'booking_status' => 'Accepted',
+            'booking_status' => 'Cancelled',
         ]);
+        $this->assertSame(2, $confirmedTrip->fresh()->available_seats);
     }
 
     public function test_driver_receives_notification_when_passenger_cancels_booking_request(): void

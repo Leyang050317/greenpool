@@ -244,16 +244,30 @@ class TripController extends Controller
     public function complete(Request $request, Trip $trip): RedirectResponse|JsonResponse
     {
         $this->ensureStatus($request, $trip, ['In Progress']);
-        $bookingsToNotify = DB::transaction(function () use ($trip) {
+        $hasAcceptedPassenger = $trip->bookings()->where('booking_status', 'Accepted')->exists();
+        abort_if(
+            $hasAcceptedPassenger && ! $trip->bookings()->where('booking_status', 'Accepted')->whereNotNull('picked_up_at')->exists(),
+            422,
+            'Pick up at least one passenger before completing this trip. If nobody boarded, report an emergency and use End trip early instead.'
+        );
+        $completion = DB::transaction(function () use ($trip) {
             $trip->update(['status' => 'Completed', 'completed_at' => now()]);
 
-            $bookings = $this->acceptedBookingsFor($trip);
-            $bookings->each(fn (Booking $booking) => $this->paymentService->createPendingForBooking($booking));
+            $acceptedBookings = $this->acceptedBookingsFor($trip);
+            $boardedBookings = $acceptedBookings->whereNotNull('picked_up_at')->values();
+            $notBoardedBookings = $acceptedBookings->whereNull('picked_up_at')->values();
+            $notBoardedBookings->each(fn (Booking $booking) => $booking->update(['booking_status' => 'Cancelled']));
+            $boardedBookings->each(fn (Booking $booking) => $this->paymentService->createPendingForBooking($booking));
 
-            return $bookings;
+            return compact('boardedBookings', 'notBoardedBookings');
         });
+        $bookingsToNotify = $completion['boardedBookings'];
         $this->notifyPassengers($bookingsToNotify, 'Completed');
         $this->broadcastBookingUpdates($bookingsToNotify, null, 'trip_completed');
+        if ($completion['notBoardedBookings']->isNotEmpty()) {
+            $this->notifyPassengers($completion['notBoardedBookings'], 'Cancelled', 'You were not picked up before this trip ended. No payment is required.');
+            $this->broadcastBookingUpdates($completion['notBoardedBookings'], null, 'trip_cancelled', $completion['notBoardedBookings']->modelKeys());
+        }
         foreach ($bookingsToNotify as $booking) {
             $booking->loadMissing(['payment', 'passenger', 'trip.user']);
             if ($booking->payment) {
@@ -341,6 +355,33 @@ class TripController extends Controller
         $this->broadcastBookingUpdates($cancellation['all'], null, 'trip_cancelled', $acceptedIds);
 
         return $this->response($request, $trip->refresh(), 'Trip cancelled successfully.', 200, 'driver.trips.index');
+    }
+
+    /**
+     * A driver may end a journey only before the first pickup, and only after
+     * recording an emergency. Once someone is onboard, a normal cancellation
+     * would lose important journey and payment context, so Emergency remains
+     * the available safety flow instead.
+     */
+    public function emergencyCancel(Request $request, Trip $trip): RedirectResponse|JsonResponse
+    {
+        $this->ensureStatus($request, $trip, ['In Progress']);
+
+        $cancellation = DB::transaction(function () use ($trip) {
+            $lockedTrip = Trip::query()->whereKey($trip->getKey())->lockForUpdate()->firstOrFail();
+            abort_unless($lockedTrip->emergencies()->whereIn('status', ['Active', 'Acknowledged'])->exists(), 422, 'Report an emergency before ending this trip.');
+            abort_if($lockedTrip->bookings()->where('booking_status', 'Accepted')->whereNotNull('picked_up_at')->exists(), 422, 'A trip with a passenger onboard cannot be cancelled. Continue using the emergency flow and complete the trip when it is safe.');
+
+            $lockedTrip->update(['status' => 'Cancelled', 'cancelled_at' => now()]);
+
+            return $this->cancelOpenBookingsFor($lockedTrip);
+        });
+
+        $this->notifyPassengers($cancellation['accepted'], 'Cancelled', 'This trip ended early because the driver reported an emergency. No payment is required because no passenger was picked up.');
+        $acceptedIds = $cancellation['accepted']->modelKeys();
+        $this->broadcastBookingUpdates($cancellation['all'], null, 'trip_cancelled', $acceptedIds);
+
+        return $this->response($request, $trip->refresh(), 'Trip ended early and accepted passengers were notified.', 200, 'driver.trips.journey');
     }
 
     public function destroy(Request $request, Trip $trip): RedirectResponse|JsonResponse
@@ -576,11 +617,11 @@ class TripController extends Controller
         }
     }
 
-    private function notifyPassengers($bookings, string $status): void
+    private function notifyPassengers($bookings, string $status, ?string $customMessage = null): void
     {
         foreach ($bookings as $booking) {
             try {
-                $booking->passenger->notify(new BookingStatusNotification($booking, $status));
+                $booking->passenger->notify(new BookingStatusNotification($booking, $status, $customMessage));
             } catch (Throwable $exception) {
                 Log::warning('Trip lifecycle notification could not be created.', [
                     'booking_id' => $booking->id,

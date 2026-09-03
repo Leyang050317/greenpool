@@ -186,6 +186,72 @@ class EmergencyModuleTest extends TestCase
         Event::assertDispatched(EmergencyResolved::class, fn (EmergencyResolved $event) => $event->emergency->is($report));
     }
 
+    public function test_passenger_cannot_resolve_a_driver_report(): void
+    {
+        [$driver, $trip] = $this->trip(['status' => 'In Progress', 'started_at' => now()]);
+        $passenger = User::factory()->create(['role' => 'passenger']);
+        $this->booking($trip, $passenger);
+        $report = Emergency::create([
+            'trip_id' => $trip->trip_id,
+            'user_id' => $driver->id,
+            'role' => 'driver',
+            'issue_type' => 'safety_risk',
+            'status' => 'Acknowledged',
+            'triggered_at' => now(),
+            'acknowledged_at' => now(),
+            'acknowledged_by' => $passenger->id,
+        ]);
+
+        $this->actingAs($passenger)->patch(route('emergencies.resolve', $report))->assertForbidden();
+        $this->assertSame('Acknowledged', $report->fresh()->status);
+    }
+
+    public function test_passenger_can_resolve_their_own_acknowledged_report(): void
+    {
+        [$driver, $trip] = $this->trip(['status' => 'In Progress', 'started_at' => now()]);
+        $passenger = User::factory()->create(['role' => 'passenger']);
+        $this->booking($trip, $passenger);
+        $report = Emergency::create([
+            'trip_id' => $trip->trip_id,
+            'user_id' => $passenger->id,
+            'role' => 'passenger',
+            'issue_type' => 'medical_emergency',
+            'status' => 'Acknowledged',
+            'triggered_at' => now(),
+            'acknowledged_at' => now(),
+            'acknowledged_by' => $driver->id,
+        ]);
+
+        $this->actingAs($passenger)->patch(route('emergencies.resolve', $report))->assertRedirect();
+        $report->refresh();
+        $this->assertSame('Resolved', $report->status);
+        $this->assertSame($passenger->id, $report->resolved_by);
+    }
+
+    public function test_driver_can_end_an_emergency_trip_before_any_pickup(): void
+    {
+        [$driver, $trip] = $this->trip(['status' => 'In Progress', 'started_at' => now()]);
+        $passenger = User::factory()->create(['role' => 'passenger']);
+        $booking = $this->booking($trip, $passenger);
+        Emergency::create(['trip_id' => $trip->trip_id, 'user_id' => $driver->id, 'role' => 'driver', 'issue_type' => 'accident_road_danger', 'status' => 'Active', 'triggered_at' => now()]);
+
+        $this->actingAs($driver)->patch(route('driver.trips.emergency-cancel', $trip))->assertRedirect(route('driver.trips.journey'));
+
+        $this->assertSame('Cancelled', $trip->fresh()->status);
+        $this->assertSame('Cancelled', $booking->fresh()->booking_status);
+    }
+
+    public function test_driver_cannot_end_an_emergency_trip_after_a_passenger_has_boarded(): void
+    {
+        [$driver, $trip] = $this->trip(['status' => 'In Progress', 'started_at' => now()]);
+        $passenger = User::factory()->create(['role' => 'passenger']);
+        $this->booking($trip, $passenger, ['picked_up_at' => now()]);
+        Emergency::create(['trip_id' => $trip->trip_id, 'user_id' => $driver->id, 'role' => 'driver', 'issue_type' => 'accident_road_danger', 'status' => 'Active', 'triggered_at' => now()]);
+
+        $this->actingAs($driver)->patch(route('driver.trips.emergency-cancel', $trip))->assertStatus(422);
+        $this->assertSame('In Progress', $trip->fresh()->status);
+    }
+
     public function test_active_emergency_cannot_be_resolved_before_acknowledgement(): void
     {
         [$driver, $trip] = $this->trip(['status' => 'In Progress', 'started_at' => now()]);

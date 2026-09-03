@@ -94,12 +94,13 @@ class EmergencyController extends Controller
     {
         $this->participantBooking($request, $emergency->trip);
         abort_unless($emergency->status === 'Acknowledged', 422, 'An emergency must be acknowledged before it can be resolved.');
+        abort_unless($this->canResolve($request, $emergency), 403);
 
-        $emergency->update([
+        $emergency->forceFill([
             'status' => 'Resolved',
             'resolved_at' => now(),
             'resolved_by' => $request->user()->id,
-        ]);
+        ])->save();
 
         EmergencyResolved::dispatch($emergency->fresh());
 
@@ -121,6 +122,22 @@ class EmergencyController extends Controller
         abort_unless($booking, 403);
 
         return $booking;
+    }
+
+    /**
+     * A passenger can confirm that they have seen an alert, but must not close
+     * a driver-reported road or safety incident. Drivers manage those reports.
+     * For a passenger's own report, either that passenger or the driver can
+     * close it after it has been acknowledged.
+     */
+    private function canResolve(Request $request, Emergency $emergency): bool
+    {
+        if ($request->user()->role === 'driver') {
+            return true;
+        }
+
+        return $emergency->role === 'passenger'
+            && $emergency->user_id === $request->user()->id;
     }
 
     private function emergencyLocation(array $validated, Trip $trip, ?Booking $participant): array

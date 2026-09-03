@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Booking;
 use App\Models\Payment;
 use App\Notifications\CashPaymentSelectedNotification;
+use App\Notifications\PaymentIssueNotification;
 use App\Services\FareRecommendationService;
 use App\Services\NotificationDeliveryService;
 use App\Services\PaymentCompletionService;
@@ -34,7 +35,7 @@ class PaymentController extends Controller
             ->with(['payer', 'payee', 'booking.trip'])
             ->where($user->role === 'driver' ? 'payee_id' : 'payer_id', $user->id);
 
-        if ($request->filled('status') && in_array($request->input('status'), ['Pending', 'Paid', 'Failed', 'Refunded'], true)) {
+        if ($request->filled('status') && in_array($request->input('status'), ['Pending', 'Under Review', 'Paid', 'Waived', 'Failed', 'Refunded'], true)) {
             $query->where('payment_status', $request->input('status'));
         }
 
@@ -54,7 +55,7 @@ class PaymentController extends Controller
         abort_unless($request->user()->role === 'passenger' && $booking->passenger_id === $request->user()->id, 403);
         $payment = $this->paymentService->createPendingForBooking($booking);
 
-        if ($payment->isPaid()) {
+        if ($payment->payment_status !== 'Pending') {
             return redirect()->route('payments.show', $payment);
         }
 
@@ -70,7 +71,7 @@ class PaymentController extends Controller
         $validated = $request->validate(['method' => ['required', 'in:stripe,cash']]);
         $payment = $this->paymentService->createPendingForBooking($booking);
 
-        if ($payment->isPaid()) {
+        if ($payment->payment_status !== 'Pending') {
             return redirect()->route('payments.show', $payment);
         }
 
@@ -107,7 +108,7 @@ class PaymentController extends Controller
     public function confirmCash(Request $request, Payment $payment): RedirectResponse
     {
         abort_unless($request->user()->role === 'driver' && $payment->payee_id === $request->user()->id, 403);
-        abort_unless($payment->payment_method === 'cash' && ! $payment->isPaid(), 422);
+        abort_unless($payment->payment_method === 'cash' && $payment->payment_status === 'Pending', 422);
 
         $completed = $this->paymentCompletionService->complete(
             $payment,
@@ -150,6 +151,56 @@ class PaymentController extends Controller
         $payment->loadMissing(['payer', 'payee', 'booking.trip.vehicle', 'booking.ratings']);
 
         return view('payments.show', compact('payment'));
+    }
+
+    public function reportIssue(Request $request, Payment $payment): RedirectResponse
+    {
+        abort_unless($payment->payer_id === $request->user()->id, 403);
+        abort_unless($payment->payment_status === 'Pending', 422, 'Only a pending payment can be reported for review.');
+
+        $validated = $request->validate([
+            'issue_reason' => ['required', 'in:not_boarded,ended_early,amount_incorrect,duplicate_charge,other'],
+            'issue_details' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $payment->update([
+            ...$validated,
+            'payment_status' => 'Under Review',
+            'issue_reported_at' => now(),
+            'issue_resolution' => null,
+            'issue_resolution_details' => null,
+            'issue_resolved_at' => null,
+            'issue_resolved_by' => null,
+        ]);
+        $payment->loadMissing('payee');
+        $this->notificationDelivery->send($payment->payee, new PaymentIssueNotification($payment, 'reported'));
+
+        return redirect()->route('payments.show', $payment)
+            ->with('success', 'Payment issue reported. You can continue discussing it with your driver in the trip chat.');
+    }
+
+    public function resolveIssue(Request $request, Payment $payment): RedirectResponse
+    {
+        abort_unless($request->user()->role === 'driver' && $payment->payee_id === $request->user()->id, 403);
+        abort_unless($payment->isUnderReview(), 422, 'This payment is not under review.');
+
+        $validated = $request->validate([
+            'resolution' => ['required', 'in:waive,keep_due'],
+            'resolution_details' => ['nullable', 'string', 'max:1000'],
+        ]);
+        $waived = $validated['resolution'] === 'waive';
+        $payment->update([
+            'payment_status' => $waived ? 'Waived' : 'Pending',
+            'issue_resolution' => $waived ? 'Waived' : 'Kept due',
+            'issue_resolution_details' => $validated['resolution_details'] ?? null,
+            'issue_resolved_at' => now(),
+            'issue_resolved_by' => $request->user()->id,
+        ]);
+        $payment->loadMissing('payer');
+        $this->notificationDelivery->send($payment->payer, new PaymentIssueNotification($payment, 'resolved'));
+
+        return redirect()->route('payments.show', $payment)
+            ->with('success', $waived ? 'Payment waived. The passenger does not need to pay.' : 'Payment remains due. The passenger has been notified.');
     }
 
     public function receipt(Request $request, Payment $payment): View

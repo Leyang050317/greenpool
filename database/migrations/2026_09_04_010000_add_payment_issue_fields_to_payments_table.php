@@ -1,0 +1,32 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::table('payments', function (Blueprint $table) {
+            $table->string('issue_reason', 50)->nullable()->after('payment_status');
+            $table->text('issue_details')->nullable()->after('issue_reason');
+            $table->timestamp('issue_reported_at')->nullable()->after('issue_details');
+            $table->string('issue_resolution', 30)->nullable()->after('issue_reported_at');
+            $table->text('issue_resolution_details')->nullable()->after('issue_resolution');
+            $table->timestamp('issue_resolved_at')->nullable()->after('issue_resolution_details');
+            $table->foreignId('issue_resolved_by')->nullable()->after('issue_resolved_at')->constrained('users')->nullOnDelete();
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::table('payments', function (Blueprint $table) {
+            $table->dropConstrainedForeignId('issue_resolved_by');
+            $table->dropColumn([
+                'issue_reason', 'issue_details', 'issue_reported_at', 'issue_resolution',
+                'issue_resolution_details', 'issue_resolved_at',
+            ]);
+        });
+    }
+};

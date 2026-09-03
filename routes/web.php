@@ -91,6 +91,8 @@ Route::middleware(['auth', 'active-account', 'verified'])->group(function () {
     Route::post('/payments/bookings/{booking}/checkout', [PaymentController::class, 'initiateCheckout'])->name('payments.checkout.initiate');
     Route::get('/payments/stripe/success', [PaymentController::class, 'stripeSuccess'])->name('payments.stripe.success');
     Route::post('/payments/{payment}/cash/confirm', [PaymentController::class, 'confirmCash'])->name('payments.cash.confirm');
+    Route::post('/payments/{payment}/issue', [PaymentController::class, 'reportIssue'])->name('payments.issue.report');
+    Route::post('/payments/{payment}/issue/resolve', [PaymentController::class, 'resolveIssue'])->name('payments.issue.resolve');
     Route::get('/payments/{payment}/receipt', [PaymentController::class, 'receipt'])->name('payments.receipt');
     Route::get('/payments/{payment}', [PaymentController::class, 'show'])->name('payments.show');
 
@@ -165,6 +167,7 @@ Route::middleware(['auth', 'active-account', 'verified'])->group(function () {
         Route::patch('trips/{trip}/complete', [TripController::class, 'complete'])->name('trips.complete');
         Route::patch('trips/{trip}/bookings/{booking}/pickup', [TripController::class, 'pickup'])->name('trips.bookings.pickup');
         Route::patch('trips/{trip}/cancel', [TripController::class, 'cancel'])->name('trips.cancel');
+        Route::patch('trips/{trip}/emergency-cancel', [TripController::class, 'emergencyCancel'])->name('trips.emergency-cancel');
         Route::post('trips/{trip}/location', [TripLocationController::class, 'store'])->middleware('throttle:15,1')->name('trips.location.store');
         Route::get('trips/locations/autocomplete', [TripController::class, 'autocomplete'])->name('trips.locations.autocomplete');
         Route::get('trips/fare-estimate', [TripController::class, 'fareEstimate'])->name('trips.fare-estimate');

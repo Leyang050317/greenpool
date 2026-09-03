@@ -21,7 +21,9 @@ class Payment extends Model
     protected $fillable = [
         'booking_id', 'payer_id', 'payee_id', 'amount', 'payment_method',
         'payment_status', 'transaction_reference', 'stripe_checkout_session_id',
-        'stripe_payment_intent_id', 'paid_at',
+        'stripe_payment_intent_id', 'paid_at', 'issue_reason', 'issue_details',
+        'issue_reported_at', 'issue_resolution', 'issue_resolution_details',
+        'issue_resolved_at', 'issue_resolved_by',
     ];
 
     protected function casts(): array
@@ -29,6 +31,8 @@ class Payment extends Model
         return [
             'amount' => 'decimal:2',
             'paid_at' => 'datetime',
+            'issue_reported_at' => 'datetime',
+            'issue_resolved_at' => 'datetime',
         ];
     }
 
@@ -50,6 +54,16 @@ class Payment extends Model
     public function isPaid(): bool
     {
         return $this->payment_status === 'Paid';
+    }
+
+    public function isUnderReview(): bool
+    {
+        return $this->payment_status === 'Under Review';
+    }
+
+    public function isWaived(): bool
+    {
+        return $this->payment_status === 'Waived';
     }
 
     public function methodLabel(): string
