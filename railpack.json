@@ -15,7 +15,8 @@
     },
     "deploy": {
         "aptPackages": [
-            "libgomp1"
+            "libgomp1",
+            "libgl1"
         ]
     }
 }
