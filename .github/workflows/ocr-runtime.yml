@@ -2,7 +2,7 @@ name: OCR Linux runtime check
 
 on:
   push:
-    branches: [codex/ocr-deployment-validation]
+    branches: [codex/ocr-deployment-validation, codex/vehicle-runtime-measurement]
   pull_request:
     paths:
       - 'ocr/**'
@@ -65,3 +65,5 @@ jobs:
         run: railpack build --name greenpool-ocr-check --progress plain --env APP_ENV=testing --env CACHE_STORE=array --env SESSION_DRIVER=array --env QUEUE_CONNECTION=sync .
       - name: Scan offline inside the final image through Laravel
         run: docker run --rm --network none --memory=1g --memory-swap=1g --cpus=2 --entrypoint /app/.venv-ocr/bin/python greenpool-ocr-check /app/ocr/smoke_test.py --through-laravel
+      - name: Measure vehicle and plate workers under a 1 GiB hard limit
+        run: docker run --rm --memory=1g --memory-swap=1g --cpus=2 --entrypoint /app/.venv-ocr/bin/python greenpool-ocr-check /app/vision/check_runtime_memory.py
