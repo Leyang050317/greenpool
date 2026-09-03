@@ -46,6 +46,8 @@ jobs:
   final-image:
     runs-on: ubuntu-24.04
     timeout-minutes: 35
+    env:
+      BUILDKIT_HOST: docker-container://buildkit
     steps:
       - uses: actions/checkout@v4
       - name: Install official Railpack CLI
