@@ -3,6 +3,7 @@
 namespace App\Services\Vehicle;
 
 use Illuminate\Http\UploadedFile;
+use Illuminate\Process\Exceptions\ProcessTimedOutException;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Process;
 use RuntimeException;
@@ -15,16 +16,25 @@ class VehicleImageValidationService
             throw new RuntimeException('Local vehicle photo validation is disabled.');
         }
 
-        $process = Process::timeout(config('vehicle_vision.timeout'))
-            ->env($this->windowsEnvironment())
-            ->run([
-                config('vehicle_vision.node_binary'),
-                config('vehicle_vision.worker'),
-                $image->getRealPath(),
-                $expectedView,
-                config('vehicle_vision.model'),
-                config('vehicle_vision.cache_directory'),
-            ]);
+        // PHP must outlive the child process so its timeout can be handled normally.
+        $timeout = max(1, (int) config('vehicle_vision.timeout', 180));
+        set_time_limit($timeout + 30);
+
+        try {
+            $process = Process::timeout($timeout)
+                ->env($this->windowsEnvironment())
+                ->run([
+                    config('vehicle_vision.node_binary'),
+                    config('vehicle_vision.worker'),
+                    $image->getRealPath(),
+                    $expectedView,
+                    config('vehicle_vision.model'),
+                    config('vehicle_vision.cache_directory'),
+                ]);
+        } catch (ProcessTimedOutException $exception) {
+            report($exception);
+            throw new RuntimeException('Vehicle photo checking timed out. Please retry one photo at a time; the first model download can take longer.', previous: $exception);
+        }
         if ($process->failed()) {
             report(new RuntimeException($process->errorOutput()));
             throw new RuntimeException('Local photo checking could not start. Please try again after the model finishes installing.');

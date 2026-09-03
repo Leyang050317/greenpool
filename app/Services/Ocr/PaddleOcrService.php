@@ -3,6 +3,7 @@
 namespace App\Services\Ocr;
 
 use Illuminate\Http\UploadedFile;
+use Illuminate\Process\Exceptions\ProcessTimedOutException;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Process;
 use JsonException;
@@ -11,13 +12,22 @@ class PaddleOcrService
 {
     public function scan(UploadedFile $file): array
     {
-        $result = Process::timeout(config('ocr.timeout'))
-            ->env($this->windowsEnvironment())
-            ->run([
-                $this->pythonBinary(),
-                config('ocr.worker_path'),
-                $file->getRealPath(),
-            ]);
+        // Reset the PHP budget for OCR, including when it follows vehicle classification.
+        $timeout = max(1, (int) config('ocr.timeout', 120));
+        set_time_limit($timeout + 30);
+
+        try {
+            $result = Process::timeout($timeout)
+                ->env($this->windowsEnvironment())
+                ->run([
+                    $this->pythonBinary(),
+                    config('ocr.worker_path'),
+                    $file->getRealPath(),
+                ]);
+        } catch (ProcessTimedOutException $exception) {
+            Log::warning('Local OCR worker timed out.', ['timeout' => $timeout]);
+            throw new OcrException('Document scanning timed out. Please try again with one image at a time.');
+        }
 
         if ($result->failed()) {
             $diagnostic = $this->safeDiagnostic($result->errorOutput());

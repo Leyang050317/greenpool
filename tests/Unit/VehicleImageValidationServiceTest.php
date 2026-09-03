@@ -20,7 +20,8 @@ class VehicleImageValidationServiceTest extends TestCase
                 'message' => 'Front vehicle image accepted.',
             ])),
         ]);
-        $file = UploadedFile::fake()->image('front.jpg', 800, 450);
+        // The child process is faked; this test only needs bytes for the bound token.
+        $file = UploadedFile::fake()->create('front.jpg', 1, 'image/jpeg');
         $service = new VehicleImageValidationService;
 
         $result = $service->validate($file, 'FRONT');
@@ -30,5 +31,27 @@ class VehicleImageValidationServiceTest extends TestCase
         $this->assertSame('RED', $service->tokenPayload($result['token'], $file, 'FRONT')['colour']);
         $this->assertFalse($service->tokenMatches($result['token'], $file, 'REAR'));
         Process::assertRan(fn ($process) => in_array('FRONT', $process->command, true));
+    }
+
+    public function test_php_budget_exceeds_the_configured_worker_timeout(): void
+    {
+        $previousLimit = (int) ini_get('max_execution_time');
+        config()->set('vehicle_vision.enabled', true);
+        config()->set('vehicle_vision.timeout', 180);
+        Process::fake(['*' => Process::result(output: json_encode([
+            'view_matches' => false, 'is_vehicle' => false,
+        ]))]);
+
+        try {
+            $result = (new VehicleImageValidationService)->validate(
+                UploadedFile::fake()->create('front.jpg', 1, 'image/jpeg'), 'FRONT'
+            );
+            $this->assertSame(210, (int) ini_get('max_execution_time'));
+            $this->assertFalse($result['accepted']);
+            $this->assertNull($result['token']);
+            Process::assertRan(fn ($process) => $process->timeout === 180);
+        } finally {
+            set_time_limit($previousLimit);
+        }
     }
 }
