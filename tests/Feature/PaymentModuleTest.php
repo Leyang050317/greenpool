@@ -230,6 +230,33 @@ class PaymentModuleTest extends TestCase
         Http::assertSentCount(1);
     }
 
+    public function test_checkout_shows_the_trip_route_map_when_google_maps_is_configured(): void
+    {
+        [, $passenger, $booking] = $this->completedBooking();
+        $booking->trip->update([
+            'departure_latitude' => 3.1390,
+            'departure_longitude' => 101.6869,
+            'destination_latitude' => 2.9264,
+            'destination_longitude' => 101.6964,
+        ]);
+        config()->set('services.google_maps.key', 'server-test-key');
+        config()->set('services.google_maps.browser_key', 'browser-test-key');
+        Http::fake(['https://routes.googleapis.com/directions/v2:computeRoutes' => Http::response(['routes' => [[
+            'distanceMeters' => 30000,
+            'duration' => '1800s',
+            'polyline' => ['encodedPolyline' => 'checkout-test-polyline'],
+        ]]])]);
+
+        $this->actingAs($passenger)
+            ->get(route('payments.checkout', $booking))
+            ->assertOk()
+            ->assertSee('Trip map')
+            ->assertSee('data-trip-static-map', false)
+            ->assertSee('checkout-test-polyline', false);
+
+        Http::assertSentCount(1);
+    }
+
     public function test_stripe_success_return_verifies_the_session_for_its_passenger(): void
     {
         [, $passenger, $booking] = $this->completedBooking();

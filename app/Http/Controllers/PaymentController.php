@@ -59,8 +59,9 @@ class PaymentController extends Controller
         }
 
         $payment->loadMissing(['payer', 'payee', 'booking.trip']);
+        $mapRoute = $this->paymentMapRoute($payment);
 
-        return view('payments.checkout', compact('payment'));
+        return view('payments.checkout', compact('payment', 'mapRoute'));
     }
 
     public function initiateCheckout(Request $request, Booking $booking): RedirectResponse
@@ -157,7 +158,7 @@ class PaymentController extends Controller
         abort_unless($payment->isPaid(), 404);
         $payment->loadMissing(['payer', 'payee', 'booking.trip.vehicle']);
         $fareBreakdown = $this->fareBreakdown($payment);
-        $mapRoute = $this->receiptMapRoute($payment);
+        $mapRoute = $this->paymentMapRoute($payment);
 
         return view('payments.receipt', compact('payment', 'fareBreakdown', 'mapRoute'));
     }
@@ -175,7 +176,7 @@ class PaymentController extends Controller
         ];
     }
 
-    private function receiptMapRoute(Payment $payment): ?array
+    private function paymentMapRoute(Payment $payment): ?array
     {
         $trip = $payment->booking->trip;
         $coordinates = [

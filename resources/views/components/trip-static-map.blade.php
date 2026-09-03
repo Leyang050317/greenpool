@@ -1,4 +1,4 @@
-@props(['trip', 'bookings' => collect(), 'route' => null, 'liveLocation' => null, 'liveTracking' => false])
+@props(['trip', 'bookings' => collect(), 'route' => null, 'liveLocation' => null, 'liveTracking' => false, 'compact' => false, 'flush' => false])
 
 @php
     $validCoordinate = fn ($latitude, $longitude) => is_numeric($latitude) && is_numeric($longitude)
@@ -37,18 +37,23 @@
     ])) : collect($markers)->pluck('position')->all();
 @endphp
 
-<section class="overflow-hidden rounded-2xl border border-gray-100 bg-white p-5">
-    <div class="mb-4 flex items-start justify-between gap-4">
+<section @class([
+    'overflow-hidden bg-white',
+    'rounded-2xl border border-gray-100' => ! $flush,
+    'p-3' => $compact,
+    'p-5 sm:p-7 lg:p-8' => ! $compact,
+])>
+    <div class="{{ $compact ? 'mb-3' : 'mb-4' }} flex items-start justify-between gap-4">
         <div><h2 class="text-sm font-semibold text-gray-900">Trip map</h2><p class="mt-1 text-xs text-gray-500">{{ $liveTracking ? 'Live driver location is shown when available.' : 'Static route plan.' }}</p><p @class(['mt-1 text-xs text-green-700' => $liveTracking, 'hidden' => ! $liveTracking]) data-live-location-status-for="{{ $mapId }}">{{ $driverLocation ? 'Live location updated '.\Carbon\Carbon::parse($driverLocation['recorded_at'])->format('g:i A').'.' : 'Waiting for the driver’s live location.' }}</p></div>
         <span class="rounded-full px-2.5 py-1 text-xs font-medium {{ $liveTracking ? 'bg-green-50 text-green-700' : 'bg-slate-100 text-slate-600' }}">{{ $liveTracking ? 'Live' : 'Static' }}</span>
     </div>
 
     @if(! $hasTripCoordinates)
-        <div class="flex min-h-56 items-center justify-center rounded-xl bg-slate-50 px-5 text-center text-sm text-slate-500">Map is currently unavailable for this trip.</div>
+        <div class="flex {{ $compact ? 'min-h-40' : 'min-h-56' }} items-center justify-center rounded-xl bg-slate-50 px-5 text-center text-sm text-slate-500">Map is currently unavailable for this trip.</div>
     @elseif(blank($browserKey))
-        <div class="flex min-h-56 items-center justify-center rounded-xl bg-slate-50 px-5 text-center text-sm text-slate-500">Map will be available once Google Maps is configured.</div>
+        <div class="flex {{ $compact ? 'min-h-40' : 'min-h-56' }} items-center justify-center rounded-xl bg-slate-50 px-5 text-center text-sm text-slate-500">Map will be available once Google Maps is configured.</div>
     @else
-        <div id="{{ $mapId }}" data-trip-static-map data-trip-id="{{ $trip->trip_id }}" data-live-tracking="{{ $liveTracking ? 'true' : 'false' }}" data-live-location='@json($driverLocation)' data-markers='@json($markers)' data-focus-points='@json($focusPoints)' data-polyline='@json(data_get($route, "encoded_polyline"))' class="h-72 rounded-xl bg-slate-100 sm:h-96" aria-label="Map for {{ $trip->departure_location }} to {{ $trip->destination }}"></div>
+        <div id="{{ $mapId }}" data-trip-static-map data-trip-id="{{ $trip->trip_id }}" data-live-tracking="{{ $liveTracking ? 'true' : 'false' }}" data-live-location='@json($driverLocation)' data-markers='@json($markers)' data-focus-points='@json($focusPoints)' data-polyline='@json(data_get($route, "encoded_polyline"))' class="{{ $compact ? 'h-48' : 'h-72 sm:h-96' }} rounded-xl bg-slate-100" aria-label="Map for {{ $trip->departure_location }} to {{ $trip->destination }}"></div>
         <p data-map-error-for="{{ $mapId }}" class="mt-3 hidden text-sm text-slate-500">Map is currently unavailable for this trip.</p>
     @endif
 </section>

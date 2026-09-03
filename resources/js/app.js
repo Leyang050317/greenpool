@@ -173,6 +173,13 @@ const subscribeToRatingNotifications = () => {
         .listen('RatingReceived', (notification) => {
             incrementNotificationBadge();
             showRealtimeNotification(notification);
+
+            if (userRole === 'passenger'
+                && (window.location.pathname.startsWith('/passenger/booking')
+                    || window.location.pathname === '/passenger/home'
+                    || window.location.pathname.startsWith('/ratings'))) {
+                window.setTimeout(() => refreshBookingPage(), 400);
+            }
         });
 };
 
@@ -234,16 +241,22 @@ const subscribeToInAppNotifications = () => {
             showRealtimeNotification(notification, notificationIcon(notification));
 
             const paymentDetail = document.querySelector('[data-payment-detail]');
-            const isCurrentPayment = paymentDetail
-                && String(notification.payment_id) === paymentDetail.dataset.paymentId;
-
-            if (notification.type === 'payment_completed' && isCurrentPayment
+            if (notification.type === 'payment_completed'
+                && paymentDetail
                 && paymentDetail.dataset.paymentStatus !== 'Paid') {
-                window.setTimeout(() => window.location.reload(), 400);
+                paymentDetail.dataset.paymentStatus = 'Paid';
+                window.location.reload();
+                return;
             }
 
             const paymentsPage = document.querySelector('[data-payments-page]');
             if (paymentsPage && ['payment_due', 'payment_completed'].includes(notification.type)) {
+                window.setTimeout(() => window.location.reload(), 400);
+            }
+
+            const passengerBookingPage = userRole === 'passenger'
+                && window.location.pathname.startsWith('/passenger/booking');
+            if (passengerBookingPage && ['payment_due', 'payment_completed'].includes(notification.type)) {
                 window.setTimeout(() => window.location.reload(), 400);
             }
 
@@ -319,6 +332,10 @@ const subscribeToBookingUpdates = () => {
             .listen('BookingStatusUpdated', (event) => {
                 if (event.picked_up_booking_id) {
                     updatePickupProgress(event);
+                    if (path.startsWith('/passenger/booking')
+                        && !document.querySelector('[data-pickup-progress]')) {
+                        refreshBookingPage();
+                    }
                     return;
                 }
                 if (event.driver_notification_type === 'booking_request_cancelled') {
@@ -346,8 +363,15 @@ const subscribeToBookingUpdates = () => {
                 }
 
                 const isRelevantTripEvent =
-                    ['trip_cancelled', 'trip_expired'].includes(event.passenger_notification_type) ||
-                    ['Cancelled', 'Expired'].includes(event.trip_status);
+                    [
+                        'booking_request_accepted',
+                        'booking_request_rejected',
+                        'trip_started',
+                        'trip_completed',
+                        'trip_cancelled',
+                        'trip_expired',
+                    ].includes(event.passenger_notification_type) ||
+                    ['Accepted', 'Rejected', 'In Progress', 'Completed', 'Cancelled', 'Expired'].includes(event.trip_status);
 
                 if (isRelevantTripEvent && (path.startsWith('/passenger/booking') || path === '/passenger/home')) {
                     refreshBookingPage();
