@@ -1,0 +1,15 @@
+{
+    "$schema": "https://schema.railpack.com",
+    "provider": "php",
+    "packages": {
+        "python": "3.12"
+    },
+    "steps": {
+        "install": {
+            "commands": [
+                "...",
+                "python -m pip install --no-cache-dir -r ocr/requirements.txt"
+            ]
+        }
+    }
+}
