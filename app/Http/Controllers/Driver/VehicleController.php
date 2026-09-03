@@ -14,6 +14,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
@@ -202,6 +203,18 @@ class VehicleController extends Controller
             'image.max' => 'Vehicle photos must not exceed 8 MB.',
         ]);
 
+        // Serialise the complete classifier + OCR flow within this container.
+        // Otherwise separate photo requests can load multiple models simultaneously.
+        $lock = Cache::store('file')->lock('vehicle-image-validation',
+            max(1, (int) config('vehicle_vision.timeout', 180))
+            + max(1, (int) config('ocr.timeout', 120)) + 120);
+        if (! $lock->get()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Another vehicle photo is being checked. Wait for it to finish, then validate this photo.',
+            ], 429);
+        }
+
         try {
             $imageResult = $this->vehicleImageValidator->validate($validated['image'], $validated['expected_view']);
             $plateNumber = null;
@@ -224,6 +237,8 @@ class VehicleController extends Controller
             ]);
         } catch (\RuntimeException $exception) {
             return response()->json(['success' => false, 'message' => $exception->getMessage()], 422);
+        } finally {
+            $lock->release();
         }
     }
 
