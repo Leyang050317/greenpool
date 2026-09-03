@@ -20,8 +20,11 @@ must import its native libraries, load the models and perform a prediction.
 
 Wait for **OCR Linux runtime check** on the repair branch/PR. It uses no application
 secrets, database or personal documents. It verifies a real prediction twice in
-separate Python processes. This is a Linux dependency/prediction test, not an
-assertion that Railway's final image or the authenticated web flow has passed.
+separate Python processes. A second job builds the whole app with Railpack, then
+runs the scan through Laravel inside the final image with networking disabled.
+This checks deployment-layer contents and preloaded models, but does not certify
+the production variables or authenticated web flow. CI uses Railpack 0.38.0;
+check Railway's builder version when results differ.
 
 If it fails, update this same branch before merging. Do not merge individual library
 fixes into production to find the next missing dependency.

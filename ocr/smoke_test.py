@@ -1,5 +1,6 @@
 """Run the real OCR worker with synthetic, non-personal data. Nonzero means unsafe to deploy."""
 
+import argparse
 import json
 import subprocess
 import sys
@@ -21,6 +22,9 @@ def validate_payload(stdout: str) -> None:
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--through-laravel', action='store_true')
+    args = parser.parse_args()
     with tempfile.TemporaryDirectory(prefix="greenpool-ocr-check-") as directory:
         image_path = Path(directory) / "synthetic.png"
         image = Image.new("RGB", (1200, 400), "white")
@@ -28,8 +32,11 @@ def main() -> None:
         font = ImageFont.load_default(size=64)
         draw.text((70, 130), "GREENPOOL OCR TEST 12345", fill="black", font=font)
         image.save(image_path)
+        command = [sys.executable, str(Path(__file__).with_name("paddle_ocr_worker.py")), str(image_path)]
+        if args.through_laravel:
+            command = ['php', str(Path(__file__).with_name('check_laravel.php')), str(image_path)]
         result = subprocess.run(
-            [sys.executable, str(Path(__file__).with_name("paddle_ocr_worker.py")), str(image_path)],
+            command,
             capture_output=True, text=True, timeout=600,
         )
         if result.returncode:
