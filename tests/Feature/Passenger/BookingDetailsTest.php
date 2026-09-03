@@ -2,6 +2,8 @@
 
 namespace Tests\Feature\Passenger;
 
+use App\Events\BookingStatusUpdated;
+use App\Events\InAppNotificationCreated;
 use App\Models\Booking;
 use App\Models\Trip;
 use App\Models\TripLocation;
@@ -10,6 +12,8 @@ use App\Models\Vehicle;
 use App\Notifications\BookingStatusNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Event;
 use Tests\TestCase;
 
 class BookingDetailsTest extends TestCase
@@ -150,6 +154,117 @@ class BookingDetailsTest extends TestCase
         $passenger->notify(new BookingStatusNotification($booking, 'Accepted'));
 
         $this->assertSame(route('passenger.bookings.show', $booking), $passenger->fresh()->notifications()->first()->data['url']);
+    }
+
+    public function test_pending_only_booking_auto_cancelled_notifies_passenger_and_broadcasts(): void
+    {
+        Event::fake([InAppNotificationCreated::class, BookingStatusUpdated::class]);
+        [$passenger, $trip] = $this->passengerAndTrip();
+        $trip->update(['departure_at' => now()->subMinute()]);
+        $booking = $this->booking($passenger, $trip, 'Pending');
+
+        Artisan::call('trips:expire-departed');
+
+        $this->assertSame('Cancelled', $trip->refresh()->status);
+        $this->assertSame('Cancelled', $booking->refresh()->booking_status);
+
+        // Passenger receives clear notification that trip was cancelled and booking is inactive
+        $notification = $passenger->notifications()->where('type', BookingStatusNotification::class)->firstOrFail();
+        $this->assertSame('Trip Cancelled', $notification->data['title']);
+        $this->assertSame('trip_cancelled', $notification->data['type']);
+        $this->assertStringContainsString('no longer active', $notification->data['message']);
+
+        // Realtime event broadcast to passenger
+        Event::assertDispatched(
+            BookingStatusUpdated::class,
+            fn (BookingStatusUpdated $event) => $event->booking->is($booking)
+                && $event->passengerNotificationType === 'trip_cancelled'
+        );
+        Event::assertDispatched(
+            InAppNotificationCreated::class,
+            fn (InAppNotificationCreated $event) => $event->recipient->is($passenger)
+                && $event->notification['type'] === 'trip_cancelled'
+        );
+
+        // Passenger UI reflects Cancelled status
+        $this->actingAs($passenger)->get(route('passenger.bookings.show', $booking))
+            ->assertOk()
+            ->assertSee('Cancelled')
+            ->assertDontSee('Cancel booking request');
+    }
+
+    public function test_accepted_booking_auto_expired_notifies_passenger_with_expired_reason(): void
+    {
+        Event::fake([InAppNotificationCreated::class, BookingStatusUpdated::class]);
+        [$passenger, $trip] = $this->passengerAndTrip();
+        $trip->update(['departure_at' => now()->subMinute()]);
+        $booking = $this->booking($passenger, $trip, 'Accepted');
+
+        Artisan::call('trips:expire-departed');
+
+        // Passenger receives clear notification that trip expired because driver didn't start it
+        $notification = $passenger->notifications()->where('type', BookingStatusNotification::class)->firstOrFail();
+        $this->assertSame('Trip Expired', $notification->data['title']);
+        $this->assertSame('trip_expired', $notification->data['type']);
+        $this->assertStringContainsString('expired because the driver did not start the scheduled trip', $notification->data['message']);
+
+        // Realtime event broadcast to passenger with trip_expired type
+        Event::assertDispatched(
+            BookingStatusUpdated::class,
+            fn (BookingStatusUpdated $event) => $event->booking->is($booking)
+                && $event->passengerNotificationType === 'trip_expired'
+        );
+        Event::assertDispatched(
+            InAppNotificationCreated::class,
+            fn (InAppNotificationCreated $event) => $event->recipient->is($passenger)
+                && $event->notification['type'] === 'trip_expired'
+        );
+    }
+
+    public function test_booking_details_page_includes_realtime_expiry_badge_attributes(): void
+    {
+        [$passenger, $trip] = $this->passengerAndTrip();
+        $booking = $this->booking($passenger, $trip, 'Accepted');
+
+        $this->actingAs($passenger)->get(route('passenger.bookings.show', $booking))
+            ->assertOk()
+            ->assertSee('data-trip-expiry-badge', false)
+            ->assertSee($trip->departure_at->toIso8601String(), false);
+    }
+
+    public function test_existing_unrelated_booking_notifications_continue_working(): void
+    {
+        [$passenger, $trip] = $this->passengerAndTrip();
+        $booking = $this->booking($passenger, $trip, 'Accepted');
+
+        $acceptedNotification = (new BookingStatusNotification($booking, 'Accepted'))->toArray($passenger);
+        $this->assertSame('Booking Accepted', $acceptedNotification['title']);
+        $this->assertSame('booking_accepted', $acceptedNotification['type']);
+
+        $rejectedNotification = (new BookingStatusNotification($booking, 'Rejected'))->toArray($passenger);
+        $this->assertSame('Booking Rejected', $rejectedNotification['title']);
+        $this->assertSame('booking_rejected', $rejectedNotification['type']);
+
+        $startedNotification = (new BookingStatusNotification($booking, 'Started'))->toArray($passenger);
+        $this->assertSame('Trip Started', $startedNotification['title']);
+        $this->assertSame('trip_started', $startedNotification['type']);
+
+        $completedNotification = (new BookingStatusNotification($booking, 'Completed'))->toArray($passenger);
+        $this->assertSame('Trip Completed', $completedNotification['title']);
+        $this->assertSame('trip_completed', $completedNotification['type']);
+    }
+
+    public function test_single_notification_is_delivered_without_duplicates(): void
+    {
+        [$passenger, $trip] = $this->passengerAndTrip();
+        $trip->update(['departure_at' => now()->subMinute()]);
+        $booking = $this->booking($passenger, $trip, 'Pending');
+
+        Artisan::call('trips:expire-departed');
+        Artisan::call('trips:expire-departed'); // Run second time to verify idempotency
+
+        // Exactly one notification delivered
+        $this->assertSame(1, $passenger->notifications()->where('type', BookingStatusNotification::class)->count());
     }
 
     private function passengerAndTrip(): array

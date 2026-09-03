@@ -103,7 +103,7 @@ class TripLifecycleRulesTest extends TestCase
     {
         $trip = $this->trip($this->driver(), ['departure_at' => now()->subMinute()]);
 
-        Artisan::call('trips:cancel-unbooked-departed');
+        Artisan::call('trips:expire-departed');
         $trip->refresh();
         $cancelledAt = $trip->cancelled_at;
         $this->assertSame('Cancelled', $trip->status);
@@ -111,17 +111,18 @@ class TripLifecycleRulesTest extends TestCase
         $this->assertNull($trip->started_at);
         $this->assertNull($trip->completed_at);
 
-        Artisan::call('trips:cancel-unbooked-departed');
+        Artisan::call('trips:expire-departed');
         $this->assertTrue($cancelledAt->equalTo($trip->refresh()->cancelled_at));
     }
 
-    public function test_departed_scheduled_trip_with_a_booking_is_not_cancelled(): void
+    public function test_departed_scheduled_trip_with_pending_bookings_only_is_cancelled(): void
     {
         $trip = $this->trip($this->driver(), ['departure_at' => now()->subMinute()]);
-        Booking::create(['trip_id' => $trip->trip_id, 'passenger_id' => $this->passenger()->id, 'booking_status' => 'Pending', 'number_of_seats' => 1, 'pickup_point' => 'Main Gate']);
+        $booking = Booking::create(['trip_id' => $trip->trip_id, 'passenger_id' => $this->passenger()->id, 'booking_status' => 'Pending', 'number_of_seats' => 1, 'pickup_point' => 'Main Gate']);
 
-        Artisan::call('trips:cancel-unbooked-departed');
-        $this->assertSame('Scheduled', $trip->refresh()->status);
+        Artisan::call('trips:expire-departed');
+        $this->assertSame('Cancelled', $trip->refresh()->status);
+        $this->assertSame('Cancelled', $booking->refresh()->booking_status);
     }
 
     public function test_departure_boundary_keeps_a_scheduled_trip_startable_for_the_full_departure_minute(): void
@@ -187,19 +188,19 @@ class TripLifecycleRulesTest extends TestCase
         Carbon::setTestNow($departureAt);
         $trip = $this->trip($this->driver(), ['departure_at' => $departureAt]);
 
-        Artisan::call('trips:cancel-unbooked-departed');
+        Artisan::call('trips:expire-departed');
         $this->assertSame('Scheduled', $trip->refresh()->status);
 
         Carbon::setTestNow($departureAt->copy()->addSeconds(30));
-        Artisan::call('trips:cancel-unbooked-departed');
+        Artisan::call('trips:expire-departed');
         $this->assertSame('Scheduled', $trip->refresh()->status);
 
         Carbon::setTestNow($departureAt->copy()->addSeconds(59));
-        Artisan::call('trips:cancel-unbooked-departed');
+        Artisan::call('trips:expire-departed');
         $this->assertSame('Scheduled', $trip->refresh()->status);
 
         Carbon::setTestNow($departureAt->copy()->addMinute());
-        Artisan::call('trips:cancel-unbooked-departed');
+        Artisan::call('trips:expire-departed');
         $this->assertSame('Cancelled', $trip->refresh()->status);
         Carbon::setTestNow();
     }
@@ -210,12 +211,127 @@ class TripLifecycleRulesTest extends TestCase
         $driver = $this->driver();
         $trip = $this->trip($driver, ['departure_at' => now()->subMinute()]);
 
-        Artisan::call('trips:cancel-unbooked-departed');
+        Artisan::call('trips:expire-departed');
 
         $this->assertSame('Cancelled', $trip->refresh()->status);
         $notification = $driver->notifications()->where('type', TripAutoCancelledNotification::class)->firstOrFail();
         $this->assertSame($trip->trip_id, $notification->data['trip_id']);
         Event::assertDispatched(InAppNotificationCreated::class, fn (InAppNotificationCreated $event) => $event->recipient->is($driver) && $event->notification['type'] === 'trip_auto_cancelled');
+    }
+
+    public function test_departed_trip_with_accepted_bookings_is_cancelled_with_expired_notification(): void
+    {
+        Event::fake([InAppNotificationCreated::class]);
+        $driver = $this->driver();
+        $trip = $this->trip($driver, ['departure_at' => now()->subMinute()]);
+        $passenger = $this->passenger();
+        $booking = Booking::create(['trip_id' => $trip->trip_id, 'passenger_id' => $passenger->id, 'booking_status' => 'Accepted', 'number_of_seats' => 1, 'pickup_point' => 'Main Gate']);
+
+        Artisan::call('trips:expire-departed');
+
+        $this->assertSame('Cancelled', $trip->refresh()->status);
+        $this->assertNotNull($trip->cancelled_at);
+        $this->assertSame('Cancelled', $booking->refresh()->booking_status);
+
+        // Driver receives "expired" notification (distinct from regular cancellation)
+        $driverNotification = $driver->notifications()->where('type', TripAutoCancelledNotification::class)->firstOrFail();
+        $this->assertSame('Trip Expired', $driverNotification->data['title']);
+        $this->assertSame('trip_auto_expired', $driverNotification->data['type']);
+
+        // Accepted passenger receives "expired" notification
+        $passengerNotification = $passenger->notifications()->where('type', BookingStatusNotification::class)->firstOrFail();
+        $this->assertSame('Trip Expired', $passengerNotification->data['title']);
+        $this->assertSame('trip_expired', $passengerNotification->data['type']);
+        $this->assertStringContainsString('did not start the scheduled trip', $passengerNotification->data['message']);
+    }
+
+    public function test_departed_trip_with_accepted_and_pending_bookings_is_cancelled_with_expired_notification(): void
+    {
+        $driver = $this->driver();
+        $trip = $this->trip($driver, ['departure_at' => now()->subMinute()]);
+        $acceptedBooking = Booking::create(['trip_id' => $trip->trip_id, 'passenger_id' => $this->passenger()->id, 'booking_status' => 'Accepted', 'number_of_seats' => 1, 'pickup_point' => 'Main Gate']);
+        $pendingBooking = Booking::create(['trip_id' => $trip->trip_id, 'passenger_id' => $this->passenger()->id, 'booking_status' => 'Pending', 'number_of_seats' => 1, 'pickup_point' => 'Library']);
+
+        Artisan::call('trips:expire-departed');
+
+        $this->assertSame('Cancelled', $trip->refresh()->status);
+        $this->assertSame('Cancelled', $acceptedBooking->refresh()->booking_status);
+        $this->assertSame('Cancelled', $pendingBooking->refresh()->booking_status);
+
+        // Driver gets expired notification since there was an accepted booking
+        $driverNotification = $driver->notifications()->where('type', TripAutoCancelledNotification::class)->firstOrFail();
+        $this->assertSame('trip_auto_expired', $driverNotification->data['type']);
+    }
+
+    public function test_expired_trip_notifies_accepted_passengers_and_driver(): void
+    {
+        Event::fake([InAppNotificationCreated::class]);
+        $driver = $this->driver();
+        $trip = $this->trip($driver, ['departure_at' => now()->subMinute()]);
+        $acceptedPassenger = $this->passenger();
+        $pendingPassenger = $this->passenger();
+        Booking::create(['trip_id' => $trip->trip_id, 'passenger_id' => $acceptedPassenger->id, 'booking_status' => 'Accepted', 'number_of_seats' => 1, 'pickup_point' => 'Main Gate']);
+        Booking::create(['trip_id' => $trip->trip_id, 'passenger_id' => $pendingPassenger->id, 'booking_status' => 'Pending', 'number_of_seats' => 1, 'pickup_point' => 'Library']);
+
+        Artisan::call('trips:expire-departed');
+
+        $this->assertSame('Cancelled', $trip->refresh()->status);
+
+        // Accepted passenger receives expired notification
+        $passengerNotification = $acceptedPassenger->notifications()->where('type', BookingStatusNotification::class)->firstOrFail();
+        $this->assertSame('Trip Expired', $passengerNotification->data['title']);
+        $this->assertSame('trip_expired', $passengerNotification->data['type']);
+
+        // Pending passenger receives cancellation notification
+        $pendingNotification = $pendingPassenger->notifications()->where('type', BookingStatusNotification::class)->firstOrFail();
+        $this->assertSame('Trip Cancelled', $pendingNotification->data['title']);
+        $this->assertStringContainsString('no longer active', $pendingNotification->data['message']);
+
+        // Driver receives auto-expired notification
+        $driverNotification = $driver->notifications()->where('type', TripAutoCancelledNotification::class)->firstOrFail();
+        $this->assertSame('Trip Expired', $driverNotification->data['title']);
+        $this->assertSame('trip_auto_expired', $driverNotification->data['type']);
+
+        Event::assertDispatched(InAppNotificationCreated::class, fn (InAppNotificationCreated $event) => $event->recipient->is($driver) && $event->notification['type'] === 'trip_auto_expired');
+        Event::assertDispatched(InAppNotificationCreated::class, fn (InAppNotificationCreated $event) => $event->recipient->is($acceptedPassenger) && $event->notification['type'] === 'trip_expired');
+        Event::assertDispatched(InAppNotificationCreated::class, fn (InAppNotificationCreated $event) => $event->recipient->is($pendingPassenger) && $event->notification['type'] === 'trip_cancelled');
+    }
+
+    public function test_command_does_not_affect_in_progress_trips(): void
+    {
+        $trip = $this->trip($this->driver(), ['departure_at' => now()->subMinute(), 'status' => 'In Progress', 'started_at' => now()->subMinutes(2)]);
+
+        Artisan::call('trips:expire-departed');
+        $this->assertSame('In Progress', $trip->refresh()->status);
+    }
+
+    public function test_command_does_not_affect_completed_trips(): void
+    {
+        $trip = $this->trip($this->driver(), ['departure_at' => now()->subMinute(), 'status' => 'Completed', 'completed_at' => now()]);
+
+        Artisan::call('trips:expire-departed');
+        $this->assertSame('Completed', $trip->refresh()->status);
+    }
+
+    public function test_command_does_not_affect_already_cancelled_trips(): void
+    {
+        Event::fake([InAppNotificationCreated::class]);
+        $trip = $this->trip($this->driver(), ['departure_at' => now()->subMinute(), 'status' => 'Cancelled', 'cancelled_at' => now()]);
+
+        Artisan::call('trips:expire-departed');
+        $this->assertSame('Cancelled', $trip->refresh()->status);
+
+        // No new notifications should be sent for already-cancelled trips
+        Event::assertNotDispatched(InAppNotificationCreated::class);
+    }
+
+    public function test_driver_cannot_start_an_auto_cancelled_trip(): void
+    {
+        $driver = $this->driver();
+        $cancelledTrip = $this->trip($driver, ['status' => 'Cancelled']);
+
+        $this->actingAs($driver)->patchJson(route('driver.trips.start', $cancelledTrip))->assertStatus(422);
+        $this->assertSame('Cancelled', $cancelledTrip->refresh()->status);
     }
 
     public function test_expired_trip_recovery_only_requires_a_future_departure_time_and_notifies_accepted_passengers(): void

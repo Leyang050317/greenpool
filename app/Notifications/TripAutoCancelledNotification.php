@@ -10,7 +10,10 @@ class TripAutoCancelledNotification extends Notification
 {
     use Queueable;
 
-    public function __construct(private readonly Trip $trip) {}
+    public function __construct(
+        private readonly Trip $trip,
+        private readonly bool $expired = false,
+    ) {}
 
     public function via(object $notifiable): array
     {
@@ -19,12 +22,25 @@ class TripAutoCancelledNotification extends Notification
 
     public function toArray(object $notifiable): array
     {
+        $route = $this->trip->departure_location.' to '.$this->trip->destination;
+
+        if ($this->expired) {
+            return [
+                'trip_id' => $this->trip->trip_id,
+                'type' => 'trip_auto_expired',
+                'title' => 'Trip Expired',
+                'icon' => 'clock',
+                'message' => "Your trip from {$route} expired because it was not started by the departure time.",
+                'url' => route('driver.trips.show', $this->trip),
+            ];
+        }
+
         return [
             'trip_id' => $this->trip->trip_id,
             'type' => 'trip_auto_cancelled',
             'title' => 'Trip Cancelled',
             'icon' => 'circle-x',
-            'message' => 'Your unbooked trip from '.$this->trip->departure_location.' to '.$this->trip->destination.' was cancelled after its departure time passed.',
+            'message' => "Your trip from {$route} was cancelled after its departure time passed.",
             'url' => route('driver.trips.show', $this->trip),
         ];
     }
