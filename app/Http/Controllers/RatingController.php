@@ -191,6 +191,15 @@ class RatingController extends Controller
     public function received(Request $request, User $user): View
     {
         abort_unless($this->canViewReceivedRatings($request, $user), 403);
+        $breakdown = $user->ratingsReceived()
+            ->selectRaw('score, COUNT(*) as total')
+            ->groupBy('score')
+            ->pluck('total', 'score');
+        $reviewCount = (int) $breakdown->sum();
+        $average = $reviewCount > 0
+            ? round((float) $breakdown->map(fn ($total, $score) => $total * $score)->sum() / $reviewCount, 1)
+            : 0.0;
+
         $query = $user->ratingsReceived()->with('reviewer');
         if ($request->filled('search')) {
             $search = $request->string('search')->trim();
@@ -205,9 +214,8 @@ class RatingController extends Controller
             $query->latest();
         }
         $ratings = $query->paginate(8)->withQueryString();
-        $average = round((float) $user->ratingsReceived()->avg('score'), 1);
 
-        return view('ratings.received', compact('user', 'ratings', 'average'));
+        return view('ratings.received', compact('user', 'ratings', 'average', 'breakdown', 'reviewCount'));
     }
 
     private function ratingParticipants(Request $request, Booking $booking): array

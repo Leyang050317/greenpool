@@ -183,6 +183,34 @@ class BookingModuleTest extends TestCase
             ->assertSee('Quiet');
     }
 
+    public function test_passenger_trip_details_show_driver_average_rating(): void
+    {
+        $passenger = User::factory()->create(['role' => 'passenger']);
+        $reviewer = User::factory()->create(['role' => 'passenger']);
+        $driver = User::factory()->create(['role' => 'driver']);
+        $ratedTrip = $this->createTrip([
+            'user_id' => $driver->id,
+            'status' => 'Completed',
+            'completed_at' => now()->subDay(),
+        ]);
+        $ratedBooking = $this->createBooking($reviewer, $ratedTrip, bookingStatus: 'Accepted');
+        Rating::create([
+            'booking_id' => $ratedBooking->id,
+            'reviewer_id' => $reviewer->id,
+            'reviewee_id' => $driver->id,
+            'score' => 4,
+            'comment' => 'Reliable driver.',
+        ]);
+        $availableTrip = $this->createTrip(['user_id' => $driver->id]);
+
+        $this->actingAs($passenger)
+            ->get(route('passenger.bookings.create', ['trip_id' => $availableTrip->trip_id]))
+            ->assertOk()
+            ->assertSee('Driver Rating')
+            ->assertSee('4.0')
+            ->assertSee('(1 review)');
+    }
+
     public function test_current_location_autofill_is_only_used_for_booking_pickup_point(): void
     {
         $passenger = User::factory()->create(['role' => 'passenger']);

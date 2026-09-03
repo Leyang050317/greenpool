@@ -41,9 +41,9 @@ class RatingModuleTest extends TestCase
         $this->actingAs($passenger)
             ->get(route('ratings.index'))
             ->assertOk()
-            ->assertSee('Driver Profile')
+            ->assertSee('Driver Profiles &amp; Reviews', false)
             ->assertSee('Rate a Driver')
-            ->assertSee('Driver Reviews')
+            ->assertDontSee('Browse reviews for drivers')
             ->assertSee('Rating History')
             ->assertSee('Open navigation menu')
             ->assertSee('M21 15a4 4 0 0 1-4 4H8l-5 3V7', false)
@@ -58,7 +58,7 @@ class RatingModuleTest extends TestCase
         $this->actingAs($passenger)
             ->get(route('ratings.index'))
             ->assertOk()
-            ->assertSeeInOrder(['Rate a Driver', 'Rating History', 'Driver Reviews', 'Driver Profile']);
+            ->assertSeeInOrder(['Rate a Driver', 'Rating History', 'Driver Profiles &amp; Reviews'], false);
     }
 
     public function test_rating_history_only_shows_filters_relevant_to_the_users_role(): void
@@ -76,7 +76,7 @@ class RatingModuleTest extends TestCase
             ->assertDontSee('name="role"', false);
     }
 
-    public function test_reviews_and_profiles_are_separate_rating_features(): void
+    public function test_profiles_link_to_the_selected_users_reviews(): void
     {
         [$driver, $passenger, $booking] = $this->completedBooking();
         Rating::create([
@@ -88,17 +88,24 @@ class RatingModuleTest extends TestCase
         ]);
 
         $hub = $this->actingAs($passenger)->get(route('ratings.index'));
-        $hub->assertSee('href="'.route('ratings.reviews').'"', false)
+        $hub->assertDontSee('href="'.route('ratings.reviews').'"', false)
             ->assertSee('href="'.route('ratings.people').'"', false);
 
-        $this->actingAs($passenger)->get(route('ratings.reviews'))
-            ->assertOk()->assertSee('Driver Reviews')
-            ->assertSee('A very safe and punctual driver.')
-            ->assertSee('reviewed by '.$passenger->name);
-
         $this->actingAs($passenger)->get(route('ratings.people'))
-            ->assertOk()->assertSee('Driver Profiles')->assertSee($driver->name)
-            ->assertDontSee('A very safe and punctual driver.');
+            ->assertOk()
+            ->assertSee('Driver Profiles & Reviews', false)
+            ->assertSee($driver->name)
+            ->assertSee('View Profile & Reviews', false)
+            ->assertSee('href="'.route('ratings.received', $driver).'"', false);
+
+        $this->actingAs($passenger)->get(route('ratings.received', $driver))
+            ->assertOk()
+            ->assertSee('Driver Profile & Reviews', false)
+            ->assertSee($driver->name)
+            ->assertSee('Rating breakdown')
+            ->assertSee('5 star')
+            ->assertSee('1 review')
+            ->assertSee('A very safe and punctual driver.');
     }
 
     public function test_reviews_show_average_and_star_breakdown(): void
