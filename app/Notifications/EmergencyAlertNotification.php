@@ -21,6 +21,10 @@ class EmergencyAlertNotification extends Notification
     public function toArray(object $notifiable): array
     {
         $trip = $this->emergency->trip;
+        $url = $this->booking
+            ? route('passenger.bookings.show', $this->booking)
+            : route('driver.trips.show', $trip);
+
         return [
             'emergency_id' => $this->emergency->id,
             'trip_id' => $trip->trip_id,
@@ -29,9 +33,9 @@ class EmergencyAlertNotification extends Notification
             'title' => 'Emergency Alert',
             'icon' => 'triangle-alert',
             'message' => $this->emergency->notificationMessage(),
-            'url' => $this->booking
-                ? route('passenger.bookings.show', $this->booking)
-                : route('driver.trips.show', $trip),
+            'url' => $url.'#emergency-'.$this->emergency->id,
+            'location_source' => $this->emergency->locationStatusLabel(),
+            'map_url' => $this->emergency->mapUrl(),
         ];
     }
 }

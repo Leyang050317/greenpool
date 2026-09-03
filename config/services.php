@@ -62,6 +62,12 @@ return [
         'redirect' => env('GOOGLE_REDIRECT_URL'),
     ],
 
+    'gemini' => [
+        'enabled' => env('GEMINI_ENABLED', false),
+        'key' => env('GEMINI_API_KEY'),
+        'model' => env('GEMINI_MODEL', 'gemini-3.5-flash-lite'),
+    ],
+
     'stripe' => [
         'key' => env('STRIPE_KEY'),
         'secret' => env('STRIPE_SECRET'),

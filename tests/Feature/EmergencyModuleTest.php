@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Events\EmergencyAcknowledged;
+use App\Events\EmergencyResolved;
 use App\Events\EmergencyTriggered;
 use App\Models\Booking;
 use App\Models\Emergency;
@@ -34,9 +35,11 @@ class EmergencyModuleTest extends TestCase
         $this->assertDatabaseHas('emergencies', ['trip_id' => $trip->trip_id, 'user_id' => $driver->id, 'role' => 'driver', 'issue_type' => $issueType, 'status' => 'Active']);
         $notification = $passenger->notifications()->where('type', EmergencyAlertNotification::class)->firstOrFail();
         $this->assertSame($booking->id, $notification->data['booking_id']);
-        $this->assertSame(route('passenger.bookings.show', $booking), $notification->data['url']);
+        $this->assertSame(route('passenger.bookings.show', $booking).'#emergency-1', $notification->data['url']);
         $this->assertSame('Emergency Alert', $notification->data['title']);
         $this->assertSame($message, $notification->data['message']);
+        $this->assertSame('Location unavailable', $notification->data['location_source']);
+        $this->assertNull($notification->data['map_url']);
         $this->assertSame(0, $driver->notifications()->where('type', EmergencyAlertNotification::class)->count());
     }
 
@@ -153,7 +156,43 @@ class EmergencyModuleTest extends TestCase
         $this->assertSame($passenger->id, $report->acknowledged_by);
         $this->assertNull($report->resolved_at);
         Event::assertDispatched(EmergencyAcknowledged::class, fn (EmergencyAcknowledged $event) => $event->emergency->is($report) && $event->emergency->status === 'Acknowledged');
-        $this->assertFalse(collect(app('router')->getRoutes()->getRoutes())->contains(fn ($route) => $route->getName() === 'emergencies.resolve'));
+        $this->assertTrue(collect(app('router')->getRoutes()->getRoutes())->contains(fn ($route) => $route->getName() === 'emergencies.resolve'));
+    }
+
+    public function test_acknowledged_emergency_can_be_resolved_by_a_trip_participant(): void
+    {
+        Event::fake([EmergencyResolved::class]);
+        [$driver, $trip] = $this->trip(['status' => 'In Progress', 'started_at' => now()]);
+        $passenger = User::factory()->create(['role' => 'passenger']);
+        $this->booking($trip, $passenger);
+        $report = Emergency::create([
+            'trip_id' => $trip->trip_id,
+            'user_id' => $driver->id,
+            'role' => 'driver',
+            'issue_type' => 'safety_risk',
+            'status' => 'Acknowledged',
+            'triggered_at' => now(),
+            'acknowledged_at' => now(),
+            'acknowledged_by' => $passenger->id,
+        ]);
+
+        $this->actingAs($driver)->patch(route('emergencies.resolve', $report))
+            ->assertRedirect()
+            ->assertSessionHas('success', 'Emergency marked as resolved.');
+
+        $this->assertSame('Resolved', $report->refresh()->status);
+        $this->assertSame($driver->id, $report->resolved_by);
+        $this->assertNotNull($report->resolved_at);
+        Event::assertDispatched(EmergencyResolved::class, fn (EmergencyResolved $event) => $event->emergency->is($report));
+    }
+
+    public function test_active_emergency_cannot_be_resolved_before_acknowledgement(): void
+    {
+        [$driver, $trip] = $this->trip(['status' => 'In Progress', 'started_at' => now()]);
+        $report = Emergency::create(['trip_id' => $trip->trip_id, 'user_id' => $driver->id, 'role' => 'driver', 'issue_type' => 'safety_risk', 'status' => 'Active', 'triggered_at' => now()]);
+
+        $this->actingAs($driver)->patch(route('emergencies.resolve', $report))->assertStatus(422);
+        $this->assertSame('Active', $report->refresh()->status);
     }
 
     public function test_unauthorized_user_cannot_acknowledge_a_report(): void

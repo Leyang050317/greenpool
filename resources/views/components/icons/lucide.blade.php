@@ -111,6 +111,9 @@
         @case('arrow-left')
             <path d="M19 12H5M11 18l-6-6 6-6" />
             @break
+        @case('chevron-right')
+            <path d="m9 18 6-6-6-6" />
+            @break
         @case('calendar')
             <rect width="18" height="18" x="3" y="4" rx="2" />
             <path d="M16 2v4M8 2v4M3 10h18" />
@@ -173,6 +176,10 @@
             <rect width="14" height="11" x="5" y="11" rx="2" />
             <path d="M8 11V7a4 4 0 0 1 8 0v4M12 15v3" />
             <circle cx="12" cy="15" r="1" />
+            @break
+        @case('log-out')
+            <path d="M17 16l4-4m0 0-4-4m4 4H7" />
+            <path d="M13 20v1a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3h4a3 3 0 0 1 3 3v1" />
             @break
         @case('mail')
             <rect width="18" height="14" x="3" y="5" rx="2" />

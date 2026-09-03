@@ -133,6 +133,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/trips/{trip}/emergencies', [EmergencyController::class, 'store'])->name('trips.emergencies.store');
     Route::post('/trips/{trip}/updates', [TripUpdateController::class, 'store'])->name('trips.updates.store');
     Route::patch('/emergencies/{emergency}/acknowledge', [EmergencyController::class, 'acknowledge'])->name('emergencies.acknowledge');
+    Route::patch('/emergencies/{emergency}/resolve', [EmergencyController::class, 'resolve'])->name('emergencies.resolve');
 
     Route::middleware('driver')->prefix('driver')->name('driver.')->group(function () {
         Route::get('profile', [DriverProfileController::class, 'edit'])->name('profile.edit');

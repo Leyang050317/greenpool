@@ -9,7 +9,7 @@ use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
-class EmergencyAcknowledged implements ShouldBroadcastNow
+class EmergencyResolved implements ShouldBroadcastNow
 {
     use Dispatchable;
     use InteractsWithSockets;
@@ -27,8 +27,8 @@ class EmergencyAcknowledged implements ShouldBroadcastNow
         return [
             'emergency_id' => $this->emergency->id,
             'status' => $this->emergency->status,
-            'acknowledged_at' => $this->emergency->acknowledged_at?->toIso8601String(),
-            'acknowledged_by' => $this->emergency->acknowledgedBy?->name,
+            'resolved_at' => $this->emergency->resolved_at?->toIso8601String(),
+            'resolved_by' => $this->emergency->resolvedBy?->name,
         ];
     }
 }

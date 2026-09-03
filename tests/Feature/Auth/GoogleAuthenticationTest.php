@@ -40,7 +40,8 @@ class GoogleAuthenticationTest extends TestCase
             ->assertOk()
             ->assertDontSee('Change Password')
             ->assertDontSee('Update Password')
-            ->assertSee('Google Account Security');
+            ->assertSee('Account Type')
+            ->assertSee('Google account');
     }
 
     public function test_password_authenticated_user_can_still_update_a_password(): void

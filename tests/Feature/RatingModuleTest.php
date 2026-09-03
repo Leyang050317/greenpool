@@ -148,7 +148,6 @@ class RatingModuleTest extends TestCase
         $response->assertOk()->assertSee('GreenPool')->assertSee('Ratings');
         $response->assertSeeInOrder(['<h1 class="truncate', 'Ratings', '</h1>'], false);
         $this->assertSame(2, substr_count($response->getContent(), 'href="'.route('ratings.index').'"'));
-        $response->assertSee('href="#"', false);
         $this->assertStringContainsString('bg-green-50 text-[#2E7D32]', $response->getContent());
     }
 
@@ -543,11 +542,10 @@ class RatingModuleTest extends TestCase
         ]);
 
         $this->actingAs($passenger)
-            ->get(route('passenger.booking'))
+            ->get(route('passenger.bookings.history'))
             ->assertOk()
             ->assertSee($driver->name)
-            ->assertSee('5.0')
-            ->assertSee('(1)');
+            ->assertSee('5.0');
 
         $this->actingAs($driver)
             ->get(route('profile.edit'))

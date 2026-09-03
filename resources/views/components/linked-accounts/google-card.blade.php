@@ -1,4 +1,4 @@
-<section class="rounded-2xl border border-gray-200 bg-white p-6">
+<section class="p-0">
     <div class="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
         <div class="flex items-center gap-4">
             <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-gray-200 bg-white">

@@ -30,7 +30,7 @@
         <header class="flex items-start justify-between bg-[#16803c] px-5 py-4 text-white">
             <div class="flex gap-3">
                 <span class="flex h-10 w-10 items-center justify-center rounded-full bg-white/15"><x-icons.lucide name="message-square" class="h-5 w-5" /></span>
-                <div><h2 class="font-bold">GreenPool Help Bot</h2><p class="mt-0.5 text-xs text-green-100">FAQ support · No personal data is shared</p></div>
+                <div><h2 class="font-bold">GreenPool Help Bot</h2><p class="mt-0.5 text-xs text-green-100">FAQ support · AI assistance when available</p></div>
             </div>
             <button type="button" @click="open = false" class="rounded-lg p-1 text-green-100 hover:bg-white/10 hover:text-white" aria-label="Close help bot"><x-icons.lucide name="x" class="h-5 w-5" /></button>
         </header>
@@ -67,7 +67,7 @@
                 <input id="faq-bot-question" x-ref="question" x-model="question" :disabled="loading" maxlength="300" placeholder="Ask a GreenPool question…" class="min-w-0 flex-1 rounded-xl border-slate-200 px-3 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-green-600 focus:ring-green-600 disabled:bg-slate-100">
                 <button type="submit" :disabled="loading || !question.trim()" class="flex h-10 w-10 items-center justify-center rounded-xl bg-[#16803c] text-white hover:bg-[#126b32] disabled:cursor-not-allowed disabled:bg-slate-300" aria-label="Send question"><x-icons.lucide name="send" class="h-4 w-4" /></button>
             </div>
-            <p class="mt-2 text-center text-[11px] text-slate-400">Answers come from GreenPool's approved FAQ content.</p>
+            <p class="mt-2 text-center text-[11px] text-slate-400">Answers use approved GreenPool FAQ content. Do not share passwords or payment details.</p>
         </form>
     </section>
 </div>

@@ -3,6 +3,7 @@
 @php
     $contacts = auth()->user()->emergencyContacts()->get();
     $emergencyContactsRoute = auth()->user()->role === 'driver' ? route('driver.profile.edit') : route('profile.edit');
+    $reports = $trip->emergencies()->with(['user', 'acknowledgedBy', 'resolvedBy'])->latest('triggered_at')->get();
 @endphp
 
 <section
@@ -39,6 +40,35 @@
             Report Emergency
         </button>
     </div>
+
+    @if($reports->isNotEmpty())
+        <div class="mt-5 space-y-3 border-t border-red-200 pt-4" aria-label="Emergency reports">
+            <p class="text-xs font-semibold uppercase tracking-wide text-red-800">Trip emergency reports</p>
+            @foreach($reports as $report)
+                <article id="emergency-{{ $report->id }}" class="rounded-xl border border-red-100 bg-white p-4 shadow-sm">
+                    <div class="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                            <p class="font-semibold text-slate-900">{{ $report->issueLabel() }}</p>
+                            <p class="mt-1 text-xs text-slate-500">Reported by {{ $report->user->name }} · {{ $report->triggered_at->format('j M, g:i A') }}</p>
+                        </div>
+                        <span data-emergency-status-for="{{ $report->id }}" class="rounded-full px-2 py-1 text-xs font-semibold {{ $report->status === 'Resolved' ? 'bg-green-100 text-green-700' : ($report->status === 'Acknowledged' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700') }}">{{ $report->status }}</span>
+                    </div>
+                    @if($report->description)<p class="mt-3 text-sm leading-6 text-slate-700">{{ $report->description }}</p>@endif
+                    <div class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-slate-600">
+                        <span><x-icons.lucide name="map-pin" class="mr-1 inline h-3.5 w-3.5" />{{ $report->locationStatusLabel() }}</span>
+                        @if($report->mapUrl())<a href="{{ $report->mapUrl() }}" target="_blank" rel="noopener noreferrer" class="font-semibold text-[#16803c] underline underline-offset-2">Open location in Maps</a>@endif
+                    </div>
+                    @if($report->status === 'Acknowledged' && $report->acknowledgedBy)<p class="mt-3 text-xs text-amber-800">Acknowledged by {{ $report->acknowledgedBy->name }} · {{ $report->acknowledged_at?->format('j M, g:i A') }}</p>@endif
+                    @if($report->status === 'Resolved' && $report->resolvedBy)<p class="mt-3 text-xs text-green-800">Resolved by {{ $report->resolvedBy->name }} · {{ $report->resolved_at?->format('j M, g:i A') }}</p>@endif
+                    @if($report->status === 'Active' && $report->user_id !== auth()->id())
+                        <form data-emergency-acknowledge-for="{{ $report->id }}" method="POST" action="{{ route('emergencies.acknowledge', $report) }}" class="mt-4">@csrf @method('PATCH')<button class="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800 hover:bg-amber-100">Acknowledge emergency</button></form>
+                    @elseif($report->status === 'Acknowledged')
+                        <form data-emergency-resolve-for="{{ $report->id }}" method="POST" action="{{ route('emergencies.resolve', $report) }}" class="mt-4">@csrf @method('PATCH')<button class="rounded-lg border border-green-300 bg-green-50 px-3 py-2 text-xs font-semibold text-green-800 hover:bg-green-100">Mark as resolved</button></form>
+                    @endif
+                </article>
+            @endforeach
+        </div>
+    @endif
 
     <div x-cloak x-show="open" class="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="emergency-modal-title">
         <div class="absolute inset-0 bg-slate-900/50" @click="if (!submitting) open = false"></div>

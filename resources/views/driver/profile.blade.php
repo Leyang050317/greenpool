@@ -15,7 +15,9 @@
             <div><p class="text-sm font-semibold text-[#2E7D32]">Driver account</p><h2 class="mt-1 text-3xl font-bold tracking-tight text-gray-950">My Profile</h2><p class="mt-2 text-sm text-gray-600">Manage your account, vehicles, and driving preferences.</p></div>
         </div>
 
-        <div><x-profile-completeness-card :profile-completeness="$profileCompleteness" /></div>
+        <div x-show="!['password', 'settings'].includes(currentView)" x-transition.opacity>
+            <x-profile-completeness-card :profile-completeness="$profileCompleteness" />
+        </div>
 
         @if (session('error'))<div class="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-800" role="alert">{{ session('error') }}</div>@endif
 
@@ -83,8 +85,9 @@
                 async scan() {
                     const file=this.$refs.file.files[0]; if(!file){this.message='Choose a driving licence image first.';return;}
                     this.busy=true;this.message='Scanning licence…';const body=new FormData();body.append('document',file);body.append('expected_document_type','DRIVING_LICENCE');
-                    try { const response=await fetch('{{ route('driver.vehicles.documents.ocr') }}',{method:'POST',headers:{'Accept':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body});const data=await response.json();if(!response.ok)throw new Error(data.message||'Unable to scan the licence.');const fields=data.fields||{};const set=(name,key,date=false)=>{const value=fields[key]?.value;if(value)this.$refs[name].value=date?this.dateValue(value):value};set('holder','name');set('identity','identity_no');set('class','licence_class');set('from','valid_from',true);set('until','valid_until',true);this.licenceClasses=this.parseLicenceClasses(this.$refs.class.value);this.scanned=true;this.message='Scan complete. Extracted details are locked and cannot be edited.'; }
-                    catch(error){this.scanned=false;this.message=error.message;} finally{this.busy=false;}
+                    const controller=new AbortController();const timeout=setTimeout(()=>controller.abort(),310000);
+                    try { const response=await fetch('{{ route('driver.vehicles.documents.ocr') }}',{method:'POST',headers:{'Accept':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body,signal:controller.signal});const data=await response.json();if(!response.ok)throw new Error(data.message||'Unable to scan the licence.');const fields=data.fields||{};const set=(name,key,date=false)=>{const value=fields[key]?.value;if(value)this.$refs[name].value=date?this.dateValue(value):value};set('holder','name');set('identity','identity_no');set('class','licence_class');set('from','valid_from',true);set('until','valid_until',true);this.licenceClasses=this.parseLicenceClasses(this.$refs.class.value);this.scanned=true;this.message='Scan complete. Extracted details are locked and cannot be edited.'; }
+                    catch(error){this.scanned=false;this.message=error.name==='AbortError'?'Scanning took too long. Please retry with a smaller, clearer image.':error.message;} finally{clearTimeout(timeout);this.busy=false;}
                 }
             }">
                 <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"><div><h3 class="text-xl font-bold text-gray-950">Driving Licence</h3><p class="mt-1 text-sm text-gray-600">Upload a licence to create trips. A valid licence is required when starting a trip.</p></div>@if($driverLicence)<span class="rounded-full px-3 py-1.5 text-xs font-semibold {{ $driverLicence->isValidOn(now()) ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700' }}">{{ $driverLicence->isValidOn(now()) ? 'Valid until '.$driverLicence->valid_until->format('d M Y') : 'Expired or unverified' }}</span>@endif</div>
@@ -114,18 +117,15 @@
 
         {{-- ===== Change Password View ===== --}}
         @if ($canManagePassword)
-        <div x-cloak x-show="currentView === 'password'" x-transition.opacity class="max-w-2xl mx-auto">
-            <div class="flex items-center mb-6">
-                <button type="button" @click="currentView = 'profile'" class="text-gray-400 hover:text-gray-600 mr-4">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
-                </button>
-                <div>
-                    <h1 class="text-2xl font-bold text-gray-900">Update Password</h1>
-                    <p class="text-sm text-gray-500 mt-1">Use a strong, unique password to keep your account secure.</p>
+        <div x-cloak x-show="currentView === 'password'" x-transition.opacity class="mx-auto mt-6 max-w-3xl">
+            <section class="overflow-hidden rounded-[28px] border border-green-100 bg-white shadow-sm">
+                <div class="bg-gradient-to-r from-[#166534] via-[#2E7D32] to-[#4aa65b] px-6 py-7 text-white sm:px-8">
+                    <button type="button" @click="currentView = 'profile'" class="mb-6 inline-flex items-center gap-2 rounded-lg px-2 py-1 text-sm font-semibold text-green-50 transition hover:bg-white/15 hover:text-white"><x-icons.lucide name="arrow-left" class="h-4 w-4" />Back to profile</button>
+                    <div class="flex items-start gap-4"><span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/15"><x-icons.lucide name="lock-keyhole" class="h-6 w-6" /></span><div><p class="text-sm font-semibold text-green-100">ACCOUNT SECURITY</p><h1 class="mt-1 text-3xl font-bold tracking-tight">Update password</h1><p class="mt-2 max-w-xl text-sm leading-6 text-green-50">Choose a unique password to keep your GreenPool account protected.</p></div></div>
                 </div>
-            </div>
-
-            <section class="rounded-2xl border border-gray-200 bg-white p-6">
+                <div class="grid gap-8 p-6 sm:p-8 lg:grid-cols-[1fr_13rem]">
+                    <div>
+                        <p class="mb-6 text-sm leading-6 text-slate-500">Use at least 8 characters with uppercase, lowercase, a number, and a symbol.</p>
                 <form method="POST" action="{{ route('password.update') }}" class="space-y-5">
                     @csrf @method('PUT')
 
@@ -165,44 +165,39 @@
                         </div>
                     </div>
 
-                    <div class="grid grid-cols-2 gap-4">
-                        <button type="button" @click="currentView = 'profile'" class="flex items-center justify-center px-4 py-2.5 text-sm font-semibold text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">Cancel</button>
-                        <button type="submit" class="flex items-center justify-center px-4 py-2.5 text-sm font-semibold text-white bg-[#2E7D32] border border-transparent rounded-lg hover:bg-[#256b29] transition-colors">Update Password</button>
+                    <div class="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end">
+                        <button type="button" @click="currentView = 'profile'" class="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-300 px-5 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cancel</button>
+                        <button type="submit" class="inline-flex min-h-11 items-center justify-center rounded-xl bg-[#2E7D32] px-5 text-sm font-semibold text-white shadow-sm hover:bg-[#256b29]">Save new password</button>
                     </div>
                 </form>
+                    </div>
+                    <aside class="h-fit rounded-2xl border border-green-100 bg-green-50 p-5"><x-icons.lucide name="shield-check" class="h-6 w-6 text-[#2E7D32]" /><h2 class="mt-3 font-bold text-slate-900">Keep it private</h2><p class="mt-2 text-sm leading-6 text-slate-600">Never share your password or a reset link. GreenPool will never ask for it in chat.</p></aside>
+                </div>
             </section>
         </div>
         @endif
 
         {{-- ===== Account Settings View ===== --}}
-        <div x-cloak x-show="currentView === 'settings'" x-transition.opacity class="max-w-2xl mx-auto">
-            <div class="flex items-center mb-6">
-                <button type="button" @click="currentView = 'profile'" class="text-gray-400 hover:text-gray-600 mr-4">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
-                </button>
-                <div>
-                    <h1 class="text-2xl font-bold text-gray-900">Account Settings</h1>
-                    <p class="text-sm text-gray-500 mt-1">Manage your account preferences and data.</p>
-                </div>
-            </div>
+        <div x-cloak x-show="currentView === 'settings'" x-transition.opacity class="mx-auto mt-6 max-w-4xl">
+            <div class="mb-6 overflow-hidden rounded-[28px] bg-slate-900 px-6 py-7 text-white shadow-sm sm:px-8"><button type="button" @click="currentView = 'profile'" class="mb-6 inline-flex items-center gap-2 rounded-lg px-2 py-1 text-sm font-semibold text-slate-300 transition hover:bg-white/10 hover:text-white"><x-icons.lucide name="arrow-left" class="h-4 w-4" />Back to profile</button><div class="flex items-start gap-4"><span class="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10 text-green-300"><x-icons.lucide name="settings" class="h-6 w-6" /></span><div><p class="text-sm font-semibold tracking-wide text-green-300">ACCOUNT CENTRE</p><h1 class="mt-1 text-3xl font-bold tracking-tight">Account settings</h1><p class="mt-2 text-sm leading-6 text-slate-300">Review sign-in details, connected accounts, and account data.</p></div></div></div>
 
-            <h4 class="text-sm font-bold text-gray-700 mb-3">Account Details</h4>
-            <div class="bg-white rounded-xl shadow-sm border border-gray-200 mb-8">
-                <div class="px-6 py-4 border-b border-gray-100">
-                    <p class="text-xs text-gray-400 mb-1">Account Email</p>
-                    <p class="text-sm font-medium text-gray-900">{{ $user->email }}</p>
-                </div>
-                <div class="px-6 py-4">
-                    <p class="text-xs text-gray-400 mb-1">Role</p>
-                    <p class="text-sm font-medium text-gray-900">{{ ucfirst($user->role) }}</p>
-                </div>
-            </div>
+            <div class="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm">
+                <section class="p-6 sm:p-7">
+                    <p class="text-xs font-bold uppercase tracking-[0.12em] text-slate-400">Account details</p>
+                    <div class="mt-4 grid overflow-hidden rounded-xl border border-slate-200 sm:grid-cols-2">
+                        <div class="border-b border-slate-100 p-5 sm:border-b-0 sm:border-r"><p class="text-xs font-bold uppercase tracking-wide text-slate-400">Account email</p><p class="mt-2 break-all text-sm font-semibold text-slate-900">{{ $user->email }}</p><p class="mt-1 text-xs text-slate-500">Email changes are protected for account safety.</p></div>
+                        <div class="p-5"><p class="text-xs font-bold uppercase tracking-wide text-slate-400">Account role</p><p class="mt-2 inline-flex rounded-full bg-green-100 px-2.5 py-1 text-sm font-semibold text-[#2E7D32]">{{ ucfirst($user->role) }}</p><p class="mt-1 text-xs text-slate-500">Your role is set when you register.</p></div>
+                    </div>
+                </section>
 
-            <h4 class="text-sm font-bold text-gray-700 mb-3">Linked Accounts</h4>
-            <div class="mb-8"><x-linked-accounts.google-card :user="$user" /></div>
+                <section class="border-t border-slate-200 p-6 sm:p-7">
+                    <p class="mb-4 text-xs font-bold uppercase tracking-[0.12em] text-slate-400">Linked accounts</p>
+                    <x-linked-accounts.google-card :user="$user" />
+                </section>
 
-            <h4 class="text-sm font-bold text-gray-700 mb-3">Recent Login Activity</h4>
-            <div class="bg-white rounded-xl shadow-sm border border-gray-200 mb-8 px-6 py-2">
+                <section class="border-t border-slate-200 p-6 sm:p-7">
+                    <p class="mb-2 text-xs font-bold uppercase tracking-[0.12em] text-slate-400">Recent login activity</p>
+                    <div class="divide-y divide-gray-100">
                 @forelse ($recentLogins as $login)
                     <div class="flex items-center gap-4 border-b border-gray-100 py-4 last:border-b-0">
                         <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-green-50 text-[#2E7D32]">
@@ -220,10 +215,11 @@
                         <p class="mt-1 text-xs text-gray-500">Your successful sign-ins will appear here.</p>
                     </div>
                 @endforelse
-            </div>
+                    </div>
+                </section>
 
-            <h4 class="text-sm font-bold text-red-500 mb-3">Danger Zone</h4>
-            <div class="bg-white rounded-xl shadow-sm border border-red-200 px-6 py-5">
+                <section class="border-t border-red-100 bg-red-50/40 p-6 sm:p-7">
+                    <p class="mb-4 text-xs font-bold uppercase tracking-[0.12em] text-red-500">Danger zone</p>
                 <div class="flex items-start">
                     <div class="flex-shrink-0 mt-0.5 mr-4 text-red-500">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
@@ -234,6 +230,7 @@
                         <button type="button" @click="showDeleteModal = true" class="inline-flex items-center px-4 py-2 border border-red-200 text-sm font-medium rounded-lg text-red-600 bg-white hover:bg-red-50 transition-colors">Delete Account</button>
                     </div>
                 </div>
+                </section>
             </div>
         </div>
 
