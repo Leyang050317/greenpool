@@ -13,6 +13,7 @@ class BookingStatusNotification extends Notification
     public function __construct(
         private readonly Booking $booking,
         private readonly string $status,
+        private readonly ?string $customMessage = null,
     ) {}
 
     public function via(object $notifiable): array
@@ -34,23 +35,26 @@ class BookingStatusNotification extends Notification
             'Started' => 'Trip Started',
             'Completed' => 'Trip Completed',
             'Cancelled' => 'Trip Cancelled',
+            'Expired' => 'Trip Expired',
             default => 'Booking updated',
         };
 
         $icon = match ($this->status) {
             'Accepted' => 'circle-check',
             'Rejected', 'Cancelled' => 'circle-x',
+            'Expired' => 'clock',
             'Started' => 'play',
             'Completed' => 'circle-check',
             default => 'bell',
         };
 
-        $message = match ($this->status) {
+        $message = $this->customMessage ?? match ($this->status) {
             'Accepted' => "Your booking for {$route} has been accepted.",
             'Rejected' => "Your booking request for {$route} was rejected.",
             'Started' => "Your trip from {$route} has started.",
             'Completed' => "Your trip from {$route} has been completed. You can now review your payment and rating information.",
             'Cancelled' => "Your booked trip from {$route} has been cancelled.",
+            'Expired' => "Your trip from {$route} expired because the driver did not start the scheduled trip.",
             default => "Your booking for {$route} was updated.",
         };
 
@@ -67,6 +71,7 @@ class BookingStatusNotification extends Notification
                 'Started' => 'trip_started',
                 'Completed' => 'trip_completed',
                 'Cancelled' => 'trip_cancelled',
+                'Expired' => 'trip_expired',
                 default => 'booking_'.$statusKey,
             },
             'title' => $title,

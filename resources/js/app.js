@@ -4,13 +4,29 @@ import Alpine from 'alpinejs';
 
 window.Alpine = Alpine;
 
+let isRefreshing = false;
+let pendingRefresh = false;
+
 const refreshBookingPage = () => {
-    if (document.visibilityState !== 'visible') {
+    if (isRefreshing) {
         return;
     }
 
+    if (document.visibilityState !== 'visible') {
+        pendingRefresh = true;
+        return;
+    }
+
+    isRefreshing = true;
+    pendingRefresh = false;
     window.location.reload();
 };
+
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && pendingRefresh) {
+        refreshBookingPage();
+    }
+});
 
 const startDerivedTripExpiryBadges = () => {
     document.querySelectorAll('[data-trip-expiry-badge]').forEach((badge) => {
@@ -135,6 +151,7 @@ const bookingUpdateNotification = (event, role) => {
         trip_started: ['Trip Started', `Your trip from ${route} has started.`, '▶'],
         trip_completed: ['Trip Completed', `Your trip from ${route} has been completed. Review your payment and rating information.`, '✓'],
         trip_cancelled: ['Trip Cancelled', `Your booked trip from ${route} has been cancelled.`, '×'],
+        trip_expired: ['Trip Expired', `Your trip from ${route} expired because the driver did not start the scheduled trip.`, '⏱'],
     };
     const driverMessages = {
         booking_request_cancelled: ['Booking Request Cancelled', `A passenger cancelled their booking request for ${route}.`, '×'],
@@ -198,6 +215,8 @@ const notificationIcon = (notification) => ({
     'credit-card': 'RM',
     banknote: '$',
     'circle-check': '✓',
+    'circle-x': '×',
+    clock: '⏱',
     star: '★',
 }[notification.icon] || '●');
 
@@ -257,9 +276,14 @@ const subscribeToInAppNotifications = () => {
                 }
             }
 
-            if (notification.type === 'trip_auto_cancelled'
+            if (['trip_auto_cancelled', 'trip_auto_expired'].includes(notification.type)
                 && (window.location.pathname.startsWith('/driver/trips') || window.location.pathname === '/driver/home')) {
-                window.setTimeout(() => window.location.reload(), 400);
+                window.setTimeout(() => refreshBookingPage(), 400);
+            }
+
+            if (['trip_cancelled', 'trip_expired'].includes(notification.type)
+                && (window.location.pathname.startsWith('/passenger/booking') || window.location.pathname === '/passenger/home')) {
+                window.setTimeout(() => refreshBookingPage(), 400);
             }
         });
 };
@@ -305,21 +329,30 @@ const subscribeToBookingUpdates = () => {
             });
     }
 
-    if (userRole === 'passenger' && (path.startsWith('/passenger/booking') || path === '/passenger/home')) {
-        window.Echo.private(`passenger.${userId}`)
-            .listen('BookingStatusUpdated', (event) => {
-                if (event.picked_up_booking_id) updatePickupProgress(event);
-                else refreshBookingPage();
-            });
-    }
-
     if (userRole === 'passenger') {
         window.Echo.private(`passenger.${userId}`)
             .listen('BookingStatusUpdated', (event) => {
+                if (event.picked_up_booking_id) {
+                    updatePickupProgress(event);
+                    return;
+                }
+
                 if (event.passenger_notification_type) {
                     incrementNotificationBadge();
                     const notification = bookingUpdateNotification(event, 'passenger');
-                    if (notification) showRealtimeNotification(notification, notification.icon);
+                    if (notification) {
+                        showRealtimeNotification(notification, notification.icon);
+                    }
+                }
+
+                const isRelevantTripEvent =
+                    ['trip_cancelled', 'trip_expired'].includes(event.passenger_notification_type) ||
+                    ['Cancelled', 'Expired'].includes(event.trip_status);
+
+                if (isRelevantTripEvent && (path.startsWith('/passenger/booking') || path === '/passenger/home')) {
+                    refreshBookingPage();
+                } else if (!event.passenger_notification_type && (path.startsWith('/passenger/booking') || path === '/passenger/home')) {
+                    refreshBookingPage();
                 }
             });
     }
