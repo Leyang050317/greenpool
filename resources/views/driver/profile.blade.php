@@ -21,7 +21,7 @@
 
         <div x-show="!['password', 'settings'].includes(currentView)" class="mt-6 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
             <div class="flex gap-1 overflow-x-auto border-b border-gray-200 p-1.5" role="tablist" aria-label="Driver profile sections">
-                @foreach ([['profile', 'Personal Info', 'user-round'], ['licence', 'Driving Licence', 'badge-check'], ['vehicles', 'My Vehicles', 'car-front'], ['preferences', 'Preferences', 'sliders-horizontal']] as [$view, $label, $icon])
+                @foreach ([['profile', 'Personal Info', 'user'], ['licence', 'Driving Licence', 'badge-check'], ['vehicles', 'My Vehicles', 'car-front'], ['preferences', 'Preferences', 'settings']] as [$view, $label, $icon])
                     <button type="button" @click="currentView = '{{ $view }}'" :class="currentView === '{{ $view }}' ? 'bg-green-50 text-[#2E7D32]' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-800'" class="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition" role="tab" :aria-selected="currentView === '{{ $view }}'"><x-icons.lucide :name="$icon" class="h-4 w-4" />{{ $label }}</button>
                 @endforeach
             </div>
