@@ -1,5 +1,6 @@
 import { env, pipeline, RawImage } from '@huggingface/transformers';
 import path from 'node:path';
+import { vehicleSessionOptions } from './runtime-options.mjs';
 
 const [imagePath, expectedView, model, cacheDirectory] = process.argv.slice(2);
 
@@ -24,7 +25,10 @@ const viewLabels = {
 };
 
 try {
-    const classifier = await pipeline('zero-shot-image-classification', model, { dtype: 'q8' });
+    const classifier = await pipeline('zero-shot-image-classification', model, {
+        dtype: 'q8',
+        session_options: vehicleSessionOptions,
+    });
     const image = await RawImage.read(path.resolve(imagePath));
     const vehiclePredictions = await classifier(image, [
         'a photograph containing a car',
