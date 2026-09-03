@@ -14,7 +14,7 @@ class PaddleOcrService
         $result = Process::timeout(config('ocr.timeout'))
             ->env($this->windowsEnvironment())
             ->run([
-                config('ocr.python_binary'),
+                $this->pythonBinary(),
                 config('ocr.worker_path'),
                 $file->getRealPath(),
             ]);
@@ -45,6 +45,20 @@ class PaddleOcrService
         }
 
         return $payload;
+    }
+
+    private function pythonBinary(): string
+    {
+        $configured = (string) config('ocr.python_binary');
+        $deployedVirtualEnvironment = base_path('.venv-ocr/bin/python');
+
+        if (PHP_OS_FAMILY !== 'Windows'
+            && in_array($configured, ['python', 'python3'], true)
+            && is_file($deployedVirtualEnvironment)) {
+            return $deployedVirtualEnvironment;
+        }
+
+        return $configured;
     }
 
     private function safeDiagnostic(string $errorOutput): string
