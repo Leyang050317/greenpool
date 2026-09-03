@@ -22,6 +22,11 @@ class User extends Authenticatable implements MustVerifyEmail
         Notifiable::notify as protected notifyThroughLaravel;
     }
 
+    /** @var array<string, mixed> */
+    protected $attributes = [
+        'account_status' => 'active',
+    ];
+
     /**
      * The attributes that are mass assignable.
      *
@@ -36,6 +41,9 @@ class User extends Authenticatable implements MustVerifyEmail
         'role',
         'photo',
         'phone_number',
+        'account_status',
+        'deactivated_at',
+        'permanently_closed_at',
     ];
 
     /**
@@ -58,6 +66,8 @@ class User extends Authenticatable implements MustVerifyEmail
         return [
             'email_verified_at' => 'datetime',
             'phone_verified_at' => 'datetime',
+            'deactivated_at' => 'datetime',
+            'permanently_closed_at' => 'datetime',
             'password' => 'hashed',
         ];
     }
@@ -142,6 +152,16 @@ class User extends Authenticatable implements MustVerifyEmail
     public function usesGoogleAuthentication(): bool
     {
         return $this->auth_provider === 'google';
+    }
+
+    public function isActive(): bool
+    {
+        return $this->account_status === 'active';
+    }
+
+    public function isDeactivated(): bool
+    {
+        return $this->account_status === 'deactivated';
     }
 
     public function sendEmailVerificationNotification(): void

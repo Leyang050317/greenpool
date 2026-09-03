@@ -31,6 +31,18 @@ class AuthenticatedSessionController extends Controller
 
             $user = $request->user();
 
+            if ($user->isDeactivated()) {
+                $request->session()->put('reactivation_password_verified_user_id', $user->id);
+
+                return redirect()->route('account.reactivate.show');
+            }
+
+            if (! $user->isActive()) {
+                Auth::logout();
+
+                return redirect()->route('login')->with('error', 'This account has been permanently closed. Please register a new account to use GreenPool again.');
+            }
+
             if (! $user->hasVerifiedEmail()) {
                 return redirect()->route('verification.notice');
             }

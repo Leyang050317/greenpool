@@ -10,3 +10,4 @@ Artisan::command('inspire', function () {
 
 Schedule::command('trips:expire-departed')->everyMinute()->withoutOverlapping();
 Schedule::command('trips:send-reminders')->everyMinute()->withoutOverlapping();
+Schedule::command('accounts:close-deactivated')->daily()->withoutOverlapping();

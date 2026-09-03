@@ -20,6 +20,16 @@ class GoogleLoginController extends Controller
             ->redirect();
     }
 
+    public function redirectToGoogleForDeactivation(Request $request)
+    {
+        $request->session()->put('google_deactivation_user_id', $request->user()->id);
+
+        return Socialite::driver('google')
+            ->redirectUrl($this->callbackUrl($request))
+            ->with(['prompt' => 'select_account'])
+            ->redirect();
+    }
+
     public function handleGoogleCallback(Request $request)
     {
         try {
@@ -27,6 +37,19 @@ class GoogleLoginController extends Controller
                 ->redirectUrl($this->callbackUrl($request))
                 ->user();
             $googleId = (string) $googleUser->getId();
+
+            if ($deactivationUserId = $request->session()->pull('google_deactivation_user_id')) {
+                $user = User::find($deactivationUserId);
+
+                if (! $user || $user->google_id !== $googleId) {
+                    return redirect()->route('profile.edit')->with('error', 'Use the Google account connected to GreenPool to continue.');
+                }
+
+                $request->session()->put('google_deactivation_verified_user_id', $user->id);
+
+                return redirect()->route($user->role === 'driver' ? 'driver.profile.edit' : 'profile.edit')
+                    ->with('status', 'google-account-confirmed');
+            }
 
             if ($request->session()->pull('google_linking', false) && Auth::check()) {
                 $user = $request->user();
@@ -52,6 +75,18 @@ class GoogleLoginController extends Controller
                 Auth::login($user);
                 $request->session()->put('auth_provider', 'google');
 
+                if ($user->isDeactivated()) {
+                    $request->session()->put('reactivation_google_verified_user_id', $user->id);
+
+                    return redirect()->route('account.reactivate.show');
+                }
+
+                if (! $user->isActive()) {
+                    Auth::logout();
+
+                    return redirect()->route('login')->with('error', 'This account has been permanently closed. Please register a new account to use GreenPool again.');
+                }
+
                 return $user->role === 'driver' ? redirect()->route('driver.home') : redirect()->route('passenger.home');
             }
 
@@ -64,6 +99,12 @@ class GoogleLoginController extends Controller
                 $legacyGoogleUser->update(['google_id' => $googleId]);
                 Auth::login($legacyGoogleUser);
                 $request->session()->put('auth_provider', 'google');
+
+                if ($legacyGoogleUser->isDeactivated()) {
+                    $request->session()->put('reactivation_google_verified_user_id', $legacyGoogleUser->id);
+
+                    return redirect()->route('account.reactivate.show');
+                }
 
                 return $legacyGoogleUser->role === 'driver' ? redirect()->route('driver.home') : redirect()->route('passenger.home');
             }
