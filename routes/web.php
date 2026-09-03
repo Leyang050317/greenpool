@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AttractionController;
 use App\Http\Controllers\Auth\LinkedAccountController;
+use App\Http\Controllers\Auth\GoogleLoginController;
 use App\Http\Controllers\ChatController;
 use App\Http\Controllers\Driver\DriverBookingController;
 use App\Http\Controllers\Driver\HomeController as DriverHomeController;
@@ -37,6 +38,12 @@ Route::get('/', function () {
 });
 
 Route::middleware('auth')->group(function () {
+    Route::get('/account/reactivate', [ProfileController::class, 'showReactivation'])->name('account.reactivate.show');
+    Route::post('/account/reactivate', [ProfileController::class, 'reactivate'])->name('account.reactivate');
+    Route::get('/account/deactivate/google', [GoogleLoginController::class, 'redirectToGoogleForDeactivation'])->name('account.deactivate.google');
+});
+
+Route::middleware(['auth', 'active-account'])->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
@@ -56,7 +63,7 @@ Route::middleware('auth')->group(function () {
         ->name('linked-accounts.google.destroy');
 });
 
-Route::middleware(['auth', 'verified'])->group(function () {
+Route::middleware(['auth', 'active-account', 'verified'])->group(function () {
     Route::get('/faq-bot/featured', [FaqBotController::class, 'featured'])->middleware('throttle:30,1')->name('faq-bot.featured');
     Route::post('/faq-bot/answer', [FaqBotController::class, 'answer'])->middleware('throttle:30,1')->name('faq-bot.answer');
     Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
@@ -185,8 +192,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
 });
 
 require __DIR__.'/auth.php';
-
-use App\Http\Controllers\Auth\GoogleLoginController;
 
 Route::get('/auth/google', [GoogleLoginController::class, 'redirectToGoogle'])->name('auth.google');
 Route::get('/auth/google/callback', [GoogleLoginController::class, 'handleGoogleCallback'])->name('auth.google.callback');

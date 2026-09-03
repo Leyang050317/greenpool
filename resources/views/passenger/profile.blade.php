@@ -252,12 +252,12 @@
                 </section>
 
                 <section class="border-t border-slate-200 p-6 sm:p-7">
-                    <p class="mb-4 text-xs font-bold uppercase tracking-[0.12em] text-slate-400">Linked accounts</p>
+                    <p class="mb-4 text-xs font-bold uppercase tracking-[0.12em] text-slate-400">Linked Accounts</p>
                     <x-linked-accounts.google-card :user="$user" />
                 </section>
 
                 <section class="border-t border-slate-200 p-6 sm:p-7">
-                    <p class="mb-2 text-xs font-bold uppercase tracking-[0.12em] text-slate-400">Recent login activity</p>
+                    <p class="mb-2 text-xs font-bold uppercase tracking-[0.12em] text-slate-400">Recent Login Activity</p>
                     <div class="divide-y divide-gray-100">
                 @forelse ($recentLogins as $login)
                     <div class="flex items-center gap-4 border-b border-gray-100 py-4 last:border-b-0">
@@ -286,10 +286,10 @@
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
                     </div>
                     <div>
-                        <h5 class="text-sm font-bold text-gray-900">Delete Account</h5>
-                        <p class="text-sm text-gray-500 mt-1 mb-4">Permanently delete your GreenPool account and associated account data.</p>
+                        <h5 class="text-sm font-bold text-gray-900">Deactivate Account</h5>
+                        <p class="text-sm text-gray-500 mt-1 mb-4">You will be signed out and cannot use GreenPool. Your completed trip, payment, and safety records will remain protected.</p>
                         <button type="button" @click="showDeleteModal = true" class="inline-flex items-center px-4 py-2 border border-red-200 text-sm font-medium rounded-lg text-red-600 bg-white hover:bg-red-50 transition-colors">
-                            Delete Account
+                            Deactivate Account
                         </button>
                     </div>
                 </div>
@@ -320,23 +320,27 @@
 
         <div x-show="showDeleteModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50" x-transition.opacity>
             <div @click.away="showDeleteModal = false" class="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
-                <h2 class="text-lg font-medium text-gray-900">Are you sure you want to delete your account?</h2>
-                <p class="mt-1 text-sm text-gray-600">Once your account is deleted, all of its resources and data will be permanently deleted. Please enter your password to confirm.</p>
+                <h2 class="text-lg font-medium text-gray-900">Deactivate your account?</h2>
+                <p class="mt-1 text-sm leading-6 text-gray-600">You will be signed out. Your account can be reactivated within 30 days; after that, personal details are permanently anonymized while trip and payment records stay protected.</p>
 
+                @if ($user->usesGoogleAuthentication())
+                    <a href="{{ route('account.deactivate.google') }}" class="mt-6 inline-flex w-full items-center justify-center rounded-lg bg-[#2E7D32] px-4 py-2 text-sm font-semibold text-white hover:bg-[#256b29]">Continue with Google to confirm</a>
+                @else
                 <form method="POST" action="{{ route('profile.destroy') }}" class="mt-6">
                     @csrf
                     @method('delete')
 
-                    <input id="password" name="password" type="password" class="block w-full border border-gray-200 rounded-md shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm p-2.5 text-gray-900" placeholder="Password" required />
+                    <input id="password" name="password" type="password" class="block w-full border border-gray-200 rounded-md shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm p-2.5 text-gray-900" placeholder="Current password" required autocomplete="current-password" />
                     @error('password', 'userDeletion')
                         <p class="text-sm text-red-600 mt-2">{{ $message }}</p>
                     @enderror
 
                     <div class="mt-6 flex justify-end space-x-3">
                         <button type="button" @click="showDeleteModal = false" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
-                        <button type="submit" class="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700">Delete Account</button>
+                        <button type="submit" class="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700">Deactivate Account</button>
                     </div>
                 </form>
+                @endif
             </div>
         </div>
     </div>

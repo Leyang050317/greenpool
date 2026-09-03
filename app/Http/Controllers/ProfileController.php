@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\ProfileUpdateRequest;
+use App\Services\AccountLifecycleService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -68,21 +69,64 @@ class ProfileController extends Controller
         return Redirect::route('profile.edit')->with('status', 'profile-updated');
     }
 
-    public function destroy(Request $request): RedirectResponse
+    public function destroy(Request $request, AccountLifecycleService $accountLifecycle): RedirectResponse
     {
-        $request->validateWithBag('userDeletion', [
-            'password' => ['required', 'current_password'],
-        ]);
-
         $user = $request->user();
 
+        if ($user->usesGoogleAuthentication()) {
+            if ((int) $request->session()->pull('google_deactivation_verified_user_id') !== $user->id) {
+                return back()->withErrors([
+                    'account' => 'Confirm your Google account before deactivating your account.',
+                ], 'userDeletion');
+            }
+        } else {
+            $request->validateWithBag('userDeletion', [
+                'password' => ['required', 'current_password'],
+            ]);
+        }
+
+        $accountLifecycle->deactivate($user);
         Auth::logout();
-
-        $user->delete();
-
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
-        return Redirect::to('/');
+        return Redirect::route('login')->with('status', 'Your account has been deactivated. Sign in within 30 days if you want to reactivate it.');
+    }
+
+    public function showReactivation(Request $request): View|RedirectResponse
+    {
+        if ($request->user()->isActive()) {
+            return Redirect::to('/');
+        }
+
+        return view('auth.reactivate-account', ['user' => $request->user()]);
+    }
+
+    public function reactivate(Request $request): RedirectResponse
+    {
+        $user = $request->user();
+
+        if (! $user->isDeactivated()) {
+            return Redirect::route('login')->with('error', 'This account can no longer be reactivated.');
+        }
+
+        $proofKey = $user->usesGoogleAuthentication()
+            ? 'reactivation_google_verified_user_id'
+            : 'reactivation_password_verified_user_id';
+
+        if ((int) $request->session()->pull($proofKey) !== $user->id) {
+            Auth::logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+
+            return Redirect::route('login')->with('error', 'Sign in again to confirm that you own this account.');
+        }
+
+        $user->update([
+            'account_status' => 'active',
+            'deactivated_at' => null,
+        ]);
+
+        return Redirect::to('/')->with('status', 'Your GreenPool account has been reactivated.');
     }
 }

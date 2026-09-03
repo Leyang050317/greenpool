@@ -22,7 +22,7 @@
     </style>
 </head>
 <body class="font-sans antialiased text-gray-900 bg-white">
-    <div class="flex min-h-screen" x-data="{ showDeactivatedError: false }">
+    <div class="flex min-h-screen">
         
         <div class="hidden lg:flex lg:w-1/2 bg-[#2E7D32] relative p-12 text-white">
             
@@ -73,12 +73,6 @@
 
                 <h2 class="text-3xl font-extrabold text-gray-900 mb-2">Welcome back</h2>
                 <p class="text-gray-500 mb-8">Sign in to continue to GreenPool.</p>
-
-                <div x-show="showDeactivatedError" x-cloak class="mb-6 p-4 bg-orange-50 border border-orange-200 rounded-lg">
-                    <p class="text-sm font-medium text-orange-600">
-                        Your account has been deactivated. Contact support to reactivate.
-                    </p>
-                </div>
 
                 <form method="POST" action="{{ route('login') }}">
                     @csrf
