@@ -12,6 +12,7 @@
                 "python -m venv .venv-ocr",
                 ".venv-ocr/bin/python -m pip install --no-cache-dir -r ocr/requirements.txt",
                 ".venv-ocr/bin/python ocr/smoke_test.py",
+                ".venv-ocr/bin/python ocr/smoke_test.py --profile plate",
                 ".venv-ocr/bin/python -m pip freeze > ocr/runtime-packages.txt"
             ]
         }

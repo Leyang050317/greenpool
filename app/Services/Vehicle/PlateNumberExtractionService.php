@@ -11,7 +11,7 @@ class PlateNumberExtractionService
 
     public function extract(UploadedFile $image): ?string
     {
-        $lines = $this->ocr->scan($image)['lines'] ?? [];
+        $lines = $this->ocr->scan($image, 'plate')['lines'] ?? [];
 
         return collect($lines)
             ->map(function (array $line): ?array {

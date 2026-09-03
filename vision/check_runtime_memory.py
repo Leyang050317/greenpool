@@ -6,13 +6,15 @@ import subprocess
 import sys
 
 root = Path(__file__).resolve().parents[1]
+print("BEGIN synthetic plate recognition", flush=True)
+subprocess.run([sys.executable, str(root / "ocr/smoke_test.py"), "--profile", "plate"], check=True, timeout=360)
 for view in ("front", "rear", "side"):
     photo = root / "public/images/vehicle-photo-examples" / f"{view}-example.png"
     for stage, command in (
         ("vehicle", ["node", str(root / "vision/vehicle-image-classifier.mjs"),
                      str(photo), view.upper(), "Xenova/clip-vit-base-patch32",
                      str(root / "storage/app/models/transformers")]),
-        ("plate-ocr", [sys.executable, str(root / "ocr/paddle_ocr_worker.py"), str(photo)]),
+        ("plate-ocr", [sys.executable, str(root / "ocr/paddle_ocr_worker.py"), str(photo), "--profile", "plate"]),
     ):
         print(f"BEGIN {view} {stage}", flush=True)
         result = subprocess.run(command, capture_output=True, text=True, timeout=360)

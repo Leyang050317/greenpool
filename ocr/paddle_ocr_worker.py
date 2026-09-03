@@ -24,11 +24,11 @@ with contextlib.redirect_stdout(sys.stderr):
     from PIL import Image, ImageEnhance, ImageOps
 
 
-def preprocess(source: Path) -> Path:
+def preprocess(source: Path, max_side: int = 2400) -> Path:
     with Image.open(source) as opened:
         image = ImageOps.exif_transpose(opened).convert("RGB")
-        if max(image.size) > 2400:
-            image.thumbnail((2400, 2400), Image.Resampling.LANCZOS)
+        if max(image.size) > max_side:
+            image.thumbnail((max_side, max_side), Image.Resampling.LANCZOS)
 
         gray = np.asarray(image.convert("L"))
         contrast = float(gray.std())
@@ -73,19 +73,30 @@ def as_lines(result: object) -> list[dict]:
     return lines
 
 
-def scan(source: Path) -> dict:
-    prepared = preprocess(source)
+def scan(source: Path, profile: str = "document") -> dict:
+    prepared = preprocess(source, 1280 if profile == "plate" else 2400)
     try:
         from paddleocr import PaddleOCR
 
+        # Vehicle plates do not need a full document model. Keep document behaviour
+        # unchanged, and explicitly select mobile models for the short Latin plate text.
+        plate_options = {
+            "ocr_version": "PP-OCRv4",
+            "text_detection_model_name": "PP-OCRv4_mobile_det",
+            "text_recognition_model_name": "en_PP-OCRv4_mobile_rec",
+            "text_det_limit_type": "max",
+            "text_det_limit_side_len": 1280,
+            "text_recognition_batch_size": 1,
+        } if profile == "plate" else {}
         engine = PaddleOCR(
             lang="en",
             device="cpu",
             cpu_threads=2,
             enable_mkldnn=False,
-            use_doc_orientation_classify=True,
+            use_doc_orientation_classify=profile != "plate",
             use_doc_unwarping=False,
             use_textline_orientation=True,
+            **plate_options,
         )
         lines = as_lines(engine.predict(str(prepared)))
         return {"full_text": "\n".join(line["text"] for line in lines), "lines": lines}
@@ -96,13 +107,14 @@ def scan(source: Path) -> dict:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("image")
+    parser.add_argument("--profile", choices=("document", "plate"), default="document")
     args = parser.parse_args()
     source = Path(args.image).resolve()
     if not source.is_file():
         raise ValueError("Uploaded document is not available.")
 
     with contextlib.redirect_stdout(sys.stderr):
-        payload = scan(source)
+        payload = scan(source, args.profile)
     print(json.dumps(payload))
     return 0
 

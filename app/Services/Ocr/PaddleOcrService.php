@@ -10,7 +10,7 @@ use JsonException;
 
 class PaddleOcrService
 {
-    public function scan(UploadedFile $file): array
+    public function scan(UploadedFile $file, string $profile = 'document'): array
     {
         // Reset the PHP budget for OCR, including when it follows vehicle classification.
         $timeout = max(1, (int) config('ocr.timeout', 120));
@@ -23,6 +23,8 @@ class PaddleOcrService
                     $this->pythonBinary(),
                     config('ocr.worker_path'),
                     $file->getRealPath(),
+                    '--profile',
+                    $profile,
                 ]);
         } catch (ProcessTimedOutException $exception) {
             Log::warning('Local OCR worker timed out.', ['timeout' => $timeout]);

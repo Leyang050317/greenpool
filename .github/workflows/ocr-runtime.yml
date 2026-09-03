@@ -2,7 +2,7 @@ name: OCR Linux runtime check
 
 on:
   push:
-    branches: [codex/ocr-deployment-validation, codex/vehicle-runtime-measurement]
+    branches: [codex/ocr-deployment-validation, codex/vehicle-runtime-measurement, codex/vehicle-plate-memory-fix]
   pull_request:
     paths:
       - 'ocr/**'
