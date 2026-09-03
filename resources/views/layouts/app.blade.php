@@ -34,6 +34,11 @@
 
         <title>{{ $pageTitle }} - GreenPool</title>
 
+        <!-- Favicon -->
+        <link rel="icon" href="{{ asset('favicon.ico') }}" sizes="any">
+        <link rel="icon" href="{{ asset('images/favicon.svg') }}" type="image/svg+xml">
+        <link rel="apple-touch-icon" href="{{ asset('images/apple-touch-icon.png') }}">
+
         <!-- Fonts -->
         <link rel="preconnect" href="https://fonts.bunny.net">
         <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&family=inter:700&display=swap" rel="stylesheet" />

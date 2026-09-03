@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\Concerns\HasProfileCompleteness;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Notifications\GreenPoolResetPassword;
 use App\Notifications\GreenPoolVerifyEmail;
 use Database\Factories\UserFactory;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
@@ -146,6 +147,14 @@ class User extends Authenticatable implements MustVerifyEmail
     public function sendEmailVerificationNotification(): void
     {
         $this->notify(new GreenPoolVerifyEmail());
+    }
+
+    /**
+     * Send the password reset notification using a branded GreenPool template.
+     */
+    public function sendPasswordResetNotification($token): void
+    {
+        $this->notify(new GreenPoolResetPassword($token));
     }
 
     public function trips(): HasMany
