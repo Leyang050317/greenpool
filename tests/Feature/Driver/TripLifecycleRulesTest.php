@@ -409,6 +409,8 @@ class TripLifecycleRulesTest extends TestCase
         $this->fakeGoogle();
         $driver = $this->driver();
         $inProgress = $this->trip($driver, ['status' => 'In Progress', 'started_at' => now()]);
+        $onboardPassenger = $this->passenger();
+        Booking::create(['trip_id' => $inProgress->trip_id, 'passenger_id' => $onboardPassenger->id, 'booking_status' => 'Accepted', 'number_of_seats' => 1, 'pickup_point' => 'Main Gate', 'picked_up_at' => now()]);
         $next = $this->trip($driver);
         $this->actingAs($driver)->patch(route('driver.trips.start', $next))->assertStatus(422);
 
@@ -505,7 +507,7 @@ class TripLifecycleRulesTest extends TestCase
         $driver = $this->driver();
         $trip = $this->trip($driver, ['status' => 'In Progress', 'started_at' => now()->subMinutes(10)]);
         $passenger = $this->passenger();
-        $booking = Booking::create(['trip_id' => $trip->trip_id, 'passenger_id' => $passenger->id, 'booking_status' => 'Accepted', 'number_of_seats' => 1, 'pickup_point' => 'Main Gate']);
+        $booking = Booking::create(['trip_id' => $trip->trip_id, 'passenger_id' => $passenger->id, 'booking_status' => 'Accepted', 'number_of_seats' => 1, 'pickup_point' => 'Main Gate', 'picked_up_at' => now()->subMinutes(5)]);
 
         $this->actingAs($driver)->patch(route('driver.trips.complete', $trip))->assertRedirect();
 

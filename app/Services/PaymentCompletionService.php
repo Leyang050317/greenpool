@@ -28,7 +28,7 @@ class PaymentCompletionService
         $completedPayment = DB::transaction(function () use ($payment, $method, $reference, $checkoutSessionId, $paymentIntentId): ?Payment {
             $lockedPayment = Payment::query()->whereKey($payment->getKey())->lockForUpdate()->firstOrFail();
 
-            if ($lockedPayment->isPaid()) {
+            if ($lockedPayment->payment_status !== 'Pending') {
                 return null;
             }
 

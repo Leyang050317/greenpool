@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Services\AccountLifecycleService;
 use Laravel\Socialite\Facades\Socialite;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
@@ -30,7 +31,7 @@ class GoogleLoginController extends Controller
             ->redirect();
     }
 
-    public function handleGoogleCallback(Request $request)
+    public function handleGoogleCallback(Request $request, AccountLifecycleService $accountLifecycle)
     {
         try {
             $googleUser = Socialite::driver('google')
@@ -45,10 +46,18 @@ class GoogleLoginController extends Controller
                     return redirect()->route('profile.edit')->with('error', 'Use the Google account connected to GreenPool to continue.');
                 }
 
-                $request->session()->put('google_deactivation_verified_user_id', $user->id);
+                // Selecting the linked Google account is the confirmation step.  Complete
+                // the requested action here instead of returning the user to Profile and
+                // expecting a second click that is easy to miss.
+                $accountLifecycle->deactivate($user);
+                Auth::logout();
+                $request->session()->invalidate();
+                $request->session()->regenerateToken();
 
-                return redirect()->route($user->role === 'driver' ? 'driver.profile.edit' : 'profile.edit')
-                    ->with('status', 'google-account-confirmed');
+                return redirect()->route('login')->with(
+                    'status',
+                    'Your account has been deactivated. Sign in within 30 days if you want to reactivate it.'
+                );
             }
 
             if ($request->session()->pull('google_linking', false) && Auth::check()) {

@@ -15,7 +15,9 @@
                         <td style="background-color:#287f36; padding:28px 36px;">
                             <table role="presentation" cellspacing="0" cellpadding="0" border="0">
                                 <tr>
-                                    <td width="42" height="42" align="center" valign="middle" style="width:42px; height:42px; border-radius:12px; background-color:#ffffff; color:#287f36; font-size:16px; font-weight:800; letter-spacing:-1px;">GP</td>
+                                    <td width="42" height="42" align="center" valign="middle" style="width:42px; height:42px;">
+                                        <img src="{{ url('/images/favicon.svg') }}" width="42" height="42" alt="GreenPool" style="display:block; width:42px; height:42px; border:0; border-radius:12px;" />
+                                    </td>
                                     <td style="padding-left:12px; color:#ffffff; font-size:24px; font-weight:700; letter-spacing:-0.5px;">GreenPool</td>
                                 </tr>
                             </table>

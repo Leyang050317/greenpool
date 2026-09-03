@@ -12,6 +12,7 @@ use App\Notifications\BookingRequestNotification;
 use App\Services\Routing\TripLocationService;
 use App\Services\Routing\TripDistanceService;
 use App\Services\Routing\TripRoutingException;
+use App\Services\PaymentService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -28,6 +29,7 @@ class PassengerBookingController extends Controller
     public function __construct(
         private readonly TripLocationService $tripLocationService,
         private readonly TripDistanceService $tripDistanceService,
+        private readonly PaymentService $paymentService,
     ) {}
 
     public function autocomplete(Request $request): JsonResponse
@@ -83,16 +85,21 @@ class PassengerBookingController extends Controller
                 'vehicle',
             ])
             ->where('status', 'Scheduled')
-            ->where('available_seats', '>', 0)
+            ->where(function ($trips) use ($request) {
+                $trips->where('available_seats', '>', 0)
+                    ->orWhereHas('bookings', fn ($bookings) => $bookings
+                        ->where('passenger_id', $request->user()->id)
+                        ->whereIn('booking_status', ['Pending', 'Accepted']));
+            })
             ->where('departure_at', '>=', now())
             ->whereHas('user.driverLicence', fn ($licence) => $licence
                 ->where('verification_status', 'Verified')
                 ->whereDate('valid_until', '>=', today())
                 ->whereRaw('DATE(valid_until) >= DATE(trips.departure_at)'))
             ->where('user_id', '!=', $request->user()->id)
-            ->whereDoesntHave('bookings', fn ($booking) => $booking
+            ->with(['bookings' => fn ($bookings) => $bookings
                 ->where('passenger_id', $request->user()->id)
-                ->where('booking_status', '!=', 'Rejected'));
+                ->whereIn('booking_status', ['Pending', 'Accepted'])]);
 
         $rankBySearchScore = false;
 
@@ -115,7 +122,9 @@ class PassengerBookingController extends Controller
 
         $trips = $query->orderBy('departure_at')->paginate(6)->withQueryString();
 
-        return view('passenger.booking.index', compact('trips'));
+        $bookingRestricted = $this->paymentService->hasBookingRestriction($request->user());
+
+        return view('passenger.booking.index', compact('trips', 'bookingRestricted'));
     }
 
     public function create(Request $request): View
@@ -147,6 +156,12 @@ class PassengerBookingController extends Controller
 
     public function store(StoreBookingRequest $request): RedirectResponse
     {
+        if ($this->paymentService->hasBookingRestriction($request->user())) {
+            throw ValidationException::withMessages([
+                'trip_id' => 'New bookings are unavailable while you have an overdue payment or a payment issue under review. Open Payments to resolve it.',
+            ]);
+        }
+
         if ($request->filled('pickup_place_id')) {
             try {
                 $pickup = $this->tripLocationService->resolve($request->string('pickup_place_id')->toString(), 'pickup_place_id');
@@ -279,15 +294,46 @@ class PassengerBookingController extends Controller
 
         abort_unless($booking->passenger_id === $request->user()->id, 403);
 
-        if ($booking->booking_status !== 'Pending') {
-            return back()->with('error', 'Only pending booking requests can be cancelled.');
+        $booking->loadMissing('trip.user');
+        $trip = $booking->trip;
+
+        if ($booking->booking_status === 'Pending') {
+            $booking->update(['booking_status' => 'Cancelled']);
+            $booking->trip->user->notify(new BookingRequestNotification($booking, 'cancelled'));
+            BookingStatusUpdated::dispatch($booking, 'booking_request_cancelled');
+
+            return redirect()->route('passenger.bookings.history')->with('success', 'Booking request cancelled successfully.');
         }
 
-        $booking->update(['booking_status' => 'Cancelled']);
-        $booking->trip->user->notify(new BookingRequestNotification($booking, 'cancelled'));
-        BookingStatusUpdated::dispatch($booking, 'booking_request_cancelled');
+        if ($booking->booking_status === 'Accepted' && $trip->status === 'Scheduled') {
+            $booking = DB::transaction(function () use ($booking, $trip) {
+                $lockedBooking = Booking::query()->whereKey($booking->getKey())->lockForUpdate()->firstOrFail();
+                $lockedTrip = Trip::query()->whereKey($trip->getKey())->lockForUpdate()->firstOrFail();
 
-        return redirect()->route('passenger.bookings.history')->with('success', 'Booking request cancelled successfully.');
+                abort_unless($lockedBooking->booking_status === 'Accepted' && $lockedTrip->status === 'Scheduled', 422);
+
+                $lockedBooking->update(['booking_status' => 'Cancelled']);
+                $lockedTrip->increment('available_seats', $lockedBooking->number_of_seats);
+
+                return $lockedBooking->load('trip.user');
+            });
+
+            $booking->trip->user->notify(new BookingRequestNotification($booking, 'cancelled_confirmed'));
+            BookingStatusUpdated::dispatch($booking, 'booking_confirmed_cancelled');
+
+            return redirect()->route('passenger.bookings.history')->with('success', 'Confirmed booking cancelled. The seats are available again.');
+        }
+
+        if ($booking->booking_status === 'Accepted' && $trip->status === 'In Progress' && $booking->picked_up_at === null) {
+            $booking->update(['booking_status' => 'Cancelled']);
+            $booking->load('trip.user');
+            $booking->trip->user->notify(new BookingRequestNotification($booking, 'not_boarding'));
+            BookingStatusUpdated::dispatch($booking, 'passenger_not_boarding');
+
+            return redirect()->route('passenger.bookings.history')->with('success', 'Your driver has been notified that you will not board.');
+        }
+
+        return back()->with('error', 'This booking can no longer be cancelled. Use Emergency if you need urgent help during the trip.');
     }
 
     private function ensurePassenger(Request $request): void

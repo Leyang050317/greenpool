@@ -4,6 +4,9 @@
     $contacts = auth()->user()->emergencyContacts()->get();
     $emergencyContactsRoute = auth()->user()->role === 'driver' ? route('driver.profile.edit') : route('profile.edit');
     $reports = $trip->emergencies()->with(['user', 'acknowledgedBy', 'resolvedBy'])->latest('triggered_at')->get();
+    $hasOpenEmergency = $reports->contains(fn ($report) => in_array($report->status, ['Active', 'Acknowledged'], true));
+    $isDriver = $trip->user_id === auth()->id();
+    $hasPickedUpPassenger = $trip->bookings()->where('booking_status', 'Accepted')->whereNotNull('picked_up_at')->exists();
 @endphp
 
 <section
@@ -37,7 +40,7 @@
         </div>
         <button type="button" @click="openPanel()" class="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-red-200 bg-white px-4 py-2 text-sm font-semibold text-red-700 shadow-sm hover:bg-red-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600 focus-visible:ring-offset-2">
             <x-icons.lucide name="triangle-alert" class="h-4 w-4" />
-            Report Emergency
+            {{ $hasOpenEmergency ? 'Report another emergency' : 'Report Emergency' }}
         </button>
     </div>
 
@@ -60,14 +63,33 @@
                     </div>
                     @if($report->status === 'Acknowledged' && $report->acknowledgedBy)<p class="mt-3 text-xs text-amber-800">Acknowledged by {{ $report->acknowledgedBy->name }} · {{ $report->acknowledged_at?->format('j M, g:i A') }}</p>@endif
                     @if($report->status === 'Resolved' && $report->resolvedBy)<p class="mt-3 text-xs text-green-800">Resolved by {{ $report->resolvedBy->name }} · {{ $report->resolved_at?->format('j M, g:i A') }}</p>@endif
+                    @php
+                        $canResolve = $report->status === 'Acknowledged'
+                            && ($isDriver || ($report->role === 'passenger' && $report->user_id === auth()->id()));
+                    @endphp
                     @if($report->status === 'Active' && $report->user_id !== auth()->id())
                         <form data-emergency-acknowledge-for="{{ $report->id }}" method="POST" action="{{ route('emergencies.acknowledge', $report) }}" class="mt-4">@csrf @method('PATCH')<button class="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800 hover:bg-amber-100">Acknowledge emergency</button></form>
-                    @elseif($report->status === 'Acknowledged')
+                    @elseif($canResolve)
                         <form data-emergency-resolve-for="{{ $report->id }}" method="POST" action="{{ route('emergencies.resolve', $report) }}" class="mt-4">@csrf @method('PATCH')<button class="rounded-lg border border-green-300 bg-green-50 px-3 py-2 text-xs font-semibold text-green-800 hover:bg-green-100">Mark as resolved</button></form>
                     @endif
                 </article>
             @endforeach
         </div>
+    @endif
+
+    @if($hasOpenEmergency)
+        <section class="mt-5 rounded-xl border border-red-200 bg-white p-4" aria-label="Emergency actions">
+            <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div><h3 class="font-semibold text-slate-900">Emergency actions remain available</h3><p class="mt-1 text-xs leading-5 text-slate-600">Your report is saved. You do not need to submit another report to call for help.</p></div>
+                <a href="tel:999" class="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-700"><x-icons.lucide name="phone" class="h-4 w-4" />Call 999</a>
+            </div>
+            @if($contacts->isNotEmpty())
+                <div class="mt-4 flex flex-wrap gap-2">@foreach($contacts as $contact)<a href="tel:{{ $contact->phone_number }}" class="inline-flex items-center gap-1.5 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm font-semibold text-green-800 hover:bg-green-100"><x-icons.lucide name="phone" class="h-3.5 w-3.5" />{{ $contact->name }}</a>@endforeach</div>
+            @endif
+            @if($isDriver && ! $hasPickedUpPassenger)
+                <div class="mt-4 border-t border-red-100 pt-4"><x-trip-confirmation name="emergency-cancel-{{ $trip->trip_id }}" title="End trip early due to emergency?" message="This cancels the trip before any passenger has boarded and notifies all accepted passengers. This cannot be undone." confirm-label="End trip early" :action="route('driver.trips.emergency-cancel', $trip)" variant="danger" class="rounded-lg px-3 py-2 text-sm font-semibold">End trip early</x-trip-confirmation></div>
+            @endif
+        </section>
     @endif
 
     <div x-cloak x-show="open" class="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="emergency-modal-title">

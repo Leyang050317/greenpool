@@ -324,6 +324,7 @@ class PaymentModuleTest extends TestCase
         [$driver, , $firstBooking] = $this->completedBooking();
         $trip = $firstBooking->trip;
         $trip->update(['status' => 'In Progress', 'completed_at' => null, 'started_at' => now()->subHour()]);
+        $firstBooking->update(['picked_up_at' => now()->subMinutes(45)]);
         $secondPassenger = User::factory()->create(['role' => 'passenger', 'email_verified_at' => now()]);
         $secondBooking = Booking::create([
             'trip_id' => $trip->trip_id, 'passenger_id' => $secondPassenger->id,
@@ -332,8 +333,9 @@ class PaymentModuleTest extends TestCase
 
         $this->actingAs($driver)->patch(route('driver.trips.complete', $trip))->assertRedirect();
         $this->assertDatabaseHas('payments', ['booking_id' => $firstBooking->id, 'payment_status' => 'Pending']);
-        $this->assertDatabaseHas('payments', ['booking_id' => $secondBooking->id, 'payment_status' => 'Pending']);
-        $this->assertSame(2, Payment::whereIn('booking_id', [$firstBooking->id, $secondBooking->id])->count());
+        $this->assertDatabaseMissing('payments', ['booking_id' => $secondBooking->id]);
+        $this->assertSame('Cancelled', $secondBooking->fresh()->booking_status);
+        $this->assertSame(1, Payment::whereIn('booking_id', [$firstBooking->id, $secondBooking->id])->count());
     }
 
     public function test_driver_total_earnings_only_include_successful_payments(): void
@@ -352,6 +354,49 @@ class PaymentModuleTest extends TestCase
         $this->actingAs($driver)->get(route('driver.home'))
             ->assertOk()
             ->assertSee('RM 25.00');
+    }
+
+    public function test_passenger_can_report_a_payment_issue_and_driver_can_resolve_it(): void
+    {
+        [$driver, $passenger, $booking] = $this->completedBooking();
+        $payment = app(PaymentService::class)->createPendingForBooking($booking);
+
+        $this->actingAs($passenger)->post(route('payments.issue.report', $payment), [
+            'issue_reason' => 'amount_incorrect',
+            'issue_details' => 'The displayed fare is not what we agreed.',
+        ])->assertRedirect(route('payments.show', $payment));
+
+        $payment->refresh();
+        $this->assertSame('Under Review', $payment->payment_status);
+        $this->assertSame('amount_incorrect', $payment->issue_reason);
+        $this->assertTrue(app(PaymentService::class)->hasBookingRestriction($passenger));
+
+        $this->actingAs($driver)->post(route('payments.issue.resolve', $payment), [
+            'resolution' => 'waive',
+            'resolution_details' => 'Trip did not proceed as expected.',
+        ])->assertRedirect(route('payments.show', $payment));
+
+        $payment->refresh();
+        $this->assertSame('Waived', $payment->payment_status);
+        $this->assertFalse(app(PaymentService::class)->hasBookingRestriction($passenger));
+
+        $payment->update(['payment_status' => 'Under Review']);
+        $this->actingAs($driver)->post(route('payments.issue.resolve', $payment), [
+            'resolution' => 'keep_due',
+        ])->assertRedirect(route('payments.show', $payment));
+        $this->assertTrue(app(PaymentService::class)->hasBookingRestriction($passenger));
+    }
+
+    public function test_completed_trip_cannot_be_completed_without_a_picked_up_passenger(): void
+    {
+        [$driver, , $booking] = $this->completedBooking();
+        $trip = $booking->trip;
+        $trip->update(['status' => 'In Progress', 'completed_at' => null, 'started_at' => now()->subHour()]);
+        $booking->update(['picked_up_at' => null]);
+
+        $this->actingAs($driver)->patch(route('driver.trips.complete', $trip))->assertStatus(422);
+        $this->assertSame('In Progress', $trip->fresh()->status);
+        $this->assertDatabaseMissing('payments', ['booking_id' => $booking->id]);
     }
 
     private function completedBooking(float $price = 10, int $seats = 1): array

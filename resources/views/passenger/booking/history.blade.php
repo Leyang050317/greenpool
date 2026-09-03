@@ -92,6 +92,10 @@
                                                 >
                                                     Cancel
                                                 </x-trip-confirmation>
+                                            @elseif($booking->booking_status === 'Accepted' && $booking->trip->status === 'Scheduled')
+                                                <x-trip-confirmation name="cancel-confirmed-booking-{{ $booking->id }}" title="Cancel confirmed booking?" message="Your driver will be notified and your seats will become available again." confirm-label="Cancel booking" :action="route('passenger.bookings.cancel', $booking)" variant="danger" class="h-9 rounded-lg px-3 text-xs font-medium">Cancel booking</x-trip-confirmation>
+                                            @elseif($booking->booking_status === 'Accepted' && $booking->trip->status === 'In Progress' && $booking->picked_up_at === null)
+                                                <x-trip-confirmation name="not-boarding-{{ $booking->id }}" title="Tell your driver you will not board?" message="Your driver will be told to skip your pickup point. Use Emergency instead if you need urgent help." confirm-label="I will not board" :action="route('passenger.bookings.cancel', $booking)" variant="danger" class="h-9 rounded-lg px-3 text-xs font-medium">I will not board</x-trip-confirmation>
                                             @elseif($booking->booking_status === 'Accepted' && $booking->trip->status === 'Completed' && ! $booking->payment?->isPaid())
                                                 <a href="{{ route('payments.checkout', $booking) }}" class="rounded-lg bg-green-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-green-700">Pay RM {{ number_format((float) $booking->trip->price_per_passenger * $booking->number_of_seats, 2) }}</a>
                                             @elseif($booking->booking_status === 'Accepted' && $booking->trip->status === 'Completed' && ! $booking->ratings->contains('reviewer_id', Auth::id()))

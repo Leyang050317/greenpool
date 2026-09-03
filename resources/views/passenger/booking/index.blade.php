@@ -24,6 +24,13 @@
                 <div class="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-800">{{ session('error') }}</div>
             @endif
 
+            @if($bookingRestricted)
+                <div class="mb-6 flex flex-col gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 sm:flex-row sm:items-center sm:justify-between">
+                    <span><strong>New bookings are paused.</strong> Resolve your overdue payment or payment issue first.</span>
+                    <a href="{{ route('payments.index') }}" class="font-semibold underline">Open Payments</a>
+                </div>
+            @endif
+
             <form
                 method="GET"
                 action="{{ route('passenger.booking') }}"
@@ -70,6 +77,7 @@
             @else
                 <div class="grid gap-4 lg:grid-cols-2">
                     @foreach($trips as $trip)
+                        @php($myBooking = $trip->bookings->first())
                         <article class="rounded-xl border border-gray-100 bg-white p-5 transition-shadow hover:shadow-md">
                             <div class="mb-4 flex items-start justify-between gap-4">
                                 <div class="flex min-w-0 items-center gap-3">
@@ -125,11 +133,17 @@
                                 @endif
                             </div>
 
-                            <div class="mt-5 flex justify-end border-t border-gray-50 pt-4">
-                                <a href="{{ route('passenger.bookings.create', ['trip_id' => $trip->trip_id]) }}" class="inline-flex items-center gap-2 rounded-xl bg-[#2E7D32] px-4 py-2 text-sm font-semibold text-white hover:bg-[#256b29]">
-                                    View Details
-                                    <x-icons.lucide name="arrow-right" class="h-4 w-4" />
-                                </a>
+                            <div class="mt-5 flex items-center justify-between gap-3 border-t border-gray-50 pt-4">
+                                @if($myBooking)
+                                    <span class="rounded-full px-2.5 py-1 text-xs font-semibold {{ $myBooking->booking_status === 'Accepted' ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700' }}">{{ $myBooking->booking_status === 'Accepted' ? 'Booking confirmed' : 'Booking pending' }}</span>
+                                    <a href="{{ route('passenger.bookings.show', $myBooking) }}" class="inline-flex items-center gap-2 rounded-xl bg-[#2E7D32] px-4 py-2 text-sm font-semibold text-white hover:bg-[#256b29]">View booking <x-icons.lucide name="arrow-right" class="h-4 w-4" /></a>
+                                @elseif($bookingRestricted)
+                                    <span class="text-xs font-medium text-amber-700">Resolve payment to book a new trip.</span>
+                                    <a href="{{ route('payments.index') }}" class="inline-flex items-center gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-800 hover:bg-amber-100">Payments <x-icons.lucide name="arrow-right" class="h-4 w-4" /></a>
+                                @else
+                                    <span></span>
+                                    <a href="{{ route('passenger.bookings.create', ['trip_id' => $trip->trip_id]) }}" class="inline-flex items-center gap-2 rounded-xl bg-[#2E7D32] px-4 py-2 text-sm font-semibold text-white hover:bg-[#256b29]">View Details <x-icons.lucide name="arrow-right" class="h-4 w-4" /></a>
+                                @endif
                             </div>
                         </article>
                     @endforeach

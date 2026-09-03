@@ -155,6 +155,8 @@ const bookingUpdateNotification = (event, role) => {
     };
     const driverMessages = {
         booking_request_cancelled: ['Booking Request Cancelled', `A passenger cancelled their booking request for ${route}.`, '×'],
+        booking_confirmed_cancelled: ['Confirmed Booking Cancelled', `A passenger cancelled their confirmed booking for ${route}.`, '×'],
+        passenger_not_boarding: ['Passenger Will Not Board', `A passenger will not board ${route}. You can skip their pickup.`, '×'],
     };
     const [title, message, icon] = (role === 'passenger' ? passengerMessages : driverMessages)[type] || [];
 
@@ -338,7 +340,7 @@ const subscribeToBookingUpdates = () => {
                     }
                     return;
                 }
-                if (event.driver_notification_type === 'booking_request_cancelled') {
+                if (['booking_request_cancelled', 'booking_confirmed_cancelled', 'passenger_not_boarding'].includes(event.driver_notification_type)) {
                     incrementNotificationBadge();
                     const notification = bookingUpdateNotification(event, 'driver');
                     if (notification) showRealtimeNotification(notification, notification.icon);
