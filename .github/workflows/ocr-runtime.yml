@@ -64,4 +64,4 @@ jobs:
       - name: Build the complete application image (no production secrets)
         run: railpack build --name greenpool-ocr-check --progress plain --env APP_ENV=testing --env CACHE_STORE=array --env SESSION_DRIVER=array --env QUEUE_CONNECTION=sync .
       - name: Scan offline inside the final image through Laravel
-        run: docker run --rm --network none --memory=4g --cpus=2 --entrypoint /app/.venv-ocr/bin/python greenpool-ocr-check /app/ocr/smoke_test.py --through-laravel
+        run: docker run --rm --network none --memory=1g --memory-swap=1g --cpus=2 --entrypoint /app/.venv-ocr/bin/python greenpool-ocr-check /app/ocr/smoke_test.py --through-laravel
