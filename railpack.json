@@ -5,15 +5,17 @@
         "python": "3.12"
     },
     "steps": {
-        "install": {
+        "build": {
             "commands": [
                 "...",
-                {
-                    "src": "ocr/requirements.txt",
-                    "dest": "ocr/requirements.txt"
-                },
-                "python -m pip install --no-cache-dir -r ocr/requirements.txt"
+                "python -m venv .venv-ocr",
+                ".venv-ocr/bin/python -m pip install --no-cache-dir -r ocr/requirements.txt"
             ]
         }
+    },
+    "deploy": {
+        "aptPackages": [
+            "libgomp1"
+        ]
     }
 }
