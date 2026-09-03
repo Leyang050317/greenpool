@@ -155,6 +155,10 @@ class VehicleController extends Controller
 
     public function ocr(Request $request): JsonResponse
     {
+        // The first local PaddleOCR run can download and initialize several models.
+        // Keep PHP's request deadline aligned with the configured worker deadline.
+        set_time_limit((int) config('ocr.timeout') + 30);
+
         $validated = $request->validate([
             'document' => ['required', 'file', 'image', 'mimes:jpg,jpeg,png', 'max:8192', 'dimensions:min_width=500,min_height=300'],
             'expected_document_type' => ['required', 'in:DRIVING_LICENCE,VEHICLE_GERAN'],

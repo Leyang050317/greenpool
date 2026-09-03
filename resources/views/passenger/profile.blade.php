@@ -7,7 +7,7 @@
         [x-cloak] { display: none !important; }
     </style>
 
-    <div class="max-w-5xl mx-auto p-8 relative" x-data="{
+    <div class="relative mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8" x-data="{
         currentView: '{{ $errors->has('otp') || $errors->has('phone_number') ? 'main' : ($errors->updatePassword->isNotEmpty() ? 'password' : ($errors->userDeletion->isNotEmpty() ? 'settings' : ($errors->isNotEmpty() ? 'edit' : 'main'))) }}',
         showToast: {{ in_array(session('status'), ['password-updated', 'profile-updated', 'google-account-linked', 'google-account-unlinked'], true) ? 'true' : 'false' }},
         showLogoutModal: false,
@@ -19,7 +19,7 @@
             }
         }
     }">
-        <div x-show="currentView === 'main'" x-transition.opacity class="max-w-3xl mx-auto">
+        <div x-show="currentView === 'main'" x-transition.opacity class="max-w-6xl mx-auto">
             <div class="mb-6">
                 <h1 class="text-2xl font-bold text-gray-900">My Profile</h1>
                 <p class="text-sm text-gray-500 mt-1">View and manage your passenger account information.</p>
@@ -27,56 +27,52 @@
 
             <div class="mb-6"><x-profile-completeness-card :profile-completeness="$profileCompleteness" /></div>
 
-            <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-8">
-                <div class="p-6 flex items-center justify-between border-b border-gray-100">
-                <div class="flex items-center">
+            <div class="mt-6 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+            <div>
+                <div class="flex flex-col gap-5 border-b border-gray-100 p-6 sm:flex-row sm:items-center sm:justify-between">
+                <div class="flex min-w-0 items-center gap-4">
                     @if($user->photo)
-                        <img src="{{ asset('storage/'.$user->photo) }}" alt="Profile" class="w-16 h-16 rounded-full mr-5 object-cover border border-gray-200">
+                        <img src="{{ asset('storage/'.$user->photo) }}" alt="Profile" class="h-20 w-20 rounded-full border border-gray-200 object-cover">
                     @else
-                        <div class="w-16 h-16 rounded-full bg-[#2E7D32] flex items-center justify-center text-white font-bold text-xl mr-5">
-                            {{ strtoupper(substr($user->name ?? 'U', 0, 2)) }}
+                        <div class="flex h-20 w-20 shrink-0 items-center justify-center rounded-full bg-[#2E7D32] text-2xl font-bold text-white">
+                            {{ mb_strtoupper(mb_substr($user->name ?? 'U', 0, 1)) }}
                         </div>
                     @endif
-                    <div>
-                        <h3 class="text-lg font-bold text-gray-900">{{ $user->name }}</h3>
-                        <p class="text-sm text-gray-500 mb-1.5">{{ $user->email }}</p>
-                        <span class="text-xs font-bold text-[#2E7D32] bg-green-100 px-2 py-1 rounded-md">{{ ucfirst($user->role) }}</span>
-                        <a href="{{ route('ratings.received', $user) }}" class="mt-2 flex w-fit items-center gap-1 text-sm font-semibold text-amber-500 hover:text-amber-600">
-                            <x-icons.lucide name="star" class="h-4 w-4 fill-current" />
+                    <div class="min-w-0">
+                        <h3 class="truncate text-xl font-bold text-gray-950">{{ $user->name }}</h3>
+                        <p class="mt-1 truncate text-sm text-gray-500">{{ $user->email }}</p>
+                        <div class="mt-3 flex flex-wrap items-center gap-2">
+                        <span class="rounded-full bg-green-100 px-2.5 py-1 text-xs font-semibold text-[#2E7D32]">{{ ucfirst($user->role) }}</span>
+                        <a href="{{ route('ratings.received', $user) }}" class="inline-flex items-center gap-1 text-xs font-semibold text-amber-600 hover:text-amber-700">
+                            <x-icons.lucide name="star" class="h-3.5 w-3.5 fill-current" />
                             {{ $user->ratings_received_count > 0 ? number_format((float) $user->ratings_received_avg_score, 1) : 'No rating' }}
                             <span class="font-normal text-gray-400">({{ $user->ratings_received_count }} {{ Str::plural('review', $user->ratings_received_count) }})</span>
                         </a>
+                        </div>
                     </div>
                 </div>
-                <button @click="currentView = 'edit'" class="flex items-center justify-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-                    <svg class="w-4 h-4 mr-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
-                    Edit
+                <button @click="currentView = 'edit'" class="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">
+                    <x-icons.lucide name="pencil" class="h-4 w-4" />Edit Profile
                 </button>
                 </div>
-                <div class="px-6 py-4 border-b border-gray-100">
-                    <p class="text-xs text-gray-400 mb-1">Name</p>
-                    <p class="text-sm font-medium text-gray-900">{{ $user->name }}</p>
-                </div>
-                <div class="px-6 py-4 border-b border-gray-100">
-                    <p class="text-xs text-gray-400 mb-1">Email Address</p>
-                    <p class="text-sm font-medium text-gray-900">{{ $user->email }}</p>
-                </div>
-                <div class="px-6 py-4">
-                    <p class="text-xs text-gray-400 mb-1">Role</p>
-                    <p class="text-sm font-medium text-gray-900">{{ ucfirst($user->role) }}</p>
+                <div class="grid divide-y divide-gray-100 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+                    <div class="p-5"><p class="text-xs font-medium uppercase tracking-wide text-gray-400">Name</p><p class="mt-2 text-sm font-semibold text-gray-900">{{ $user->name }}</p></div>
+                    <div class="p-5"><p class="text-xs font-medium uppercase tracking-wide text-gray-400">Email Address</p><p class="mt-2 truncate text-sm font-semibold text-gray-900">{{ $user->email }}</p></div>
+                    <div class="p-5"><p class="text-xs font-medium uppercase tracking-wide text-gray-400">Account Type</p><p class="mt-2 text-sm font-semibold text-gray-900">{{ $user->usesGoogleAuthentication() ? 'Google account' : 'Password account' }}</p></div>
                 </div>
             </div>
 
-            <div class="mb-8">
+            <div class="border-t border-gray-100 px-6 py-6">
                 <x-phone-verification-card :user="$user" />
             </div>
 
-            <div class="mb-8">
+            <div class="border-t border-gray-100 px-6 py-6">
                 <x-emergency-contacts-card :user="$user" />
             </div>
 
-            <h4 class="text-sm font-bold text-gray-700 mb-3">Account</h4>
-            <div class="bg-white rounded-xl shadow-sm border border-gray-200 divide-y divide-gray-100">
+            <section class="border-t border-gray-100 px-6 pb-6 pt-8">
+            <h4 class="mb-3 text-sm font-bold text-gray-700">Account</h4>
+            <div class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm divide-y divide-gray-100">
                 @if ($canManagePassword)
                 <button type="button" @click="currentView = 'password'" class="w-full flex items-center justify-between px-6 py-4 hover:bg-gray-50 transition-colors rounded-t-xl group text-left">
                     <div class="flex items-center">
@@ -103,11 +99,13 @@
 
                 <button type="button" @click="showLogoutModal = true" class="w-full flex items-center justify-between px-6 py-4 hover:bg-gray-50 transition-colors rounded-b-xl group text-left">
                     <div class="flex items-center">
-                        <svg class="w-5 h-5 text-gray-400 mr-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+                        <x-icons.lucide name="log-out" class="mr-4 h-5 w-5 shrink-0 text-gray-400" />
                         <p class="text-sm font-medium text-gray-900">Log Out</p>
                     </div>
                     <svg class="w-5 h-5 text-gray-300 group-hover:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
                 </button>
+            </div>
+            </section>
             </div>
         </div>
 
@@ -195,18 +193,10 @@
         </div>
 
         @if ($canManagePassword)
-        <div x-show="currentView === 'password'" x-cloak x-transition.opacity class="max-w-2xl mx-auto">
-            <div class="flex items-center mb-6">
-                <button type="button" @click="currentView = 'main'" class="text-gray-400 hover:text-gray-600 mr-4">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
-                </button>
-                <div>
-                    <h1 class="text-2xl font-bold text-gray-900">Update Password</h1>
-                    <p class="text-sm text-gray-500 mt-1">Use a secure password for your GreenPool account.</p>
-                </div>
-            </div>
-
-            <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
+        <div x-show="currentView === 'password'" x-cloak x-transition.opacity class="mx-auto max-w-3xl">
+            <section class="overflow-hidden rounded-[28px] border border-green-100 bg-white shadow-sm">
+                <div class="bg-gradient-to-r from-[#166534] via-[#2E7D32] to-[#4aa65b] px-6 py-7 text-white sm:px-8"><button type="button" @click="currentView = 'main'" class="mb-6 inline-flex items-center gap-2 rounded-lg px-2 py-1 text-sm font-semibold text-green-50 transition hover:bg-white/15 hover:text-white"><x-icons.lucide name="arrow-left" class="h-4 w-4" />Back to profile</button><div class="flex items-start gap-4"><span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/15"><x-icons.lucide name="lock-keyhole" class="h-6 w-6" /></span><div><p class="text-sm font-semibold text-green-100">ACCOUNT SECURITY</p><h1 class="mt-1 text-3xl font-bold tracking-tight">Update password</h1><p class="mt-2 text-sm leading-6 text-green-50">Choose a unique password to keep your GreenPool account protected.</p></div></div></div>
+                <div class="grid gap-8 p-6 sm:p-8 lg:grid-cols-[1fr_13rem]"><div><p class="mb-6 text-sm leading-6 text-slate-500">Use at least 8 characters with uppercase, lowercase, a number, and a symbol.</p>
                 <form method="POST" action="{{ route('password.update') }}">
                     @csrf
                     @method('put')
@@ -235,47 +225,40 @@
                         @enderror
                     </div>
 
-                    <div class="grid grid-cols-2 gap-4">
-                        <button type="button" @click="currentView = 'main'" class="flex items-center justify-center px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+                    <div class="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                        <button type="button" @click="currentView = 'main'" class="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-300 px-5 text-sm font-semibold text-slate-700 hover:bg-slate-50">
                             Cancel
                         </button>
-                        <button type="submit" class="flex items-center justify-center px-4 py-2.5 text-sm font-medium text-white bg-[#2E7D32] border border-transparent rounded-lg hover:bg-green-800 transition-colors">
-                            Save
+                        <button type="submit" class="inline-flex min-h-11 items-center justify-center rounded-xl bg-[#2E7D32] px-5 text-sm font-semibold text-white shadow-sm hover:bg-[#256b29]">
+                            Save new password
                         </button>
                     </div>
                 </form>
-            </div>
+                </div><aside class="h-fit rounded-2xl border border-green-100 bg-green-50 p-5"><x-icons.lucide name="shield-check" class="h-6 w-6 text-[#2E7D32]" /><h2 class="mt-3 font-bold text-slate-900">Keep it private</h2><p class="mt-2 text-sm leading-6 text-slate-600">Never share your password or a reset link. GreenPool will never ask for it in chat.</p></aside></div>
+            </section>
         </div>
         @endif
 
-        <div x-show="currentView === 'settings'" x-cloak x-transition.opacity class="max-w-2xl mx-auto">
-            <div class="flex items-center mb-6">
-                <button type="button" @click="currentView = 'main'" class="text-gray-400 hover:text-gray-600 mr-4">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
-                </button>
-                <div>
-                    <h1 class="text-2xl font-bold text-gray-900">Account Settings</h1>
-                    <p class="text-sm text-gray-500 mt-1">Manage your account preferences and data.</p>
-                </div>
-            </div>
+        <div x-show="currentView === 'settings'" x-cloak x-transition.opacity class="mx-auto max-w-4xl">
+            <div class="mb-6 overflow-hidden rounded-[28px] bg-slate-900 px-6 py-7 text-white shadow-sm sm:px-8"><button type="button" @click="currentView = 'main'" class="mb-6 inline-flex items-center gap-2 rounded-lg px-2 py-1 text-sm font-semibold text-slate-300 transition hover:bg-white/10 hover:text-white"><x-icons.lucide name="arrow-left" class="h-4 w-4" />Back to profile</button><div class="flex items-start gap-4"><span class="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10 text-green-300"><x-icons.lucide name="settings" class="h-6 w-6" /></span><div><p class="text-sm font-semibold tracking-wide text-green-300">ACCOUNT CENTRE</p><h1 class="mt-1 text-3xl font-bold tracking-tight">Account settings</h1><p class="mt-2 text-sm leading-6 text-slate-300">Review sign-in details, connected accounts, and account data.</p></div></div></div>
 
-            <h4 class="text-sm font-bold text-gray-700 mb-3">Account Details</h4>
-            <div class="bg-white rounded-xl shadow-sm border border-gray-200 mb-8">
-                <div class="px-6 py-4 border-b border-gray-100">
-                    <p class="text-xs text-gray-400 mb-1">Account Email</p>
-                    <p class="text-sm font-medium text-gray-900">{{ $user->email }}</p>
-                </div>
-                <div class="px-6 py-4">
-                    <p class="text-xs text-gray-400 mb-1">Role</p>
-                    <p class="text-sm font-medium text-gray-900">{{ ucfirst($user->role) }}</p>
-                </div>
-            </div>
+            <div class="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm">
+                <section class="p-6 sm:p-7">
+                    <p class="text-xs font-bold uppercase tracking-[0.12em] text-slate-400">Account details</p>
+                    <div class="mt-4 grid overflow-hidden rounded-xl border border-slate-200 sm:grid-cols-2">
+                        <div class="border-b border-slate-100 p-5 sm:border-b-0 sm:border-r"><p class="text-xs font-bold uppercase tracking-wide text-slate-400">Account email</p><p class="mt-2 break-all text-sm font-semibold text-slate-900">{{ $user->email }}</p><p class="mt-1 text-xs text-slate-500">Email changes are protected for account safety.</p></div>
+                        <div class="p-5"><p class="text-xs font-bold uppercase tracking-wide text-slate-400">Account role</p><p class="mt-2 inline-flex rounded-full bg-green-100 px-2.5 py-1 text-sm font-semibold text-[#2E7D32]">{{ ucfirst($user->role) }}</p><p class="mt-1 text-xs text-slate-500">Your role is set when you register.</p></div>
+                    </div>
+                </section>
 
-            <h4 class="text-sm font-bold text-gray-700 mb-3">Linked Accounts</h4>
-            <div class="mb-8"><x-linked-accounts.google-card :user="$user" /></div>
+                <section class="border-t border-slate-200 p-6 sm:p-7">
+                    <p class="mb-4 text-xs font-bold uppercase tracking-[0.12em] text-slate-400">Linked accounts</p>
+                    <x-linked-accounts.google-card :user="$user" />
+                </section>
 
-            <h4 class="text-sm font-bold text-gray-700 mb-3">Recent Login Activity</h4>
-            <div class="bg-white rounded-xl shadow-sm border border-gray-200 mb-8 px-6 py-2">
+                <section class="border-t border-slate-200 p-6 sm:p-7">
+                    <p class="mb-2 text-xs font-bold uppercase tracking-[0.12em] text-slate-400">Recent login activity</p>
+                    <div class="divide-y divide-gray-100">
                 @forelse ($recentLogins as $login)
                     <div class="flex items-center gap-4 border-b border-gray-100 py-4 last:border-b-0">
                         <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-green-50 text-[#2E7D32]">
@@ -293,10 +276,11 @@
                         <p class="mt-1 text-xs text-gray-500">Your successful sign-ins will appear here.</p>
                     </div>
                 @endforelse
-            </div>
+                    </div>
+                </section>
 
-            <h4 class="text-sm font-bold text-red-500 mb-3">Danger Zone</h4>
-            <div class="bg-white rounded-xl shadow-sm border border-red-200 px-6 py-5">
+                <section class="border-t border-red-100 bg-red-50/40 p-6 sm:p-7">
+                    <p class="mb-4 text-xs font-bold uppercase tracking-[0.12em] text-red-500">Danger zone</p>
                 <div class="flex items-start">
                     <div class="flex-shrink-0 mt-0.5 mr-4 text-red-500">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
@@ -309,6 +293,7 @@
                         </button>
                     </div>
                 </div>
+                </section>
             </div>
         </div>
 

@@ -9,10 +9,12 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use RuntimeException;
 use Tests\TestCase;
+use Tests\Concerns\CreatesVehicleValidationTokens;
 
 class VehicleManagementTest extends TestCase
 {
     use RefreshDatabase;
+    use CreatesVehicleValidationTokens;
 
     public function test_driver_can_view_only_their_vehicles(): void
     {
@@ -741,7 +743,7 @@ class VehicleManagementTest extends TestCase
             'manufacturer' => $vehicle->brand,
             'model_name' => $vehicle->model,
         ];
-        $data = [...$data, ...$overrides];
+        $data = $this->withVehicleValidationTokens([...$data, ...$overrides]);
         $data['geran_plate_number'] = $data['plate_number'];
         $this->withSession(['vehicle_geran_ocr' => [
             'hash' => hash_file('sha256', $geran->getRealPath()),

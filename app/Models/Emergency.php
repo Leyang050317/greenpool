@@ -83,4 +83,13 @@ class Emergency extends Model
             default => 'Location source not confirmed',
         };
     }
+
+    public function mapUrl(): ?string
+    {
+        if ($this->latitude === null || $this->longitude === null) {
+            return null;
+        }
+
+        return 'https://www.google.com/maps?q='.$this->latitude.','.$this->longitude;
+    }
 }

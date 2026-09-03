@@ -411,12 +411,17 @@ const subscribeToEmergencyAlerts = () => {
         });
 };
 
-const updateEmergencyAcknowledgement = (event) => {
+const updateEmergencyStatus = (event) => {
     document.querySelectorAll(`[data-emergency-status-for="${event.emergency_id}"]`).forEach((status) => {
         status.textContent = event.status;
-        status.className = 'rounded-full bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-700';
+        status.className = event.status === 'Resolved'
+            ? 'rounded-full bg-green-100 px-2 py-1 text-xs font-semibold text-green-700'
+            : 'rounded-full bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-700';
     });
     document.querySelectorAll(`[data-emergency-acknowledge-for="${event.emergency_id}"]`).forEach((form) => form.remove());
+    if (event.status === 'Resolved') {
+        document.querySelectorAll(`[data-emergency-resolve-for="${event.emergency_id}"]`).forEach((form) => form.remove());
+    }
 };
 
 const subscribeToEmergencyAcknowledgements = () => {
@@ -428,7 +433,8 @@ const subscribeToEmergencyAcknowledgements = () => {
 
     [...new Set(tripIds)].forEach((tripId) => {
         window.Echo.private(`trip.${tripId}`)
-            .listen('EmergencyAcknowledged', updateEmergencyAcknowledgement);
+            .listen('EmergencyAcknowledged', updateEmergencyStatus)
+            .listen('EmergencyResolved', updateEmergencyStatus);
     });
 };
 

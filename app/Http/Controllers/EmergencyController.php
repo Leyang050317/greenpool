@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Events\EmergencyTriggered;
 use App\Events\EmergencyAcknowledged;
+use App\Events\EmergencyResolved;
 use App\Models\Booking;
 use App\Models\Emergency;
 use App\Models\Trip;
@@ -87,6 +88,22 @@ class EmergencyController extends Controller
         EmergencyAcknowledged::dispatch($emergency->fresh());
 
         return back()->with('success', 'Issue report acknowledged.');
+    }
+
+    public function resolve(Request $request, Emergency $emergency): RedirectResponse
+    {
+        $this->participantBooking($request, $emergency->trip);
+        abort_unless($emergency->status === 'Acknowledged', 422, 'An emergency must be acknowledged before it can be resolved.');
+
+        $emergency->update([
+            'status' => 'Resolved',
+            'resolved_at' => now(),
+            'resolved_by' => $request->user()->id,
+        ]);
+
+        EmergencyResolved::dispatch($emergency->fresh());
+
+        return back()->with('success', 'Emergency marked as resolved.');
     }
 
     private function participantBooking(Request $request, Trip $trip): ?Booking

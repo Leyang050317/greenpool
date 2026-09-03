@@ -3,6 +3,7 @@
 namespace Tests\Feature\Driver;
 
 use App\Models\User;
+use Tests\Concerns\CreatesVehicleValidationTokens;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -11,6 +12,7 @@ use Tests\TestCase;
 class VehicleDocumentVerificationTest extends TestCase
 {
     use RefreshDatabase;
+    use CreatesVehicleValidationTokens;
 
     public function test_matching_normalized_geran_owner_name_can_be_saved(): void
     {
@@ -72,7 +74,7 @@ class VehicleDocumentVerificationTest extends TestCase
 
     private function payload(array $overrides = []): array
     {
-        return array_replace([
+        return $this->withVehicleValidationTokens(array_replace([
             'plate_number' => 'VAB 1234', 'brand' => 'Proton', 'model' => 'Saga',
             'colour' => 'Silver', 'seat_capacity' => 4,
             'front_image' => UploadedFile::fake()->image('front.jpg', 800, 450),
@@ -81,7 +83,7 @@ class VehicleDocumentVerificationTest extends TestCase
             'vehicle_geran' => UploadedFile::fake()->image('geran.jpg', 500, 300),
             'registered_owner_name' => 'ER KIM WEN', 'owner_identity_no' => '991109040290',
             'manufacturer' => 'PROTON', 'model_name' => 'SAGA 1.3 PREMIUM',
-        ], $overrides);
+        ], $overrides));
     }
 
     private function addValidDrivingLicence(User $driver): void

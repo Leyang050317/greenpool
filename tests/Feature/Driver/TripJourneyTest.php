@@ -48,11 +48,11 @@ class TripJourneyTest extends TestCase
             ->assertSee('35 min')
             ->assertSee('Report Emergency')
             ->assertSee('Use this only for a genuine emergency')
-            ->assertSee('Confirm Emergency')
+            ->assertSee('Safety assistance')
             ->assertSee('tel:999', false)
-            ->assertSee('Call Emergency Contact')
+            ->assertSee('Call emergency contact')
             ->assertSee(route('trips.emergencies.store', $trip), false)
-            ->assertSee('name="issue_type" value="safety_risk"', false);
+            ->assertSee('<option value="safety_risk">', false);
     }
 
     public function test_active_journey_shows_the_latest_live_driver_location_state(): void
@@ -83,7 +83,7 @@ class TripJourneyTest extends TestCase
             ->assertSee('"status":"Next Pickup"', false);
     }
 
-    public function test_active_journey_shows_one_emergency_action_without_a_persistent_report_list(): void
+    public function test_active_journey_shows_the_current_emergency_report_and_location_link(): void
     {
         $driver = $this->driver();
         $trip = $this->trip($driver);
@@ -101,16 +101,16 @@ class TripJourneyTest extends TestCase
         $this->actingAs($driver)->get(route('driver.trips.journey'))
             ->assertOk()
             ->assertSee('Report Emergency')
-            ->assertSee('Report Emergency')
-            ->assertSee('Confirm Emergency')
+            ->assertSee('Trip emergency reports')
+            ->assertSee('Traffic Delay')
             ->assertSee('Call 999')
-            ->assertDontSee('Acknowledge')
-            ->assertDontSee('Reported by');
+            ->assertSee('Reported by')
+            ->assertSee('Open location in Maps');
 
         $this->assertSame('Active', $emergency->fresh()->status);
     }
 
-    public function test_acknowledged_emergency_does_not_create_a_second_persistent_ui_panel(): void
+    public function test_acknowledged_emergency_shows_its_status_and_resolution_action(): void
     {
         $driver = $this->driver();
         $trip = $this->trip($driver);
@@ -130,7 +130,9 @@ class TripJourneyTest extends TestCase
         $this->actingAs($driver)->get(route('driver.trips.journey'))
             ->assertOk()
             ->assertSee('Report Emergency')
-            ->assertDontSee('Reported by');
+            ->assertSee('Trip emergency reports')
+            ->assertSee('Acknowledged by')
+            ->assertSee('Mark as resolved');
     }
 
     public function test_picking_up_a_booking_advances_the_timeline_without_changing_trip_lifecycle_times(): void

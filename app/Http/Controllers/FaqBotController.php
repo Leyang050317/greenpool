@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Faq;
+use App\Services\GeminiFaqService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -20,7 +21,7 @@ class FaqBotController extends Controller
         ]);
     }
 
-    public function answer(Request $request): JsonResponse
+    public function answer(Request $request, GeminiFaqService $gemini): JsonResponse
     {
         $validated = $request->validate([
             'question' => ['required', 'string', 'min:2', 'max:300'],
@@ -42,23 +43,46 @@ class FaqBotController extends Controller
             ]);
         }
 
+        // When Gemini is configured, let it select the relevant approved FAQ
+        // before the lightweight keyword fallback runs. This avoids a shared
+        // word such as "keep" incorrectly sending an alerts question to the
+        // payment-receipt FAQ.
+        $aiAnswer = $gemini->answer($validated['question'], $faqs, $request->user());
+
+        if ($aiAnswer !== null) {
+            return response()->json([
+                'matched' => false,
+                'ai' => true,
+                'title' => 'GreenPool AI Help',
+                'answer' => $aiAnswer,
+                'suggestions' => $faqs->where('is_featured', true)->take(4)->map(fn (Faq $faq) => ['id' => $faq->id, 'question' => $faq->question])->values(),
+            ]);
+        }
+
         $match = $faqs
             ->map(function (Faq $faq) use ($question, $terms): array {
-                $keywords = collect($faq->keywords ?? [])->map(fn ($keyword) => $this->normalise($keyword));
-                $haystack = $keywords->push($this->normalise($faq->question), $this->normalise($faq->answer))->implode(' ');
-                $score = $keywords->sum(fn ($keyword) => $keyword !== '' && str_contains($question, $keyword) ? 8 : 0);
+                $faqKeywords = collect($faq->keywords ?? [])->map(fn ($keyword) => $this->normalise($keyword));
+                $haystack = $faqKeywords->concat([$this->normalise($faq->question), $this->normalise($faq->answer)])->implode(' ');
+                $keywordScore = $faqKeywords->sum(fn ($keyword) => $keyword !== '' && str_contains($question, $keyword) ? 8 : 0);
+                $keywordTermMatches = collect($terms)->filter(fn (string $term) => $faqKeywords->contains($term))->count();
+                $exactTermMatches = collect($terms)->filter(fn (string $term) => str_contains($haystack, $term))->count();
+                $score = $keywordScore + ($exactTermMatches * 2);
                 $score += collect($terms)->sum(function (string $term) use ($haystack): int {
                     if (str_contains($haystack, $term)) {
-                        return 2;
+                        return 0;
                     }
 
                     return collect(explode(' ', $haystack))
                         ->contains(fn (string $candidate) => strlen($candidate) >= 4 && similar_text($term, $candidate) / max(strlen($term), strlen($candidate)) >= 0.82) ? 1 : 0;
                 });
 
-                return ['faq' => $faq, 'score' => $score];
+                // FAQ fallback is deliberately conservative. General words in
+                // the question or in an answer are not enough to claim a match.
+                return ['faq' => $faq, 'score' => $score, 'has_direct_match' => $keywordScore > 0 || $keywordTermMatches > 0];
             })
-            ->filter(fn (array $result) => $result['score'] >= 2)
+            // A fuzzy similarity by itself is not enough; words such as
+            // "alerts" and "receipt" must never redirect a user to payment help.
+            ->filter(fn (array $result) => $result['has_direct_match'] && $result['score'] >= 2)
             ->sortByDesc('score')
             ->first();
 
@@ -99,6 +123,10 @@ class FaqBotController extends Controller
             'carpool' => 'trip', 'ride' => 'booking', 'book' => 'booking', 'reserve' => 'booking',
             'chat' => 'message', 'text' => 'message', 'favourite' => 'attraction', 'favorite' => 'attraction',
             'vehicle' => 'car', 'licence' => 'license', 'money' => 'payment', 'paid' => 'payment',
+            // Users commonly describe notification preferences as alerts or
+            // pop-ups, so direct the offline FAQ fallback to Settings too.
+            'alert' => 'settings notification', 'alerts' => 'settings notification',
+            'popup' => 'settings notification', 'popups' => 'settings notification',
         ];
         $stopWords = ['a', 'an', 'and', 'are', 'can', 'do', 'for', 'how', 'i', 'in', 'is', 'it', 'my', 'of', 'on', 'the', 'to', 'what', 'where', 'why', 'with', 'you'];
 
