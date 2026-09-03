@@ -1,0 +1,67 @@
+name: OCR Linux runtime check
+
+on:
+  push:
+    branches: [codex/ocr-deployment-validation]
+  pull_request:
+    paths:
+      - 'ocr/**'
+      - 'railpack.json'
+      - 'app/Services/Ocr/**'
+      - '.github/workflows/ocr-runtime.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ocr-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  scan:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install the runtime libraries declared in Railpack
+        run: |
+          sudo apt-get update
+          python -c 'import json,subprocess; p=json.load(open("railpack.json"))["deploy"]["aptPackages"]; subprocess.run(["sudo","apt-get","install","-y","--no-install-recommends"]+[x for x in p if x != "..."],check=True)'
+      - name: Install OCR dependencies
+        run: |
+          python -m venv .venv-ocr
+          .venv-ocr/bin/python -m pip install --no-cache-dir -r ocr/requirements.txt
+      - name: Exercise actual OCR with synthetic data
+        run: .venv-ocr/bin/python ocr/smoke_test.py
+      - name: Verify another fresh process can reuse downloaded models
+        run: .venv-ocr/bin/python ocr/smoke_test.py
+      - name: Report resolved dependency versions
+        if: always()
+        run: .venv-ocr/bin/python -m pip freeze
+
+  final-image:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      BUILDKIT_HOST: docker-container://buildkit
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install official Railpack CLI
+        run: |
+          mkdir -p /tmp/greenpool-railpack
+          cd /tmp/greenpool-railpack
+          curl --fail --location --retry 3 -O https://github.com/railwayapp/railpack/releases/download/v0.38.0/railpack-v0.38.0-x86_64-unknown-linux-musl.tar.gz
+          curl --fail --location --retry 3 -O https://github.com/railwayapp/railpack/releases/download/v0.38.0/checksums.txt
+          grep 'railpack-v0.38.0-x86_64-unknown-linux-musl.tar.gz' checksums.txt | sha256sum --check -
+          tar -xzf railpack-v0.38.0-x86_64-unknown-linux-musl.tar.gz
+          sudo install -m 755 railpack /usr/local/bin/railpack
+      - name: Start isolated build engine
+        run: docker run -d --privileged --name buildkit moby/buildkit:latest
+      - name: Build the complete application image (no production secrets)
+        run: railpack build --name greenpool-ocr-check --progress plain --env APP_ENV=testing --env CACHE_STORE=array --env SESSION_DRIVER=array --env QUEUE_CONNECTION=sync .
+      - name: Scan offline inside the final image through Laravel
+        run: docker run --rm --network none --memory=1g --memory-swap=1g --cpus=2 --entrypoint /app/.venv-ocr/bin/python greenpool-ocr-check /app/ocr/smoke_test.py --through-laravel

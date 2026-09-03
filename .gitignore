@@ -21,6 +21,8 @@
 /vendor
 /tmp/
 /.venv*
+/ocr/.models/
+/ocr/runtime-packages.txt
 /python-*-amd64.exe
 Homestead.json
 Homestead.yaml
