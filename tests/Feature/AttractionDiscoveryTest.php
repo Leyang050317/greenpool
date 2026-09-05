@@ -3,9 +3,11 @@
 namespace Tests\Feature;
 
 use App\Models\Attraction;
+use App\Models\Favourite;
 use App\Models\User;
 use App\Models\Vehicle;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
@@ -68,6 +70,78 @@ class AttractionDiscoveryTest extends TestCase
         ]);
     }
 
+    public function test_user_can_combine_state_and_category_filters(): void
+    {
+        $user = User::factory()->create(['email_verified_at' => now()]);
+        $museum = Attraction::query()->create([
+            'attraction_name' => 'Penang State Museum',
+            'state' => 'Penang',
+        ]);
+        $museum->detail()->create(['category' => 'Museum']);
+        $park = Attraction::query()->create([
+            'attraction_name' => 'Penang Botanic Gardens',
+            'state' => 'Penang',
+        ]);
+        $park->detail()->create(['category' => 'Nature & Parks']);
+
+        $this->actingAs($user)
+            ->get(route('attractions.index', ['state' => 'Penang', 'category' => 'Museum']))
+            ->assertOk()
+            ->assertSee('Explore by Category')
+            ->assertSee($museum->attraction_name)
+            ->assertDontSee($park->attraction_name);
+    }
+
+    public function test_google_sync_adds_and_updates_places_without_deleting_favourites(): void
+    {
+        config()->set('services.google_places.key', 'test-google-key');
+        $user = User::factory()->create();
+        $existing = Attraction::query()->create([
+            'attraction_name' => 'Old Penang Hill Name',
+            'state' => 'Penang',
+            'description' => 'A curated description that must be kept.',
+        ]);
+        $existing->detail()->create([
+            'category' => 'Tourist Attraction',
+            'source_place_id' => 'place-penang-hill',
+            'google_place_id' => 'place-penang-hill',
+        ]);
+        Favourite::query()->create([
+            'user_id' => $user->id,
+            'attraction_id' => $existing->getKey(),
+        ]);
+
+        Http::fake([
+            'https://places.googleapis.com/v1/places:searchText' => Http::response([
+                'places' => [
+                    $this->googlePlace('place-penang-hill', 'Penang Hill', 'historical_landmark'),
+                    $this->googlePlace('place-penang-museum', 'Penang State Museum', 'museum'),
+                ],
+            ]),
+        ]);
+
+        $exitCode = Artisan::call('attractions:sync-google', [
+            '--state' => 'Penang',
+            '--per-state' => 8,
+        ]);
+
+        $this->assertSame(0, $exitCode);
+        $this->assertDatabaseCount('tourist_attractions', 2);
+        $this->assertDatabaseHas('tourist_attractions', [
+            'attraction_id' => $existing->getKey(),
+            'attraction_name' => 'Penang Hill',
+            'description' => 'A curated description that must be kept.',
+        ]);
+        $this->assertDatabaseHas('tourist_attractions', [
+            'attraction_name' => 'Penang State Museum',
+            'state' => 'Penang',
+        ]);
+        $this->assertDatabaseHas('favourites', [
+            'user_id' => $user->id,
+            'attraction_id' => $existing->getKey(),
+        ]);
+    }
+
     public function test_passenger_can_continue_from_an_attraction_to_a_destination_filtered_ride_search(): void
     {
         $user = User::factory()->create(['email_verified_at' => now(), 'role' => 'passenger']);
@@ -111,9 +185,9 @@ class AttractionDiscoveryTest extends TestCase
             ->assertSee('ChIJ-attraction-place-id');
 
         $this->get(route('driver.trips.create', [
-                'destination' => $attraction->attraction_name,
-                'destination_place_id' => $attraction->detail->google_place_id,
-            ]))
+            'destination' => $attraction->attraction_name,
+            'destination_place_id' => $attraction->detail->google_place_id,
+        ]))
             ->assertOk()
             ->assertSee('Batu Caves')
             ->assertSee('Destination was added from Tourist Attractions.');
@@ -153,5 +227,24 @@ class AttractionDiscoveryTest extends TestCase
 
         $this->assertDatabaseHas('tourist_attractions', ['attraction_name' => 'Putra Mosque', 'state' => 'Putrajaya']);
         $this->assertDatabaseHas('attraction_details', ['google_place_id' => 'place-putra-mosque', 'source_name' => 'Google Places']);
+    }
+
+    /** @return array<string, mixed> */
+    private function googlePlace(string $id, string $name, string $primaryType): array
+    {
+        return [
+            'id' => $id,
+            'displayName' => ['text' => $name],
+            'formattedAddress' => "{$name}, Penang, Malaysia",
+            'primaryType' => $primaryType,
+            'location' => ['latitude' => 5.4141, 'longitude' => 100.3288],
+            'rating' => 4.5,
+            'userRatingCount' => 1000,
+            'photos' => [['name' => "places/{$id}/photos/photo-1"]],
+            'addressComponents' => [
+                ['types' => ['country'], 'shortText' => 'MY'],
+                ['types' => ['administrative_area_level_1'], 'longText' => 'Penang'],
+            ],
+        ];
     }
 }

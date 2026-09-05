@@ -15,6 +15,18 @@
             <div class="aspect-[16/7] overflow-hidden rounded-2xl bg-slate-200">
                 <img src="{{ $googlePhotoUrl ?: $attraction->displayImageUrl() }}" alt="{{ $attraction->attraction_name }}" class="h-full w-full object-cover">
             </div>
+            @if ($googlePhotoUrl && data_get($googlePlace, 'photos.0.authorAttributions'))
+                <p class="mt-2 text-right text-[11px] text-slate-400">
+                    Photo by
+                    @foreach (data_get($googlePlace, 'photos.0.authorAttributions', []) as $attribution)
+                        @if (data_get($attribution, 'uri'))
+                            <a href="{{ data_get($attribution, 'uri') }}" target="_blank" rel="noopener noreferrer" class="underline hover:text-slate-600">{{ data_get($attribution, 'displayName', 'Google Maps contributor') }}</a>{{ !$loop->last ? ', ' : '' }}
+                        @else
+                            {{ data_get($attribution, 'displayName', 'Google Maps contributor') }}{{ !$loop->last ? ', ' : '' }}
+                        @endif
+                    @endforeach
+                </p>
+            @endif
 
             <div class="mt-7 flex flex-col justify-between gap-5 sm:flex-row sm:items-start">
                 <div>
