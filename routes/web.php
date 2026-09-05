@@ -23,11 +23,13 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RatingController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\StripeWebhookController;
+use App\Http\Controllers\TelegramWebhookController;
 use App\Http\Controllers\TripUpdateController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
 Route::post('/stripe/webhook', StripeWebhookController::class)->name('stripe.webhook');
+Route::post('/telegram/webhook', [TelegramWebhookController::class, 'handle'])->name('telegram.webhook');
 
 Route::get('/', function () {
     if (Auth::check()) {

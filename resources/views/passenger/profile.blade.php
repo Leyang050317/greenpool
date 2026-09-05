@@ -70,6 +70,10 @@
                 <x-emergency-contacts-card :user="$user" />
             </div>
 
+            <div class="border-t border-gray-100 px-6 py-6">
+                <x-telegram-verification-card :user="$user" />
+            </div>
+
             <section class="border-t border-gray-100 px-6 pb-6 pt-8">
             <h4 class="mb-3 text-sm font-bold text-gray-700">Account</h4>
             <div class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm divide-y divide-gray-100">

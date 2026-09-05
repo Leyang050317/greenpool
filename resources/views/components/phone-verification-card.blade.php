@@ -111,9 +111,13 @@
                 </button>
             </div>
 
-            @if (app()->environment('local'))
+            @if ($user->telegram_chat_id)
+                <div class="mt-4 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm leading-6 text-green-800">
+                    A verification code has been sent to your linked Telegram account. Please check your Telegram chat.
+                </div>
+            @elseif (app()->environment('local'))
                 <div class="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-800">
-                    Development mode: no SMS is sent. Use the code recorded in storage/logs/laravel.log.
+                    No Telegram account linked. Check storage/logs/laravel.log for the verification code.
                 </div>
             @endif
 
