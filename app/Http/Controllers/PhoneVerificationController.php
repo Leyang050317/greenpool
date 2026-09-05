@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Services\TelegramOtpService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -51,8 +52,13 @@ class PhoneVerificationController extends Controller
             'phone_number' => $phoneNumber,
         ], now()->addMinutes(5));
 
+        // Send the OTP via Telegram if the user has linked their account
+        if ($user->telegram_chat_id) {
+            app(TelegramOtpService::class)->sendOtpMessage($user, $otp);
+        }
+
         if (app()->environment('local')) {
-            Log::info('Mock phone verification OTP generated.', [
+            Log::info('Phone verification OTP generated.', [
                 'user_id' => $user->id,
                 'phone_number' => $phoneNumber,
                 'otp' => $otp,

@@ -47,6 +47,7 @@
             </form></section>
             <div class="mt-6"><x-phone-verification-card :user="$user" /></div>
             <div class="mt-6"><x-emergency-contacts-card :user="$user" /></div>
+            <div class="mt-6"><x-telegram-verification-card :user="$user" /></div>
             <section class="mt-8">
                 <h3 class="mb-3 text-base font-bold text-gray-900">Account</h3>
                 <div class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
