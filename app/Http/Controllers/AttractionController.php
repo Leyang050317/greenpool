@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\Attraction;
-use App\Models\AttractionDetail;
 use App\Models\Favourite;
 use App\Services\Attractions\GooglePlacesService;
 use Illuminate\Http\JsonResponse;
@@ -79,7 +78,6 @@ class AttractionController extends Controller
     {
         $search = trim((string) $request->query('search', ''));
         $state = trim((string) $request->query('state', ''));
-        $category = trim((string) $request->query('category', ''));
         $tab = $request->query('tab') === 'favourites' ? 'favourites' : 'discover';
 
         $attractions = Attraction::query()
@@ -96,10 +94,6 @@ class AttractionController extends Controller
                 });
             })
             ->when($state !== '', fn ($query) => $query->where('state', $state))
-            ->when($category !== '', fn ($query) => $query->whereHas(
-                'detail',
-                fn ($query) => $query->where('category', $category)
-            ))
             ->withExists([
                 'favourites as is_favourited' => fn ($query) => $query->where('user_id', $request->user()->getKey()),
             ])
@@ -110,16 +104,9 @@ class AttractionController extends Controller
 
         $quickStates = ['Kuala Lumpur', 'Penang', 'Melaka', 'Sabah', 'Selangor', 'Pahang', 'Kedah'];
         $moreStates = ['Johor', 'Kelantan', 'Labuan', 'Negeri Sembilan', 'Perak', 'Perlis', 'Putrajaya', 'Sarawak', 'Terengganu'];
-        $availableCategories = AttractionDetail::query()
-            ->whereNotNull('category')
-            ->where('category', '!=', '')
-            ->distinct()
-            ->orderBy('category')
-            ->pluck('category');
-
         $featured = collect();
 
-        if ($tab === 'discover' && $search === '' && $state === '' && $category === '') {
+        if ($tab === 'discover' && $search === '' && $state === '') {
             $featured = Attraction::query()
                 ->with('detail')
                 ->withExists([
@@ -139,10 +126,8 @@ class AttractionController extends Controller
             'attractions',
             'search',
             'state',
-            'category',
             'quickStates',
             'moreStates',
-            'availableCategories',
             'featured',
             'googleAutoCards',
             'tab',
