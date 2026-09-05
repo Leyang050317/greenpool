@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class PhoneVerificationTest extends TestCase
@@ -17,7 +18,10 @@ class PhoneVerificationTest extends TestCase
             'role' => 'passenger',
             'phone_number' => null,
             'phone_verified_at' => null,
+            'telegram_chat_id' => '111222333',
         ]);
+        config(['services.telegram.bot_token' => 'test-token']);
+        Http::fake(['api.telegram.org/*' => Http::response(['ok' => true])]);
 
         $this->actingAs($user)
             ->post(route('phone-verification.send'), [
@@ -101,7 +105,10 @@ class PhoneVerificationTest extends TestCase
             'role' => 'passenger',
             'phone_number' => '+60 12-345 6789',
             'phone_verified_at' => now(),
+            'telegram_chat_id' => '111222333',
         ]);
+        config(['services.telegram.bot_token' => 'test-token']);
+        Http::fake(['api.telegram.org/*' => Http::response(['ok' => true])]);
 
         $this->actingAs($user)
             ->post(route('phone-verification.send'), [
