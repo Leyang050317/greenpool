@@ -1,8 +1,8 @@
 <?php
 
 use App\Http\Controllers\AttractionController;
-use App\Http\Controllers\Auth\LinkedAccountController;
 use App\Http\Controllers\Auth\GoogleLoginController;
+use App\Http\Controllers\Auth\LinkedAccountController;
 use App\Http\Controllers\ChatController;
 use App\Http\Controllers\Driver\DriverBookingController;
 use App\Http\Controllers\Driver\HomeController as DriverHomeController;
@@ -29,7 +29,9 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
 Route::post('/stripe/webhook', StripeWebhookController::class)->name('stripe.webhook');
-Route::post('/telegram/webhook', [TelegramWebhookController::class, 'handle'])->name('telegram.webhook');
+Route::post('/telegram/webhook', [TelegramWebhookController::class, 'handle'])
+    ->middleware('throttle:120,1')
+    ->name('telegram.webhook');
 
 Route::get('/', function () {
     if (Auth::check()) {
@@ -49,9 +51,16 @@ Route::middleware(['auth', 'active-account'])->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+    Route::get('/telegram/link', [TelegramWebhookController::class, 'redirect'])
+        ->middleware('throttle:6,1')
+        ->name('telegram.link');
+    Route::delete('/telegram/link', [TelegramWebhookController::class, 'unlink'])
+        ->name('telegram.unlink');
     Route::post('/phone-verification/send', [PhoneVerificationController::class, 'send'])
+        ->middleware('throttle:5,1')
         ->name('phone-verification.send');
     Route::post('/phone-verification/verify', [PhoneVerificationController::class, 'verify'])
+        ->middleware('throttle:10,1')
         ->name('phone-verification.verify');
     Route::post('/emergency-contacts', [EmergencyContactController::class, 'store'])
         ->name('emergency-contacts.store');

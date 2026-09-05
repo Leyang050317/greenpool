@@ -19,37 +19,48 @@ class TelegramOtpService
     {
         if (empty($user->telegram_chat_id)) {
             Log::warning("User {$user->id} has no linked Telegram chat ID. Cannot send OTP.");
+
             return false;
         }
 
         $otp = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
 
-        Cache::put('otp_' . $user->id, $otp, now()->addMinutes(5));
+        Cache::put('otp_'.$user->id, $otp, now()->addMinutes(5));
 
         $token = config('services.telegram.bot_token');
 
         if (! $token) {
             Log::error('Telegram bot token is not configured. Set TELEGRAM_BOT_TOKEN in your .env file.');
+
             return false;
         }
 
         $message = "Your GreenPool verification code is: <b>{$otp}</b>\n\nThis code expires in 5 minutes. Do not share it with anyone.";
 
         try {
-            $response = Http::post("https://api.telegram.org/bot{$token}/sendMessage", [
-                'chat_id'    => $user->telegram_chat_id,
-                'text'       => $message,
+            $response = Http::timeout(10)->post("https://api.telegram.org/bot{$token}/sendMessage", [
+                'chat_id' => $user->telegram_chat_id,
+                'text' => $message,
                 'parse_mode' => 'HTML',
             ]);
 
             if ($response->failed()) {
-                Log::error("Telegram API error for User {$user->id}: " . $response->body());
+                Log::warning('Telegram OTP delivery failed.', [
+                    'user_id' => $user->id,
+                    'status' => $response->status(),
+                    'telegram_error_code' => data_get($response->json(), 'error_code'),
+                ]);
+
                 return false;
             }
 
             return true;
-        } catch (\Throwable $e) {
-            Log::error("Failed to send Telegram OTP to User {$user->id}: " . $e->getMessage());
+        } catch (\Throwable $exception) {
+            Log::warning('Telegram OTP delivery could not be completed.', [
+                'user_id' => $user->id,
+                'exception_type' => $exception::class,
+            ]);
+
             return false;
         }
     }
@@ -63,10 +74,11 @@ class TelegramOtpService
      */
     public function verifyOtp(User $user, string $inputOtp): bool
     {
-        $cached = Cache::get('otp_' . $user->id);
+        $cached = Cache::get('otp_'.$user->id);
 
         if ($cached !== null && hash_equals((string) $cached, trim($inputOtp))) {
-            Cache::forget('otp_' . $user->id);
+            Cache::forget('otp_'.$user->id);
+
             return true;
         }
 
@@ -87,6 +99,7 @@ class TelegramOtpService
     {
         if (empty($user->telegram_chat_id)) {
             Log::warning("User {$user->id} has no linked Telegram chat ID. Cannot send OTP message.");
+
             return false;
         }
 
@@ -94,26 +107,36 @@ class TelegramOtpService
 
         if (! $token) {
             Log::error('Telegram bot token is not configured. Set TELEGRAM_BOT_TOKEN in your .env file.');
+
             return false;
         }
 
         $message = "Your GreenPool phone verification code is: <b>{$otp}</b>\n\nThis code expires in 5 minutes. Do not share it with anyone.";
 
         try {
-            $response = Http::post("https://api.telegram.org/bot{$token}/sendMessage", [
-                'chat_id'    => $user->telegram_chat_id,
-                'text'       => $message,
+            $response = Http::timeout(10)->post("https://api.telegram.org/bot{$token}/sendMessage", [
+                'chat_id' => $user->telegram_chat_id,
+                'text' => $message,
                 'parse_mode' => 'HTML',
             ]);
 
             if ($response->failed()) {
-                Log::error("Telegram API error sending OTP message for User {$user->id}: " . $response->body());
+                Log::warning('Telegram phone OTP delivery failed.', [
+                    'user_id' => $user->id,
+                    'status' => $response->status(),
+                    'telegram_error_code' => data_get($response->json(), 'error_code'),
+                ]);
+
                 return false;
             }
 
             return true;
-        } catch (\Throwable $e) {
-            Log::error("Failed to send Telegram OTP message to User {$user->id}: " . $e->getMessage());
+        } catch (\Throwable $exception) {
+            Log::warning('Telegram phone OTP delivery could not be completed.', [
+                'user_id' => $user->id,
+                'exception_type' => $exception::class,
+            ]);
+
             return false;
         }
     }

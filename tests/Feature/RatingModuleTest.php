@@ -605,6 +605,7 @@ class RatingModuleTest extends TestCase
         $booking = Booking::create([
             'trip_id' => $trip->trip_id, 'passenger_id' => $passenger->id,
             'booking_status' => 'Accepted', 'number_of_seats' => 1, 'pickup_point' => 'KL Sentral',
+            'picked_up_at' => now()->subMinutes(30),
         ]);
 
         return [$driver, $passenger, $booking->load('trip')];

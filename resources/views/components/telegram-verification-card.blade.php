@@ -11,6 +11,14 @@
             <div>
                 <h3 class="text-lg font-bold text-gray-950">Telegram Verification</h3>
                 <p class="mt-1 text-sm text-gray-600">Link your Telegram account to receive secure OTP verification codes.</p>
+
+                <x-input-error :messages="$errors->get('telegram')" class="mt-3" />
+
+                @if (session('status') === 'telegram-unlinked')
+                    <div class="mt-5 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-800">
+                        Your Telegram account has been unlinked.
+                    </div>
+                @endif
                 
                 @if ($user->telegram_chat_id)
                     <div class="mt-5 flex items-center gap-2 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-semibold text-green-800">
@@ -25,6 +33,14 @@
             <div class="shrink-0 mt-1">
                 <x-telegram-link-button />
             </div>
+        @else
+            <form method="POST" action="{{ route('telegram.unlink') }}" class="mt-1 shrink-0" onsubmit="return confirm('Unlink this Telegram account? You will not be able to receive verification codes until you link it again.')">
+                @csrf
+                @method('DELETE')
+                <button type="submit" class="inline-flex items-center justify-center rounded-lg border border-red-200 px-4 py-2.5 text-sm font-semibold text-red-700 hover:bg-red-50">
+                    Unlink
+                </button>
+            </form>
         @endif
     </div>
 </section>

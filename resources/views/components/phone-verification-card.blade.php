@@ -78,6 +78,9 @@
             @endif
         </div>
         <p class="mt-2 text-xs text-gray-500">{{ $user->phone_verified_at ? 'Your verified number is locked until you confirm a change.' : 'Verification is required before the number can be used for trip communication.' }}</p>
+        @if (!$user->telegram_chat_id)
+            <p class="mt-2 text-xs font-medium text-amber-700">Link Telegram first so GreenPool can deliver your verification code.</p>
+        @endif
         <x-input-error :messages="$errors->get('phone_number')" class="mt-2" />
     </form>
 

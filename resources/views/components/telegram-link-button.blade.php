@@ -1,16 +1,4 @@
-{{--
-    Telegram Deep Link Button
-    -------------------------
-    IMPORTANT: Replace 'GREENPOOL123_bot' below with your actual Telegram bot
-    username (without the @ symbol).
-
-    Example: If your bot is @GreenPoolBot, the href should be:
-    https://t.me/GreenPoolBot?start={{ auth()->id() }}
---}}
-
-<a href="https://t.me/GREENPOOL123_bot?start={{ auth()->id() }}"
-   target="_blank"
-   rel="noopener noreferrer"
+<a href="{{ route('telegram.link') }}"
    class="inline-flex items-center gap-2 rounded-lg bg-[#2AABEE] px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors duration-150 hover:bg-[#229ED9] focus:outline-none focus:ring-2 focus:ring-[#2AABEE] focus:ring-offset-2">
     {{-- Telegram icon --}}
     <svg class="h-5 w-5 fill-current" viewBox="0 0 24 24" aria-hidden="true">

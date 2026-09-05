@@ -40,7 +40,14 @@ class PhoneVerificationController extends Controller
                 ->withErrors(['phone_number' => 'Confirm the phone number change before requesting a new verification code.']);
         }
 
+        if (blank($user->telegram_chat_id)) {
+            return redirect()->route($this->profileRoute($user))
+                ->withErrors(['telegram' => 'Link your Telegram account before requesting a phone verification code.']);
+        }
+
         $otp = (string) random_int(100000, 999999);
+        $originalPhoneNumber = $user->phone_number;
+        $originalVerifiedAt = $user->phone_verified_at;
 
         $user->forceFill([
             'phone_number' => $phoneNumber,
@@ -52,9 +59,15 @@ class PhoneVerificationController extends Controller
             'phone_number' => $phoneNumber,
         ], now()->addMinutes(5));
 
-        // Send the OTP via Telegram if the user has linked their account
-        if ($user->telegram_chat_id) {
-            app(TelegramOtpService::class)->sendOtpMessage($user, $otp);
+        if (! app(TelegramOtpService::class)->sendOtpMessage($user, $otp)) {
+            Cache::forget($this->cacheKey($user));
+            $user->forceFill([
+                'phone_number' => $originalPhoneNumber,
+                'phone_verified_at' => $originalVerifiedAt,
+            ])->save();
+
+            return redirect()->route($this->profileRoute($user))
+                ->withErrors(['telegram' => 'The verification code could not be sent to Telegram. Please check your connection and try again.']);
         }
 
         if (app()->environment('local')) {
