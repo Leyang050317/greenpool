@@ -2,8 +2,8 @@
   "$schema": "https://railway.com/railway.schema.json",
   "deploy": {
     "preDeployCommand": [
-      "php artisan migrate --force",
       "php artisan optimize:clear",
+      "php artisan migrate --force",
       "php artisan config:cache",
       "php artisan route:cache",
       "php artisan view:cache"
