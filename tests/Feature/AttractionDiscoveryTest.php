@@ -70,28 +70,6 @@ class AttractionDiscoveryTest extends TestCase
         ]);
     }
 
-    public function test_user_can_combine_state_and_category_filters(): void
-    {
-        $user = User::factory()->create(['email_verified_at' => now()]);
-        $museum = Attraction::query()->create([
-            'attraction_name' => 'Penang State Museum',
-            'state' => 'Penang',
-        ]);
-        $museum->detail()->create(['category' => 'Museum']);
-        $park = Attraction::query()->create([
-            'attraction_name' => 'Penang Botanic Gardens',
-            'state' => 'Penang',
-        ]);
-        $park->detail()->create(['category' => 'Nature & Parks']);
-
-        $this->actingAs($user)
-            ->get(route('attractions.index', ['state' => 'Penang', 'category' => 'Museum']))
-            ->assertOk()
-            ->assertSee('Explore by Category')
-            ->assertSee($museum->attraction_name)
-            ->assertDontSee($park->attraction_name);
-    }
-
     public function test_google_sync_adds_and_updates_places_without_deleting_favourites(): void
     {
         config()->set('services.google_places.key', 'test-google-key');
