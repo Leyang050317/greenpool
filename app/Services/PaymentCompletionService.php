@@ -57,7 +57,7 @@ class PaymentCompletionService
         }
 
         try {
-            Mail::to($completedPayment->payer->email)->send(
+            Mail::to($completedPayment->payer->email)->sendNow(
                 new PaymentReceiptMail($completedPayment, $this->fareBreakdown($completedPayment))
             );
         } catch (\Throwable $exception) {
