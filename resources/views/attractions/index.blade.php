@@ -25,12 +25,14 @@
 
         <form method="GET" action="{{ route('attractions.index') }}" class="mb-5 max-w-[480px]" x-data="attractionSearch({{ Js::from(route('attractions.autocomplete')) }}, {{ Js::from(route('attractions.google-place')) }})">
             <input type="hidden" name="tab" value="{{ $tab }}">
+            <input type="hidden" name="state" value="{{ $state }}">
+            <input type="hidden" name="category" value="{{ $category }}">
             <label for="search" class="sr-only">Search attractions</label>
             <div class="relative">
                 <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-400"><x-icons.lucide name="search" /></span>
                 <input id="search" name="search" value="{{ $search }}" placeholder="Search Malaysian attractions..." @input="searchGoogle()" @focus="open = true" @keydown.escape="open = false" autocomplete="off" class="block w-full rounded-[10px] border-slate-200 py-2.5 pl-10 pr-10 text-sm text-slate-900 placeholder:text-slate-400 focus:border-green-600 focus:ring-2 focus:ring-green-100">
                 @if ($search !== '')
-                    <a href="{{ route('attractions.index', ['tab' => $tab, 'state' => $state ?: null]) }}" class="absolute inset-y-0 right-0 flex items-center px-3 text-slate-400 hover:text-slate-700" aria-label="Clear search"><x-icons.lucide name="x" /></a>
+                    <a href="{{ route('attractions.index', ['tab' => $tab, 'state' => $state ?: null, 'category' => $category ?: null]) }}" class="absolute inset-y-0 right-0 flex items-center px-3 text-slate-400 hover:text-slate-700" aria-label="Clear search"><x-icons.lucide name="x" /></a>
                 @endif
                 <div x-cloak x-show="open && suggestions.length" class="absolute z-30 mt-1 w-full overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
                     <template x-for="suggestion in suggestions" :key="suggestion.place_id">
@@ -44,15 +46,15 @@
         <section class="mb-8">
             <p class="mb-2.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-slate-400">Explore by State</p>
             <div class="flex flex-wrap items-center gap-2">
-                <a href="{{ route('attractions.index', ['tab' => $tab, 'search' => $search ?: null]) }}" class="rounded-full border px-3.5 py-1.5 text-[13px] font-medium transition {{ $state === '' ? 'border-green-600 bg-green-600 text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-green-300 hover:text-green-700' }}">All States</a>
+                <a href="{{ route('attractions.index', ['tab' => $tab, 'search' => $search ?: null, 'category' => $category ?: null]) }}" class="rounded-full border px-3.5 py-1.5 text-[13px] font-medium transition {{ $state === '' ? 'border-green-600 bg-green-600 text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-green-300 hover:text-green-700' }}">All States</a>
                 @foreach ($quickStates as $availableState)
-                    <a href="{{ route('attractions.index', ['tab' => $tab, 'search' => $search ?: null, 'state' => $availableState]) }}" class="rounded-full border px-3.5 py-1.5 text-[13px] font-medium transition {{ $state === $availableState ? 'border-green-600 bg-green-600 text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-green-300 hover:text-green-700' }}">{{ $availableState }}</a>
+                    <a href="{{ route('attractions.index', ['tab' => $tab, 'search' => $search ?: null, 'state' => $availableState, 'category' => $category ?: null]) }}" class="rounded-full border px-3.5 py-1.5 text-[13px] font-medium transition {{ $state === $availableState ? 'border-green-600 bg-green-600 text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-green-300 hover:text-green-700' }}">{{ $availableState }}</a>
                 @endforeach
                 <details class="relative">
                     <summary class="cursor-pointer list-none rounded-full border border-slate-200 bg-white px-3.5 py-1.5 text-[13px] font-medium text-slate-600 hover:border-green-300 hover:text-green-700">More States</summary>
                     <div class="absolute left-0 z-20 mt-2 w-48 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
                         @foreach ($moreStates as $availableState)
-                            <a href="{{ route('attractions.index', ['tab' => $tab, 'search' => $search ?: null, 'state' => $availableState]) }}" class="block px-4 py-2 text-sm {{ $state === $availableState ? 'bg-green-50 font-semibold text-green-700' : 'text-slate-700 hover:bg-slate-50' }}">{{ $availableState }}</a>
+                            <a href="{{ route('attractions.index', ['tab' => $tab, 'search' => $search ?: null, 'state' => $availableState, 'category' => $category ?: null]) }}" class="block px-4 py-2 text-sm {{ $state === $availableState ? 'bg-green-50 font-semibold text-green-700' : 'text-slate-700 hover:bg-slate-50' }}">{{ $availableState }}</a>
                         @endforeach
                     </div>
                 </details>
@@ -60,12 +62,30 @@
             @if ($state !== '')
                 <div class="mt-2.5 flex items-center gap-2 text-[13px] text-slate-500">
                     <span>Filtering: <span class="font-semibold text-green-700">{{ $state }}</span></span>
-                    <a href="{{ route('attractions.index', ['tab' => $tab, 'search' => $search ?: null]) }}" class="text-slate-400 underline hover:text-slate-700">Clear filter</a>
+                    <a href="{{ route('attractions.index', ['tab' => $tab, 'search' => $search ?: null, 'category' => $category ?: null]) }}" class="text-slate-400 underline hover:text-slate-700">Clear state</a>
+                </div>
+            @endif
+
+            @if ($availableCategories->isNotEmpty())
+                <div class="mt-5 border-t border-slate-100 pt-5">
+                    <p class="mb-2.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-slate-400">Explore by Category</p>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <a href="{{ route('attractions.index', ['tab' => $tab, 'search' => $search ?: null, 'state' => $state ?: null]) }}" class="rounded-full border px-3.5 py-1.5 text-[13px] font-medium transition {{ $category === '' ? 'border-green-600 bg-green-600 text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-green-300 hover:text-green-700' }}">All Categories</a>
+                        @foreach ($availableCategories as $availableCategory)
+                            <a href="{{ route('attractions.index', ['tab' => $tab, 'search' => $search ?: null, 'state' => $state ?: null, 'category' => $availableCategory]) }}" class="rounded-full border px-3.5 py-1.5 text-[13px] font-medium transition {{ $category === $availableCategory ? 'border-green-600 bg-green-600 text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-green-300 hover:text-green-700' }}">{{ $availableCategory }}</a>
+                        @endforeach
+                    </div>
+                    @if ($category !== '')
+                        <div class="mt-2.5 flex items-center gap-2 text-[13px] text-slate-500">
+                            <span>Category: <span class="font-semibold text-green-700">{{ $category }}</span></span>
+                            <a href="{{ route('attractions.index', ['tab' => $tab, 'search' => $search ?: null, 'state' => $state ?: null]) }}" class="text-slate-400 underline hover:text-slate-700">Clear category</a>
+                        </div>
+                    @endif
                 </div>
             @endif
         </section>
 
-        @if ($tab === 'discover' && $search === '' && $state === '' && $featured->isNotEmpty())
+        @if ($tab === 'discover' && $search === '' && $state === '' && $category === '' && $featured->isNotEmpty())
             <section class="mb-9">
                 <h2 class="mb-4 text-[15px] font-semibold text-slate-900">Featured Attractions</h2>
                 <div class="grid gap-3 lg:grid-cols-[2fr_1fr]">
@@ -117,6 +137,8 @@
                         Search Results
                     @elseif ($state !== '')
                         Attractions in {{ $state }}
+                    @elseif ($category !== '')
+                        {{ $category }} Attractions
                     @else
                         Discover Attractions
                     @endif
@@ -129,7 +151,7 @@
             @if ($attractions->isEmpty())
                 <div class="rounded-xl border border-dashed border-slate-300 bg-white px-6 py-16 text-center">
                     <p class="font-semibold text-slate-800">{{ $tab === 'favourites' ? 'No favourite attractions yet.' : 'No attractions found.' }}</p>
-                    <p class="mt-1 text-sm text-slate-500">{{ $tab === 'favourites' ? 'Save places you would like to visit and they will appear here.' : 'Try another search term or state.' }}</p>
+                    <p class="mt-1 text-sm text-slate-500">{{ $tab === 'favourites' ? 'Save places you would like to visit and they will appear here.' : 'Try another search term, state, or category.' }}</p>
                     @if ($tab === 'favourites')
                         <a href="{{ route('attractions.index') }}" class="mt-5 inline-flex rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700">Explore attractions</a>
                     @endif
