@@ -12,16 +12,7 @@ class PaymentService
     {
         return Payment::query()
             ->where('payer_id', $passenger->id)
-            ->where(function ($query) {
-                $query->where('payment_status', 'Under Review')
-                    ->orWhere(function ($pending) {
-                        $pending->where('payment_status', 'Pending')
-                            ->where(function ($restriction) {
-                                $restriction->where('issue_resolution', 'Kept due')
-                                    ->orWhere('created_at', '<=', now()->subDay());
-                            });
-                    });
-            })
+            ->where('payment_status', 'Pending')
             ->exists();
     }
 

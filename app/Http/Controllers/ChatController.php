@@ -7,9 +7,9 @@ use App\Models\Booking;
 use App\Notifications\MessageReceivedNotification;
 use App\Services\NotificationDeliveryService;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\View\View;
 
 class ChatController extends Controller
@@ -136,11 +136,8 @@ class ChatController extends Controller
 
     private function canSendMessage(Booking $booking): bool
     {
-        $booking->loadMissing('payment');
-
-        return (in_array($booking->booking_status, ['Pending', 'Accepted'], true)
-                && ! in_array($booking->trip->status, ['Completed', 'Cancelled'], true))
-            || $booking->payment?->isUnderReview();
+        return in_array($booking->booking_status, ['Pending', 'Accepted'], true)
+                && ! in_array($booking->trip->status, ['Completed', 'Cancelled'], true);
     }
 
     private function otherUserFor(Request $request, Booking $booking)

@@ -102,8 +102,6 @@ Route::middleware(['auth', 'active-account', 'verified'])->group(function () {
     Route::post('/payments/bookings/{booking}/checkout', [PaymentController::class, 'initiateCheckout'])->name('payments.checkout.initiate');
     Route::get('/payments/stripe/success', [PaymentController::class, 'stripeSuccess'])->name('payments.stripe.success');
     Route::post('/payments/{payment}/cash/confirm', [PaymentController::class, 'confirmCash'])->name('payments.cash.confirm');
-    Route::post('/payments/{payment}/issue', [PaymentController::class, 'reportIssue'])->name('payments.issue.report');
-    Route::post('/payments/{payment}/issue/resolve', [PaymentController::class, 'resolveIssue'])->name('payments.issue.resolve');
     Route::get('/payments/{payment}/receipt', [PaymentController::class, 'receipt'])->name('payments.receipt');
     Route::get('/payments/{payment}', [PaymentController::class, 'show'])->name('payments.show');
 

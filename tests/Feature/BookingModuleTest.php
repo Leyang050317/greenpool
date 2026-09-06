@@ -380,6 +380,48 @@ class BookingModuleTest extends TestCase
         ]);
     }
 
+    public function test_passenger_cannot_submit_another_booking_until_a_pending_payment_is_paid(): void
+    {
+        $passenger = User::factory()->create(['role' => 'passenger']);
+        $completedTrip = $this->createTrip(['status' => 'Completed', 'completed_at' => now()]);
+        $completedBooking = $this->createBooking($passenger, $completedTrip, bookingStatus: 'Accepted');
+        $payment = Payment::create([
+            'booking_id' => $completedBooking->id,
+            'payer_id' => $passenger->id,
+            'payee_id' => $completedTrip->user_id,
+            'amount' => 10,
+            'payment_status' => 'Pending',
+        ]);
+        $availableTrip = $this->createTrip(['available_seats' => 3]);
+        $bookingData = [
+            'trip_id' => $availableTrip->trip_id,
+            'pickup_point' => 'Library',
+            'pickup_latitude' => 3.121,
+            'pickup_longitude' => 101.65,
+            'number_of_seats' => 1,
+            'number_of_luggage' => 0,
+        ];
+
+        $this->actingAs($passenger)
+            ->post(route('passenger.bookings.store'), $bookingData)
+            ->assertSessionHasErrors('trip_id');
+        $this->assertDatabaseMissing('bookings', [
+            'trip_id' => $availableTrip->trip_id,
+            'passenger_id' => $passenger->id,
+        ]);
+
+        $payment->update(['payment_status' => 'Paid', 'paid_at' => now()]);
+
+        $this->actingAs($passenger)
+            ->post(route('passenger.bookings.store'), $bookingData)
+            ->assertRedirect(route('passenger.bookings.history'));
+        $this->assertDatabaseHas('bookings', [
+            'trip_id' => $availableTrip->trip_id,
+            'passenger_id' => $passenger->id,
+            'booking_status' => 'Pending',
+        ]);
+    }
+
     public function test_passenger_can_submit_booking_request_with_detected_pickup_coordinates(): void
     {
         $passenger = User::factory()->create(['role' => 'passenger']);

@@ -26,7 +26,7 @@
 
             @if($bookingRestricted)
                 <div class="mb-6 flex flex-col gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 sm:flex-row sm:items-center sm:justify-between">
-                    <span><strong>New bookings are paused.</strong> Resolve your overdue payment or payment issue first.</span>
+                    <span><strong>New bookings are paused.</strong> Complete your outstanding payment first.</span>
                     <a href="{{ route('payments.index') }}" class="font-semibold underline">Open Payments</a>
                 </div>
             @endif
