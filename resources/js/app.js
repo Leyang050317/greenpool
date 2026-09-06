@@ -136,10 +136,22 @@ const showRealtimeNotification = (notification, iconText = '★') => {
         toast.classList.remove('translate-y-[-0.5rem]', 'opacity-0');
     });
 
-    window.setTimeout(() => {
+    let dismissTimer;
+    const dismiss = () => {
         toast.classList.add('translate-y-[-0.5rem]', 'opacity-0');
         window.setTimeout(() => toast.remove(), 200);
-    }, 6000);
+    };
+    const scheduleDismiss = () => {
+        window.clearTimeout(dismissTimer);
+        dismissTimer = window.setTimeout(dismiss, 10000);
+    };
+
+    // Keep important notifications visible while the user is reading them.
+    toast.addEventListener('mouseenter', () => window.clearTimeout(dismissTimer));
+    toast.addEventListener('mouseleave', scheduleDismiss);
+    toast.addEventListener('focusin', () => window.clearTimeout(dismissTimer));
+    toast.addEventListener('focusout', scheduleDismiss);
+    scheduleDismiss();
 };
 
 const bookingUpdateNotification = (event, role) => {
