@@ -2,7 +2,6 @@
 
 namespace Tests\Feature;
 
-use App\Models\Faq;
 use App\Models\Trip;
 use App\Models\User;
 use App\Notifications\TripReminderNotification;
@@ -41,21 +40,26 @@ class SettingsAndHelpTest extends TestCase
         ]);
     }
 
-    public function test_help_page_displays_active_database_faqs(): void
+    public function test_help_page_omits_the_unused_faq_section_and_displays_the_correct_header(): void
     {
         $user = User::factory()->create(['email_verified_at' => now()]);
-        Faq::create([
-            'question' => 'Where are payment receipts?',
-            'answer' => 'Open Payments.',
-            'category' => 'Payments',
-            'is_active' => true,
-        ]);
 
         $this->actingAs($user)
             ->get(route('help.index'))
             ->assertOk()
-            ->assertSee('Where are payment receipts?')
-            ->assertSee('Open Payments.');
+            ->assertSee('aria-label="Current page: Help &amp; Support"', false)
+            ->assertSee('Quick guides')
+            ->assertDontSee('Frequently asked questions');
+    }
+
+    public function test_settings_page_displays_the_correct_header(): void
+    {
+        $user = User::factory()->create(['email_verified_at' => now()]);
+
+        $this->actingAs($user)
+            ->get(route('settings.index'))
+            ->assertOk()
+            ->assertSee('aria-label="Current page: Settings"', false);
     }
 
     public function test_an_optional_notification_is_not_delivered_when_its_setting_is_disabled(): void

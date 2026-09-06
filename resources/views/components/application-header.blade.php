@@ -15,8 +15,8 @@
         request()->routeIs('payments.*') => 'Payments',
         request()->routeIs('ratings.*') => 'Ratings',
         request()->routeIs('profile.*', 'driver.profile.*', 'passenger.profile.*') => 'Profile',
-        request()->routeIs('driver.settings.*', 'passenger.settings.*') => 'Settings',
-        request()->routeIs('driver.help.*', 'passenger.help.*') => 'Help',
+        request()->routeIs('settings.*', 'driver.settings.*', 'passenger.settings.*') => 'Settings',
+        request()->routeIs('help.*', 'driver.help.*', 'passenger.help.*') => 'Help & Support',
         default => 'Dashboard',
     };
 
@@ -42,7 +42,7 @@
             <x-icons.lucide name="menu" />
         </button>
 
-        <h1 class="truncate text-lg font-semibold leading-none text-[#111827]">
+        <h1 class="truncate text-lg font-semibold leading-none text-[#111827]" aria-label="Current page: {{ $pageTitle }}">
             {{ $pageTitle }}
         </h1>
     </div>
