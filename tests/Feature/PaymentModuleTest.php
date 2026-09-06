@@ -356,35 +356,26 @@ class PaymentModuleTest extends TestCase
             ->assertSee('RM 25.00');
     }
 
-    public function test_passenger_can_report_a_payment_issue_and_driver_can_resolve_it(): void
+    public function test_pending_payment_blocks_new_bookings_until_it_is_paid(): void
     {
-        [$driver, $passenger, $booking] = $this->completedBooking();
+        [, $passenger, $booking] = $this->completedBooking();
         $payment = app(PaymentService::class)->createPendingForBooking($booking);
 
-        $this->actingAs($passenger)->post(route('payments.issue.report', $payment), [
-            'issue_reason' => 'amount_incorrect',
-            'issue_details' => 'The displayed fare is not what we agreed.',
-        ])->assertRedirect(route('payments.show', $payment));
-
-        $payment->refresh();
-        $this->assertSame('Under Review', $payment->payment_status);
-        $this->assertSame('amount_incorrect', $payment->issue_reason);
         $this->assertTrue(app(PaymentService::class)->hasBookingRestriction($passenger));
 
-        $this->actingAs($driver)->post(route('payments.issue.resolve', $payment), [
-            'resolution' => 'waive',
-            'resolution_details' => 'Trip did not proceed as expected.',
-        ])->assertRedirect(route('payments.show', $payment));
+        $this->actingAs($passenger)->get(route('payments.index'))
+            ->assertOk()
+            ->assertSee('Pending')
+            ->assertDontSee('Under Review')
+            ->assertDontSee('Waived');
 
-        $payment->refresh();
-        $this->assertSame('Waived', $payment->payment_status);
+        $this->actingAs($passenger)->get(route('payments.show', $payment))
+            ->assertOk()
+            ->assertDontSee('Report payment issue')
+            ->assertDontSee('Waive payment');
+
+        app(PaymentCompletionService::class)->complete($payment, 'stripe', 'pi_booking_unblocked');
         $this->assertFalse(app(PaymentService::class)->hasBookingRestriction($passenger));
-
-        $payment->update(['payment_status' => 'Under Review']);
-        $this->actingAs($driver)->post(route('payments.issue.resolve', $payment), [
-            'resolution' => 'keep_due',
-        ])->assertRedirect(route('payments.show', $payment));
-        $this->assertTrue(app(PaymentService::class)->hasBookingRestriction($passenger));
     }
 
     public function test_completed_trip_cannot_be_completed_without_a_picked_up_passenger(): void

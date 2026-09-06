@@ -9,10 +9,10 @@ use App\Http\Requests\Passenger\StoreBookingRequest;
 use App\Models\Booking;
 use App\Models\Trip;
 use App\Notifications\BookingRequestNotification;
-use App\Services\Routing\TripLocationService;
-use App\Services\Routing\TripDistanceService;
-use App\Services\Routing\TripRoutingException;
 use App\Services\PaymentService;
+use App\Services\Routing\TripDistanceService;
+use App\Services\Routing\TripLocationService;
+use App\Services\Routing\TripRoutingException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -23,7 +23,9 @@ use Illuminate\View\View;
 class PassengerBookingController extends Controller
 {
     private const DESTINATION_FILTER_RADIUS_KM = 20;
+
     private const DESTINATION_CLOSE_RADIUS_KM = 5;
+
     private const DESTINATION_NEAR_RADIUS_KM = 10;
 
     public function __construct(
@@ -158,7 +160,7 @@ class PassengerBookingController extends Controller
     {
         if ($this->paymentService->hasBookingRestriction($request->user())) {
             throw ValidationException::withMessages([
-                'trip_id' => 'New bookings are unavailable while you have an overdue payment or a payment issue under review. Open Payments to resolve it.',
+                'trip_id' => 'New bookings are unavailable while you have an unpaid completed trip. Open Payments to complete the payment.',
             ]);
         }
 
@@ -418,7 +420,7 @@ class PassengerBookingController extends Controller
     }
 
     /**
-     * @param list<string> $keywords
+     * @param  list<string>  $keywords
      */
     private function addDestinationSearchScore($query, Request $request, string $destination, array $keywords, ?array $selectedLocation): void
     {

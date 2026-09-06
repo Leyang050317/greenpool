@@ -6,8 +6,6 @@
             'Paid' => 'bg-green-50 text-green-700',
             'Failed' => 'bg-red-50 text-red-700',
             'Refunded' => 'bg-slate-100 text-slate-600',
-            'Under Review' => 'bg-blue-50 text-blue-700',
-            'Waived' => 'bg-slate-100 text-slate-600',
         ];
     @endphp
     <div class="min-h-screen bg-[#F8FAFC] px-4 py-8 sm:px-6 lg:px-8" data-payments-page>
@@ -24,7 +22,7 @@
             </div>
 
             <form method="GET" class="mt-6 flex flex-wrap gap-2" aria-label="Filter payments">
-                @foreach(['' => 'All', 'Pending' => 'Pending', 'Under Review' => 'Under Review', 'Paid' => 'Paid', 'Waived' => 'Waived'] as $value => $label)
+                @foreach(['' => 'All', 'Pending' => 'Pending', 'Paid' => 'Paid'] as $value => $label)
                     <button name="status" value="{{ $value }}" class="rounded-full border px-4 py-2 text-sm font-semibold {{ request('status', '') === $value ? 'border-green-600 bg-green-600 text-white' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50' }}">{{ $label }}</button>
                 @endforeach
             </form>
