@@ -11,8 +11,8 @@ use Illuminate\Support\Facades\Log;
 class GeminiFaqService
 {
     /**
-     * Answer only from the FAQ entries supplied by the application. This keeps
-     * the public bot helpful without exposing account, payment, or trip data.
+     * Answer general questions safely while grounding GreenPool-specific
+     * questions in the approved FAQ entries supplied by the application.
      *
      * @param Collection<int, Faq> $faqs
      */
@@ -27,11 +27,16 @@ class GeminiFaqService
         $knowledge = $faqs->map(fn (Faq $faq) => "[{$faq->category}] {$faq->question}\n{$faq->answer}")
             ->implode("\n\n");
 
+        $greenPoolQuestion = $this->isGreenPoolQuestion($question);
+        $scope = $greenPoolQuestion
+            ? 'This is a GreenPool-specific question. Answer using only the approved FAQ content. If the FAQ does not answer it, say so clearly and direct the user to the relevant GreenPool menu.'
+            : 'This is a general-knowledge question. You may answer concisely using general knowledge, but do not present general information as a GreenPool feature, rule, price, or policy. For live weather, current traffic, prices, laws, or other changing facts, explain that you cannot see live data and give only stable, general guidance.';
+
         $prompt = <<<TEXT
 You are GreenPool Help, a concise support assistant for a Malaysian carpooling project.
-The user is a {$user->role}. Answer using only the approved FAQ content below.
+The user is a {$user->role}. {$scope}
 Do not invent app features, policies, prices, or account information. Never ask for passwords, card numbers, OTPs, or identity documents.
-For an immediate safety emergency, tell the user to use GreenPool's Emergency button and call 999. If the FAQ does not answer the question, say so clearly and suggest a relevant GreenPool menu.
+For an immediate safety emergency, tell the user to use GreenPool's Emergency button and call 999.
 
 APPROVED FAQ CONTENT:
 {$knowledge}
@@ -81,5 +86,23 @@ TEXT;
 
             return null;
         }
+    }
+
+    private function isGreenPoolQuestion(string $question): bool
+    {
+        $question = mb_strtolower($question);
+
+        foreach ([
+            'greenpool', 'booking', 'book a ride', 'ride', 'trip', 'driver', 'passenger',
+            'payment', 'pay', 'fare', 'receipt', 'refund', 'message', 'notification',
+            'vehicle', 'licence', 'license', 'profile', 'account', 'rating', 'emergency',
+            'attraction', 'favourite', 'favorite', 'app',
+        ] as $term) {
+            if (str_contains($question, $term)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
