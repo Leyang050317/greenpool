@@ -120,6 +120,34 @@ class FaqBotTest extends TestCase
             ->assertJsonPath('answer', 'You can manage notification preferences from Settings.');
     }
 
+    public function test_gemini_can_answer_a_general_question_without_treating_it_as_greenpool_policy(): void
+    {
+        config()->set('services.gemini.enabled', true);
+        config()->set('services.gemini.key', 'test-key');
+        config()->set('services.gemini.model', 'gemini-test');
+        Http::fake([
+            'generativelanguage.googleapis.com/*' => Http::response([
+                'candidates' => [
+                    ['content' => ['parts' => [['text' => 'Malaysia has a tropical climate. I cannot see live weather conditions.']]]],
+                ],
+            ]),
+        ]);
+        $user = User::factory()->create(['email_verified_at' => now(), 'role' => 'passenger']);
+
+        $this->actingAs($user)
+            ->postJson(route('faq-bot.answer'), ['question' => 'What is the weather in Malaysia?'])
+            ->assertOk()
+            ->assertJsonPath('ai', true)
+            ->assertJsonPath('answer', 'Malaysia has a tropical climate. I cannot see live weather conditions.');
+
+        Http::assertSent(function ($request): bool {
+            $prompt = data_get($request->data(), 'contents.0.parts.0.text', '');
+
+            return str_contains($prompt, 'This is a general-knowledge question.')
+                && str_contains($prompt, 'cannot see live data');
+        });
+    }
+
     public function test_fuzzy_similarity_does_not_send_an_alerts_question_to_an_unrelated_payment_faq(): void
     {
         $user = User::factory()->create(['email_verified_at' => now()]);
