@@ -23,7 +23,10 @@
         request()->routeIs('ratings.*') => 'Ratings',
         request()->routeIs('attractions.*') => 'Tourist Attractions',
         default => config('app.name', 'GreenPool'),
-    } : config('app.name', 'Laravel'));
+    } : match (true) {
+        request()->routeIs('messages.*', 'bookings.chat.*') => 'Messages',
+        default => config('app.name', 'GreenPool'),
+    });
 @endphp
 
 <!DOCTYPE html>
