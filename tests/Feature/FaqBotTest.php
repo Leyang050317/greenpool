@@ -121,32 +121,20 @@ class FaqBotTest extends TestCase
         Http::assertNothingSent();
     }
 
-    public function test_gemini_can_answer_a_general_question_without_treating_it_as_greenpool_policy(): void
+    public function test_bot_refuses_a_non_greenpool_question_without_calling_gemini(): void
     {
         config()->set('services.gemini.enabled', true);
         config()->set('services.gemini.key', 'test-key');
         config()->set('services.gemini.model', 'gemini-test');
-        Http::fake([
-            'generativelanguage.googleapis.com/*' => Http::response([
-                'candidates' => [
-                    ['content' => ['parts' => [['text' => 'Malaysia has a tropical climate. I cannot see live weather conditions.']]]],
-                ],
-            ]),
-        ]);
         $user = User::factory()->create(['email_verified_at' => now(), 'role' => 'passenger']);
 
         $this->actingAs($user)
             ->postJson(route('faq-bot.answer'), ['question' => 'What is the weather in Malaysia?'])
             ->assertOk()
             ->assertJsonPath('ai', true)
-            ->assertJsonPath('answer', 'Malaysia has a tropical climate. I cannot see live weather conditions.');
+            ->assertJsonPath('answer', 'I can help only with GreenPool features, such as trips, bookings, payments, messages, ratings, vehicles, notifications, accounts, and tourist attractions.');
 
-        Http::assertSent(function ($request): bool {
-            $prompt = data_get($request->data(), 'contents.0.parts.0.text', '');
-
-            return str_contains($prompt, 'This is a general-knowledge question.')
-                && str_contains($prompt, 'cannot see live data');
-        });
+        Http::assertNothingSent();
     }
 
     public function test_gemini_output_is_returned_as_plain_text(): void
@@ -157,17 +145,17 @@ class FaqBotTest extends TestCase
         Http::fake([
             'generativelanguage.googleapis.com/*' => Http::response([
                 'candidates' => [
-                    ['content' => ['parts' => [['text' => '**Malaysia** has a tropical climate.']]]],
+                    ['content' => ['parts' => [['text' => 'Use **Find a Ride** to browse available trips.']]]],
                 ],
             ]),
         ]);
         $user = User::factory()->create(['email_verified_at' => now(), 'role' => 'passenger']);
 
         $this->actingAs($user)
-            ->postJson(route('faq-bot.answer'), ['question' => 'What is Malaysia climate like?'])
+            ->postJson(route('faq-bot.answer'), ['question' => 'How do I use the booking feature?'])
             ->assertOk()
             ->assertJsonPath('ai', true)
-            ->assertJsonPath('answer', 'Malaysia has a tropical climate.');
+            ->assertJsonPath('answer', 'Use Find a Ride to browse available trips.');
     }
 
     public function test_direct_create_trip_question_uses_the_seeded_approved_faq(): void
@@ -184,6 +172,34 @@ class FaqBotTest extends TestCase
             ->assertJsonPath('faq.question', 'How do I create a trip as a driver?');
 
         Http::assertNothingSent();
+    }
+
+    public function test_gemini_can_explain_a_greenpool_feature_when_the_faq_database_is_empty(): void
+    {
+        config()->set('services.gemini.enabled', true);
+        config()->set('services.gemini.key', 'test-key');
+        config()->set('services.gemini.model', 'gemini-test');
+        Http::fake([
+            'generativelanguage.googleapis.com/*' => Http::response([
+                'candidates' => [
+                    ['content' => ['parts' => [['text' => 'As a driver, open My Trips, choose Create Trip, then select your verified vehicle and enter the trip details.']]]],
+                ],
+            ]),
+        ]);
+        $user = User::factory()->create(['email_verified_at' => now(), 'role' => 'driver']);
+
+        $this->actingAs($user)
+            ->postJson(route('faq-bot.answer'), ['question' => 'How do I create a trip as a driver?'])
+            ->assertOk()
+            ->assertJsonPath('ai', true)
+            ->assertJsonPath('answer', 'As a driver, open My Trips, choose Create Trip, then select your verified vehicle and enter the trip details.');
+
+        Http::assertSent(function ($request): bool {
+            $prompt = data_get($request->data(), 'contents.0.parts.0.text', '');
+
+            return str_contains($prompt, 'WEBSITE CAPABILITY MAP:')
+                && str_contains($prompt, 'Trip creation requires a verified valid driving licence');
+        });
     }
 
     public function test_fuzzy_similarity_does_not_send_an_alerts_question_to_an_unrelated_payment_faq(): void
