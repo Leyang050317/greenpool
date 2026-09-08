@@ -1,5 +1,5 @@
 @php
-    $pageTitle = Auth::user()?->role === 'driver' ? match (true) {
+    $pageTitle = request()->routeIs('profile.edit') ? 'Profile' : (Auth::user()?->role === 'driver' ? match (true) {
         request()->routeIs('driver.home') => 'Dashboard',
         request()->routeIs('driver.trips.index') => 'My Trips',
         request()->routeIs('driver.trips.create') => 'Create Trip',
@@ -13,6 +13,7 @@
         request()->routeIs('driver.vehicles.create') => 'Add Vehicle',
         request()->routeIs('driver.vehicles.edit') => 'Edit Vehicle',
         request()->routeIs('driver.vehicles.show') => 'Vehicle Details',
+        request()->routeIs('driver.vehicles.archived') => 'Archived Vehicles',
         request()->routeIs('driver.profile.*') => 'Profile',
         request()->routeIs('settings.*') => 'Settings',
         request()->routeIs('help.*') => 'Help & Support',
@@ -22,7 +23,7 @@
         request()->routeIs('ratings.*') => 'Ratings',
         request()->routeIs('attractions.*') => 'Tourist Attractions',
         default => config('app.name', 'GreenPool'),
-    } : config('app.name', 'Laravel');
+    } : config('app.name', 'Laravel'));
 @endphp
 
 <!DOCTYPE html>

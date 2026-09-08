@@ -43,6 +43,23 @@ class AttractionDiscoveryTest extends TestCase
             ->assertSee($penangAttraction->location);
     }
 
+    public function test_attraction_search_exposes_feedback_and_an_accessible_favourite_action(): void
+    {
+        $user = User::factory()->create(['email_verified_at' => now()]);
+        $attraction = Attraction::query()->create([
+            'attraction_name' => 'Batu Caves',
+            'state' => 'Selangor',
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('attractions.index'))
+            ->assertOk()
+            ->assertSee('Searching places…')
+            ->assertSee('No matching places found. Press Enter to search saved attractions.')
+            ->assertSee('Suggestions are unavailable right now. You can still press Enter to search saved attractions.')
+            ->assertSee('Save Batu Caves to favourites');
+    }
+
     public function test_user_can_save_and_remove_an_attraction_from_favourites(): void
     {
         $user = User::factory()->create(['email_verified_at' => now()]);
