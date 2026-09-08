@@ -80,7 +80,11 @@ class ImportGoogleTouristAttractions extends Command
                 $attraction = Attraction::query()->create([
                     'attraction_name' => mb_substr($name, 0, 150),
                     'state' => $state,
-                    'description' => "Discover {$name} in {$state}, Malaysia.",
+                    'description' => mb_substr(
+                        (string) data_get($place, 'editorialSummary.text') ?: "Discover {$name} in {$state}, Malaysia.",
+                        0,
+                        1000,
+                    ),
                     'location' => mb_substr((string) data_get($place, 'formattedAddress'), 0, 255) ?: null,
                     // Google photo names are not cached; cards load the current photo via the Place ID.
                     'image_url' => null,
@@ -93,6 +97,8 @@ class ImportGoogleTouristAttractions extends Command
                     'google_place_id' => data_get($place, 'id'),
                     'latitude' => data_get($place, 'location.latitude'),
                     'longitude' => data_get($place, 'location.longitude'),
+                    'rating' => data_get($place, 'rating'),
+                    'user_rating_count' => data_get($place, 'userRatingCount'),
                 ]);
             }
         });

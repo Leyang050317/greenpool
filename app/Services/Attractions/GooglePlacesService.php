@@ -67,7 +67,7 @@ class GooglePlacesService
     /** @return array<string, mixed> */
     public function detailsByPlaceId(string $placeId): array
     {
-        $place = $this->get($this->placePath($placeId), [], 'id,displayName,formattedAddress,addressComponents,location,primaryType,photos,editorialSummary,regularOpeningHours,nationalPhoneNumber,internationalPhoneNumber,websiteUri,googleMapsUri')->json();
+        $place = $this->get($this->placePath($placeId), [], 'id,displayName,formattedAddress,addressComponents,location,primaryType,photos,rating,userRatingCount,editorialSummary,regularOpeningHours,nationalPhoneNumber,internationalPhoneNumber,websiteUri,googleMapsUri')->json();
 
         if (! $this->isMalaysian($place)) {
             throw new RuntimeException('The selected attraction must be in Malaysia.');
@@ -213,7 +213,7 @@ class GooglePlacesService
 
     private function touristAttractionFieldMask(): string
     {
-        return 'places.id,places.displayName,places.formattedAddress,places.addressComponents,places.location,places.primaryType,places.photos,places.rating,places.userRatingCount';
+        return 'places.id,places.displayName,places.formattedAddress,places.addressComponents,places.location,places.primaryType,places.photos,places.rating,places.userRatingCount,places.editorialSummary';
     }
 
     private function popularityScore(array $place): float

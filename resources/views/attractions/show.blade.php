@@ -33,6 +33,11 @@
                     <span class="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-700">{{ $attraction->category }}</span>
                     <h1 class="mt-2 text-2xl font-bold tracking-tight text-slate-900">{{ $attraction->attraction_name }}</h1>
                     <p class="mt-2 inline-flex items-center gap-1.5 text-[13px] text-slate-500"><x-icons.lucide name="map-pin" />{{ $attraction->location ?: $attraction->state }}</p>
+                    @php($rating = data_get($googlePlace, 'rating') ?? $attraction->detail?->rating)
+                    @php($reviewCount = data_get($googlePlace, 'userRatingCount') ?? $attraction->detail?->user_rating_count)
+                    @if ($rating !== null)
+                        <p class="mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-slate-700" aria-label="Google rating {{ number_format((float) $rating, 1) }} out of 5{{ $reviewCount !== null ? ' from '.number_format((int) $reviewCount).' reviews' : '' }}"><span class="text-base text-amber-400" aria-hidden="true">★</span>{{ number_format((float) $rating, 1) }}@if ($reviewCount !== null)<span class="font-normal text-slate-400">({{ number_format((int) $reviewCount) }} Google reviews)</span>@endif</p>
+                    @endif
                 </div>
                 <form method="POST" action="{{ $isFavourited ? route('attractions.favourites.destroy', $attraction) : route('attractions.favourites.store', $attraction) }}">
                     @csrf

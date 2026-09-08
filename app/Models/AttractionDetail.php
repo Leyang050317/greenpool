@@ -10,13 +10,18 @@ class AttractionDetail extends Model
     protected $primaryKey = 'detail_id';
 
     protected $fillable = [
-        'attraction_id', 'category', 'opening_hours', 'entrance_fee', 'contact', 'website',
+        'attraction_id', 'category', 'rating', 'user_rating_count', 'opening_hours', 'entrance_fee', 'contact', 'website',
         'source_name', 'source_place_id', 'google_place_id', 'latitude', 'longitude', 'image_attribution',
     ];
 
     protected function casts(): array
     {
-        return ['latitude' => 'float', 'longitude' => 'float'];
+        return [
+            'latitude' => 'float',
+            'longitude' => 'float',
+            'rating' => 'float',
+            'user_rating_count' => 'integer',
+        ];
     }
 
     public function attraction(): BelongsTo
