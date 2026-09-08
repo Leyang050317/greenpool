@@ -55,7 +55,11 @@ class AttractionController extends Controller
             $attraction = Attraction::query()->create([
                 'attraction_name' => mb_substr($name, 0, 150),
                 'state' => mb_substr($state, 0, 50),
-                'description' => "Discover {$name} in {$state}, Malaysia.",
+                'description' => mb_substr(
+                    (string) data_get($place, 'editorialSummary.text') ?: "Discover {$name} in {$state}, Malaysia.",
+                    0,
+                    1000,
+                ),
                 'location' => mb_substr((string) data_get($place, 'formattedAddress'), 0, 255) ?: null,
                 'image_url' => null,
             ]);
@@ -66,6 +70,8 @@ class AttractionController extends Controller
                 'google_place_id' => $placeId,
                 'latitude' => data_get($place, 'location.latitude'),
                 'longitude' => data_get($place, 'location.longitude'),
+                'rating' => data_get($place, 'rating'),
+                'user_rating_count' => data_get($place, 'userRatingCount'),
             ]);
 
             return $attraction;

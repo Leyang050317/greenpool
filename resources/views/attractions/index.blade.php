@@ -84,8 +84,11 @@
                             <img src="{{ $googleAutoCards && ! $primaryFeatured->image_url ? route('attractions.google-card-photo', $primaryFeatured) : $primaryFeaturedFallback }}" data-fallback="{{ $primaryFeaturedFallback }}" onerror="this.src = this.dataset.fallback" alt="{{ $primaryFeatured->attraction_name }}" class="absolute inset-0 h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]">
                             <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/75 via-slate-900/25 to-transparent p-5 pt-20 text-white">
                                 <span class="rounded-md bg-white/20 px-2 py-0.5 text-[11px] font-medium backdrop-blur">{{ $primaryFeatured->category }}</span>
-                                <h3 class="mt-2 text-lg font-semibold">{{ $primaryFeatured->attraction_name }}</h3>
-                                <p class="mt-1 inline-flex items-center gap-1 text-[13px] text-white/80"><x-icons.lucide name="map-pin" />{{ $primaryFeatured->state }}</p>
+                                 <h3 class="mt-2 text-lg font-semibold">{{ $primaryFeatured->attraction_name }}</h3>
+                                 <p class="mt-1 inline-flex items-center gap-1 text-[13px] text-white/80"><x-icons.lucide name="map-pin" />{{ $primaryFeatured->state }}</p>
+                                 @if ($primaryFeatured->detail?->rating !== null)
+                                     <p class="mt-1 inline-flex items-center gap-1 text-[13px] font-medium text-white" aria-label="Google rating {{ number_format($primaryFeatured->detail->rating, 1) }} out of 5{{ $primaryFeatured->detail->user_rating_count !== null ? ' from '.number_format($primaryFeatured->detail->user_rating_count).' reviews' : '' }}"><span class="text-amber-300" aria-hidden="true">★</span>{{ number_format($primaryFeatured->detail->rating, 1) }}@if ($primaryFeatured->detail->user_rating_count !== null)<span class="font-normal text-white/75">({{ number_format($primaryFeatured->detail->user_rating_count) }})</span>@endif</p>
+                                 @endif
                             </div>
                         </a>
                         <form method="POST" action="{{ $primaryFeatured->is_favourited ? route('attractions.favourites.destroy', $primaryFeatured) : route('attractions.favourites.store', $primaryFeatured) }}" class="absolute right-3 top-3">
@@ -101,8 +104,11 @@
                                 <img src="{{ $googleAutoCards && ! $attraction->image_url ? route('attractions.google-card-photo', $attraction) : $featuredFallback }}" data-fallback="{{ $featuredFallback }}" onerror="this.src = this.dataset.fallback" alt="{{ $attraction->attraction_name }}" class="absolute inset-0 h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]">
                                 <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/75 via-slate-900/25 to-transparent p-4 pt-16 text-white">
                                     <span class="rounded-md bg-white/20 px-2 py-0.5 text-[11px] font-medium backdrop-blur">{{ $attraction->category }}</span>
-                                    <h3 class="mt-2 text-[15px] font-semibold">{{ $attraction->attraction_name }}</h3>
-                                    <p class="mt-1 inline-flex items-center gap-1 text-xs text-white/80"><x-icons.lucide name="map-pin" />{{ $attraction->state }}</p>
+                                     <h3 class="mt-2 text-[15px] font-semibold">{{ $attraction->attraction_name }}</h3>
+                                     <p class="mt-1 inline-flex items-center gap-1 text-xs text-white/80"><x-icons.lucide name="map-pin" />{{ $attraction->state }}</p>
+                                     @if ($attraction->detail?->rating !== null)
+                                         <p class="mt-1 inline-flex items-center gap-1 text-xs font-medium text-white" aria-label="Google rating {{ number_format($attraction->detail->rating, 1) }} out of 5{{ $attraction->detail->user_rating_count !== null ? ' from '.number_format($attraction->detail->user_rating_count).' reviews' : '' }}"><span class="text-amber-300" aria-hidden="true">★</span>{{ number_format($attraction->detail->rating, 1) }}@if ($attraction->detail->user_rating_count !== null)<span class="font-normal text-white/75">({{ number_format($attraction->detail->user_rating_count) }})</span>@endif</p>
+                                     @endif
                                 </div>
                             </a>
                             <form method="POST" action="{{ $attraction->is_favourited ? route('attractions.favourites.destroy', $attraction) : route('attractions.favourites.store', $attraction) }}" class="absolute right-3 top-3">
@@ -161,12 +167,15 @@
                             </div>
                             <div class="p-4">
                                 <h3 class="text-[15px] font-semibold leading-snug text-slate-900"><a href="{{ route('attractions.show', $attraction) }}" class="hover:text-green-700">{{ $attraction->attraction_name }}</a></h3>
-                                <div class="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
-                                    <span class="inline-flex items-center gap-1"><x-icons.lucide name="map-pin" />{{ $attraction->state }}</span>
-                                    <span class="text-slate-300">·</span>
-                                    <span class="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-700">{{ $attraction->category }}</span>
-                                </div>
-                                <p class="mt-2 line-clamp-2 text-[13px] leading-relaxed text-slate-500">{{ $attraction->description ?: 'Discover this destination on your next GreenPool journey.' }}</p>
+                                 <div class="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
+                                     <span class="inline-flex items-center gap-1"><x-icons.lucide name="map-pin" />{{ $attraction->state }}</span>
+                                     <span class="text-slate-300">·</span>
+                                     <span class="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-700">{{ $attraction->category }}</span>
+                                 </div>
+                                 @if ($attraction->detail?->rating !== null)
+                                     <p class="mt-2 inline-flex items-center gap-1 text-[13px] font-semibold text-slate-700" aria-label="Google rating {{ number_format($attraction->detail->rating, 1) }} out of 5{{ $attraction->detail->user_rating_count !== null ? ' from '.number_format($attraction->detail->user_rating_count).' reviews' : '' }}"><span class="text-amber-400" aria-hidden="true">★</span>{{ number_format($attraction->detail->rating, 1) }}@if ($attraction->detail->user_rating_count !== null)<span class="font-normal text-slate-400">({{ number_format($attraction->detail->user_rating_count) }} Google reviews)</span>@endif</p>
+                                 @endif
+                                 <p class="mt-2 line-clamp-2 text-[13px] leading-relaxed text-slate-500">{{ $attraction->description ?: 'Discover this destination on your next GreenPool journey.' }}</p>
                             </div>
                         </article>
                     @endforeach

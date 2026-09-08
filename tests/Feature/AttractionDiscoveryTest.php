@@ -43,6 +43,31 @@ class AttractionDiscoveryTest extends TestCase
             ->assertSee($penangAttraction->location);
     }
 
+    public function test_attraction_ratings_are_displayed_when_google_data_has_been_saved(): void
+    {
+        $user = User::factory()->create(['email_verified_at' => now()]);
+        $attraction = Attraction::query()->create([
+            'attraction_name' => 'Batu Caves',
+            'state' => 'Selangor',
+        ]);
+        $attraction->detail()->create([
+            'rating' => 4.6,
+            'user_rating_count' => 1284,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('attractions.index'))
+            ->assertOk()
+            ->assertSee('4.6')
+            ->assertSee('1,284 Google reviews');
+
+        $this->actingAs($user)
+            ->get(route('attractions.show', $attraction))
+            ->assertOk()
+            ->assertSee('4.6')
+            ->assertSee('1,284 Google reviews');
+    }
+
     public function test_attraction_search_exposes_feedback_and_an_accessible_favourite_action(): void
     {
         $user = User::factory()->create(['email_verified_at' => now()]);
@@ -76,7 +101,6 @@ class AttractionDiscoveryTest extends TestCase
             'attraction_id' => $attraction->attraction_id,
             'user_id' => $user->id,
         ]);
-
         $this->actingAs($user)
             ->delete(route('attractions.favourites.destroy', $attraction))
             ->assertSessionHas('success');
@@ -134,6 +158,11 @@ class AttractionDiscoveryTest extends TestCase
         $this->assertDatabaseHas('favourites', [
             'user_id' => $user->id,
             'attraction_id' => $existing->getKey(),
+        ]);
+        $this->assertDatabaseHas('attraction_details', [
+            'attraction_id' => $existing->getKey(),
+            'rating' => 4.5,
+            'user_rating_count' => 1000,
         ]);
     }
 

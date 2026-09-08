@@ -97,7 +97,12 @@ class SyncGoogleTouristAttractions extends Command
             }
 
             $wasCreated = ! $attraction;
-            $description = $attraction?->description ?: $this->descriptionFor($name, $state, $category);
+            $description = $attraction?->description
+                ?: mb_substr(
+                    (string) data_get($place, 'editorialSummary.text') ?: $this->descriptionFor($name, $state, $category),
+                    0,
+                    1000,
+                );
             $location = mb_substr((string) data_get($place, 'formattedAddress'), 0, 255) ?: $attraction?->location;
 
             if ($attraction) {
@@ -126,6 +131,8 @@ class SyncGoogleTouristAttractions extends Command
                     'google_place_id' => $placeId,
                     'latitude' => data_get($place, 'location.latitude'),
                     'longitude' => data_get($place, 'location.longitude'),
+                    'rating' => data_get($place, 'rating'),
+                    'user_rating_count' => data_get($place, 'userRatingCount'),
                 ]
             );
 
