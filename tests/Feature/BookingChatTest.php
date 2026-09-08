@@ -31,6 +31,7 @@ class BookingChatTest extends TestCase
         $this->actingAs($passenger)
             ->get(route('bookings.chat.show', $booking))
             ->assertOk()
+            ->assertSee('<title>Messages - GreenPool</title>', false)
             ->assertSee('Chat with Driver Chat')
             ->assertSee('Hi driver.')
             ->assertSee(route('messages.index'), false);
@@ -38,6 +39,7 @@ class BookingChatTest extends TestCase
         $this->actingAs($driver)
             ->get(route('bookings.chat.show', $booking))
             ->assertOk()
+            ->assertSee('<title>Messages - GreenPool</title>', false)
             ->assertSee('Chat with Passenger Chat')
             ->assertSee('Hi driver.')
             ->assertSee(route('messages.index'), false)
