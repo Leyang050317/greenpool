@@ -452,12 +452,14 @@ class RatingModuleTest extends TestCase
         $this->actingAs($passenger)
             ->get(route('ratings.pending'))
             ->assertOk()
+            ->assertSee('Rate a Driver')
             ->assertSee($driver->name)
             ->assertSee(route('ratings.create', $booking), false);
 
         $this->actingAs($driver)
             ->get(route('ratings.pending'))
             ->assertOk()
+            ->assertSee('Rate a Passenger')
             ->assertSee($passenger->name)
             ->assertSee(route('ratings.create', $booking), false);
     }

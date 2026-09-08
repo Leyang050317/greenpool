@@ -704,6 +704,20 @@ class BookingModuleTest extends TestCase
             ->assertDontSee('Pending Passenger');
     }
 
+    public function test_driver_cannot_attempt_to_accept_a_request_when_the_trip_has_become_full(): void
+    {
+        $driver = User::factory()->create(['role' => 'driver']);
+        $passenger = User::factory()->create(['role' => 'passenger']);
+        $trip = $this->createTrip(['user_id' => $driver->id, 'available_seats' => 0]);
+        $booking = $this->createBooking($passenger, $trip, 1);
+
+        $this->actingAs($driver)
+            ->get(route('driver.booking-requests.show', $booking))
+            ->assertOk()
+            ->assertSee('Not enough available seats')
+            ->assertDontSee('Accept Booking');
+    }
+
     public function test_booking_requests_show_the_passengers_real_database_rating(): void
     {
         $driver = User::factory()->create(['role' => 'driver']);

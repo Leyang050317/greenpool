@@ -345,6 +345,10 @@ const subscribeToBookingUpdates = () => {
                     const notification = bookingUpdateNotification(event, 'driver');
                     if (notification) showRealtimeNotification(notification, notification.icon);
                 }
+
+                if (path.startsWith('/driver/trips')) {
+                    window.setTimeout(() => refreshBookingPage(), 400);
+                }
             });
     }
 
@@ -768,9 +772,12 @@ Alpine.data('bookingChat', (config) => ({
     currentUserId: Number.parseInt(config.currentUserId, 10),
     messages: config.messages || [],
     message: '',
+    sendError: '',
+    sessionExpired: false,
     sending: false,
     canSend: Boolean(config.canSend),
     endpoint: config.endpoint,
+    loginUrl: config.loginUrl,
 
     init() {
         this.scrollToBottom();
@@ -813,6 +820,7 @@ Alpine.data('bookingChat', (config) => ({
         }
 
         this.sending = true;
+        this.sendError = '';
 
         try {
             const response = await fetch(this.endpoint, {
@@ -825,7 +833,13 @@ Alpine.data('bookingChat', (config) => ({
                 body: JSON.stringify({ message: value }),
             });
 
-            const data = await response.json();
+            const data = await response.json().catch(() => ({}));
+
+            if (response.status === 419) {
+                this.sessionExpired = true;
+                this.sendError = 'Your session has expired. Your message is still here; please sign in again before sending it.';
+                return;
+            }
 
             if (!response.ok) {
                 throw new Error(data.message || 'Unable to send message.');
@@ -834,7 +848,7 @@ Alpine.data('bookingChat', (config) => ({
             this.message = '';
             this.appendMessage(data.message);
         } catch (error) {
-            window.alert(error.message);
+            this.sendError = error.message || 'Unable to send message. Please try again.';
         } finally {
             this.sending = false;
         }

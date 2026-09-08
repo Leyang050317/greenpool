@@ -30,6 +30,25 @@ class PasswordResetTest extends TestCase
         Notification::assertSentTo($user, GreenPoolResetPassword::class);
     }
 
+    public function test_reset_password_response_does_not_reveal_whether_an_email_exists(): void
+    {
+        Notification::fake();
+        $user = User::factory()->create();
+
+        $known = $this->from('/forgot-password')
+            ->post('/forgot-password', ['email' => $user->email]);
+        $unknown = $this->from('/forgot-password')
+            ->post('/forgot-password', ['email' => 'unknown@example.test']);
+
+        $known->assertRedirect('/forgot-password')
+            ->assertSessionHas('status', 'If an account exists for this email address, we have sent a password reset link.')
+            ->assertSessionHasNoErrors();
+        $unknown->assertRedirect('/forgot-password')
+            ->assertSessionHas('status', 'If an account exists for this email address, we have sent a password reset link.')
+            ->assertSessionHasNoErrors();
+        Notification::assertSentTo($user, GreenPoolResetPassword::class);
+    }
+
     public function test_reset_password_screen_can_be_rendered(): void
     {
         Notification::fake();
