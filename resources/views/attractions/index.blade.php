@@ -29,14 +29,21 @@
             <label for="search" class="sr-only">Search attractions</label>
             <div class="relative">
                 <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-400"><x-icons.lucide name="search" /></span>
-                <input id="search" name="search" value="{{ $search }}" placeholder="Search Malaysian attractions..." @input="searchGoogle()" @focus="open = true" @keydown.escape="open = false" autocomplete="off" class="block w-full rounded-[10px] border-slate-200 py-2.5 pl-10 pr-10 text-sm text-slate-900 placeholder:text-slate-400 focus:border-green-600 focus:ring-2 focus:ring-green-100">
+                <input id="search" name="search" value="{{ $search }}" placeholder="Search Malaysian attractions..." @input="searchGoogle()" @focus="open = true" @keydown.escape="open = false" autocomplete="off" :aria-expanded="Boolean(open && (suggestions.length || loading || notice))" aria-controls="attraction-search-results" :aria-busy="loading" class="block w-full rounded-[10px] border-slate-200 py-2.5 pl-10 pr-10 text-sm text-slate-900 placeholder:text-slate-400 focus:border-green-600 focus:ring-2 focus:ring-green-100">
                 @if ($search !== '')
                     <a href="{{ route('attractions.index', ['tab' => $tab, 'state' => $state ?: null]) }}" class="absolute inset-y-0 right-0 flex items-center px-3 text-slate-400 hover:text-slate-700" aria-label="Clear search"><x-icons.lucide name="x" /></a>
                 @endif
-                <div x-cloak x-show="open && suggestions.length" class="absolute z-30 mt-1 w-full overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
-                    <template x-for="suggestion in suggestions" :key="suggestion.place_id">
-                        <button type="button" @click="openPlace(suggestion)" class="block w-full px-3.5 py-2.5 text-left text-sm text-slate-700 hover:bg-green-50 hover:text-green-800" x-text="suggestion.text"></button>
-                    </template>
+                <div id="attraction-search-results" x-cloak x-show="open && (suggestions.length || loading || notice)" class="absolute z-30 mt-1 w-full overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
+                    <div x-show="loading" class="flex items-center gap-2 px-3.5 py-3 text-sm text-slate-500" role="status" aria-live="polite">
+                        <span class="h-4 w-4 animate-spin rounded-full border-2 border-green-100 border-t-green-600" aria-hidden="true"></span>
+                        Searching places…
+                    </div>
+                    <p x-show="!loading && notice" x-text="notice" class="px-3.5 py-3 text-sm text-slate-500" role="status" aria-live="polite"></p>
+                    <div x-show="!loading && suggestions.length" role="listbox" aria-label="Attraction suggestions">
+                        <template x-for="suggestion in suggestions" :key="suggestion.place_id">
+                            <button type="button" role="option" @click="openPlace(suggestion)" class="block min-h-11 w-full px-3.5 py-2.5 text-left text-sm text-slate-700 hover:bg-green-50 hover:text-green-800" x-text="suggestion.text"></button>
+                        </template>
+                    </div>
                 </div>
             </div>
             <p class="mt-1.5 text-xs text-slate-400">Search saved places or choose a Google suggestion to explore any Malaysian attraction.</p>
@@ -45,12 +52,12 @@
         <section class="mb-8">
             <p class="mb-2.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-slate-400">Explore by State</p>
             <div class="flex flex-wrap items-center gap-2">
-                <a href="{{ route('attractions.index', ['tab' => $tab, 'search' => $search ?: null]) }}" class="rounded-full border px-3.5 py-1.5 text-[13px] font-medium transition {{ $state === '' ? 'border-green-600 bg-green-600 text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-green-300 hover:text-green-700' }}">All States</a>
+                <a href="{{ route('attractions.index', ['tab' => $tab, 'search' => $search ?: null]) }}" class="inline-flex min-h-11 items-center rounded-full border px-3.5 py-1.5 text-[13px] font-medium transition {{ $state === '' ? 'border-green-600 bg-green-600 text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-green-300 hover:text-green-700' }}">All States</a>
                 @foreach ($quickStates as $availableState)
-                    <a href="{{ route('attractions.index', ['tab' => $tab, 'search' => $search ?: null, 'state' => $availableState]) }}" class="rounded-full border px-3.5 py-1.5 text-[13px] font-medium transition {{ $state === $availableState ? 'border-green-600 bg-green-600 text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-green-300 hover:text-green-700' }}">{{ $availableState }}</a>
+                    <a href="{{ route('attractions.index', ['tab' => $tab, 'search' => $search ?: null, 'state' => $availableState]) }}" class="inline-flex min-h-11 items-center rounded-full border px-3.5 py-1.5 text-[13px] font-medium transition {{ $state === $availableState ? 'border-green-600 bg-green-600 text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-green-300 hover:text-green-700' }}">{{ $availableState }}</a>
                 @endforeach
                 <details class="relative">
-                    <summary class="cursor-pointer list-none rounded-full border border-slate-200 bg-white px-3.5 py-1.5 text-[13px] font-medium text-slate-600 hover:border-green-300 hover:text-green-700">More States</summary>
+                    <summary class="inline-flex min-h-11 cursor-pointer list-none items-center rounded-full border border-slate-200 bg-white px-3.5 py-1.5 text-[13px] font-medium text-slate-600 hover:border-green-300 hover:text-green-700">More States</summary>
                     <div class="absolute left-0 z-20 mt-2 w-48 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
                         @foreach ($moreStates as $availableState)
                             <a href="{{ route('attractions.index', ['tab' => $tab, 'search' => $search ?: null, 'state' => $availableState]) }}" class="block px-4 py-2 text-sm {{ $state === $availableState ? 'bg-green-50 font-semibold text-green-700' : 'text-slate-700 hover:bg-slate-50' }}">{{ $availableState }}</a>
@@ -84,7 +91,7 @@
                         <form method="POST" action="{{ $primaryFeatured->is_favourited ? route('attractions.favourites.destroy', $primaryFeatured) : route('attractions.favourites.store', $primaryFeatured) }}" class="absolute right-3 top-3">
                             @csrf
                             @if ($primaryFeatured->is_favourited) @method('DELETE') @endif
-                            <button type="submit" class="flex h-10 w-10 items-center justify-center rounded-full {{ $primaryFeatured->is_favourited ? 'bg-red-100 text-red-500' : 'bg-white/90 text-slate-400' }}"><span class="text-xl">{{ $primaryFeatured->is_favourited ? '♥' : '♡' }}</span></button>
+                            <button type="submit" class="flex h-11 w-11 items-center justify-center rounded-full {{ $primaryFeatured->is_favourited ? 'bg-red-100 text-red-500' : 'bg-white/90 text-slate-400' }}" aria-label="{{ $primaryFeatured->is_favourited ? 'Remove '.$primaryFeatured->attraction_name.' from favourites' : 'Save '.$primaryFeatured->attraction_name.' to favourites' }}"><span class="text-xl">{{ $primaryFeatured->is_favourited ? '♥' : '♡' }}</span></button>
                         </form>
                     </article>
                     @foreach ($featured->skip(1) as $attraction)
@@ -101,7 +108,7 @@
                             <form method="POST" action="{{ $attraction->is_favourited ? route('attractions.favourites.destroy', $attraction) : route('attractions.favourites.store', $attraction) }}" class="absolute right-3 top-3">
                                 @csrf
                                 @if ($attraction->is_favourited) @method('DELETE') @endif
-                                <button type="submit" class="flex h-9 w-9 items-center justify-center rounded-full {{ $attraction->is_favourited ? 'bg-red-100 text-red-500' : 'bg-white/90 text-slate-400' }}"><span class="text-lg">{{ $attraction->is_favourited ? '♥' : '♡' }}</span></button>
+                                <button type="submit" class="flex h-11 w-11 items-center justify-center rounded-full {{ $attraction->is_favourited ? 'bg-red-100 text-red-500' : 'bg-white/90 text-slate-400' }}" aria-label="{{ $attraction->is_favourited ? 'Remove '.$attraction->attraction_name.' from favourites' : 'Save '.$attraction->attraction_name.' to favourites' }}"><span class="text-lg">{{ $attraction->is_favourited ? '♥' : '♡' }}</span></button>
                             </form>
                         </article>
                     @endforeach
@@ -147,7 +154,7 @@
                                 <form method="POST" action="{{ $attraction->is_favourited ? route('attractions.favourites.destroy', $attraction) : route('attractions.favourites.store', $attraction) }}" class="absolute right-2.5 top-2.5">
                                     @csrf
                                     @if ($attraction->is_favourited) @method('DELETE') @endif
-                                    <button type="submit" class="flex h-8 w-8 items-center justify-center rounded-full {{ $attraction->is_favourited ? 'bg-red-100 text-red-500' : 'bg-white/90 text-slate-400 hover:bg-red-50 hover:text-red-500' }}" aria-label="{{ $attraction->is_favourited ? 'Remove from favourites' : 'Save to favourites' }}">
+                                    <button type="submit" class="flex h-11 w-11 items-center justify-center rounded-full {{ $attraction->is_favourited ? 'bg-red-100 text-red-500' : 'bg-white/90 text-slate-400 hover:bg-red-50 hover:text-red-500' }}" aria-label="{{ $attraction->is_favourited ? 'Remove '.$attraction->attraction_name.' from favourites' : 'Save '.$attraction->attraction_name.' to favourites' }}">
                                         <span class="text-base leading-none">{{ $attraction->is_favourited ? '♥' : '♡' }}</span>
                                     </button>
                                 </form>
@@ -173,20 +180,40 @@
     <script>
         window.attractionSearch = (endpoint, placeEndpoint) => ({
             timer: null,
+            requestId: 0,
             open: false,
+            loading: false,
+            notice: '',
             suggestions: [],
             searchGoogle() {
                 const input = this.$root.querySelector('#search').value.trim();
+                const requestId = ++this.requestId;
                 this.suggestions = [];
+                this.notice = '';
                 this.open = true;
                 clearTimeout(this.timer);
-                if (input.length < 2) return;
+                if (input.length < 2) {
+                    this.loading = false;
+                    return;
+                }
+
+                this.loading = true;
                 this.timer = setTimeout(async () => {
                     try {
                         const response = await window.axios.get(endpoint, { params: { input } });
+                        if (requestId !== this.requestId) return;
                         this.suggestions = response.data.data || [];
+                        if (!this.suggestions.length) {
+                            this.notice = 'No matching places found. Press Enter to search saved attractions.';
+                        }
                     } catch (_) {
+                        if (requestId !== this.requestId) return;
                         this.suggestions = [];
+                        this.notice = 'Suggestions are unavailable right now. You can still press Enter to search saved attractions.';
+                    } finally {
+                        if (requestId === this.requestId) {
+                            this.loading = false;
+                        }
                     }
                 }, 350);
             },
