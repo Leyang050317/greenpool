@@ -91,7 +91,7 @@ class FaqBotTest extends TestCase
             ->assertJsonPath('faq.answer', 'Open Find a Ride.');
     }
 
-    public function test_bot_prefers_gemini_when_it_is_enabled(): void
+    public function test_bot_prefers_an_exact_approved_faq_when_it_is_enabled(): void
     {
         config()->set('services.gemini.enabled', true);
         config()->set('services.gemini.key', 'test-key');
@@ -115,9 +115,10 @@ class FaqBotTest extends TestCase
         $this->actingAs($user)
             ->postJson(route('faq-bot.answer'), ['question' => 'How do I manage notifications?'])
             ->assertOk()
-            ->assertJsonPath('matched', false)
-            ->assertJsonPath('ai', true)
-            ->assertJsonPath('answer', 'You can manage notification preferences from Settings.');
+            ->assertJsonPath('matched', true)
+            ->assertJsonPath('faq.answer', 'Open Settings.');
+
+        Http::assertNothingSent();
     }
 
     public function test_gemini_can_answer_a_general_question_without_treating_it_as_greenpool_policy(): void
@@ -146,6 +147,43 @@ class FaqBotTest extends TestCase
             return str_contains($prompt, 'This is a general-knowledge question.')
                 && str_contains($prompt, 'cannot see live data');
         });
+    }
+
+    public function test_gemini_output_is_returned_as_plain_text(): void
+    {
+        config()->set('services.gemini.enabled', true);
+        config()->set('services.gemini.key', 'test-key');
+        config()->set('services.gemini.model', 'gemini-test');
+        Http::fake([
+            'generativelanguage.googleapis.com/*' => Http::response([
+                'candidates' => [
+                    ['content' => ['parts' => [['text' => '**Malaysia** has a tropical climate.']]]],
+                ],
+            ]),
+        ]);
+        $user = User::factory()->create(['email_verified_at' => now(), 'role' => 'passenger']);
+
+        $this->actingAs($user)
+            ->postJson(route('faq-bot.answer'), ['question' => 'What is Malaysia climate like?'])
+            ->assertOk()
+            ->assertJsonPath('ai', true)
+            ->assertJsonPath('answer', 'Malaysia has a tropical climate.');
+    }
+
+    public function test_direct_create_trip_question_uses_the_seeded_approved_faq(): void
+    {
+        $this->seed(FaqSeeder::class);
+        config()->set('services.gemini.enabled', true);
+        config()->set('services.gemini.key', 'test-key');
+        $user = User::factory()->create(['email_verified_at' => now(), 'role' => 'driver']);
+
+        $this->actingAs($user)
+            ->postJson(route('faq-bot.answer'), ['question' => 'How do I create a trip?'])
+            ->assertOk()
+            ->assertJsonPath('matched', true)
+            ->assertJsonPath('faq.question', 'How do I create a trip as a driver?');
+
+        Http::assertNothingSent();
     }
 
     public function test_fuzzy_similarity_does_not_send_an_alerts_question_to_an_unrelated_payment_faq(): void

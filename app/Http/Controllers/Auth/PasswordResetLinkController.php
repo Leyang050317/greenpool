@@ -5,13 +5,17 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Throwable;
 
 class PasswordResetLinkController extends Controller
 {
+    private const GENERIC_RESET_RESPONSE = 'If an account exists for this email address, we have sent a password reset link.';
+
     /**
      * Display the password reset link request view.
      */
@@ -31,24 +35,31 @@ class PasswordResetLinkController extends Controller
             'email' => ['required', 'email'],
         ]);
 
-        // We will send the password reset link to this user. Once we have attempted
-        // to send the link, we will examine the response then see the message we
-        // need to show to the user. Finally, we'll send out a proper response.
-        try {
-            $status = Password::sendResetLink(
-                $request->only('email')
-            );
-        } catch (Throwable $exception) {
-            report($exception);
+        $email = mb_strtolower(trim($validatedEmail = $request->string('email')->toString()));
+        $rateLimitKey = 'password-reset:'.hash('sha256', $request->ip().'|'.$email);
 
-            return back()
-                ->withInput($request->only('email'))
-                ->withErrors(['email' => 'We could not send the reset link right now. Please try again later.']);
+        // The browser response is identical for existing and unknown addresses,
+        // preventing this endpoint from revealing who has an account.
+        if (! RateLimiter::tooManyAttempts($rateLimitKey, 5)) {
+            RateLimiter::hit($rateLimitKey, 60);
+
+            try {
+                $status = Password::sendResetLink(['email' => $validatedEmail]);
+
+                Log::info('Password reset request processed.', [
+                    'outcome' => $status === Password::RESET_LINK_SENT ? 'sent' : 'not_sent',
+                ]);
+            } catch (Throwable $exception) {
+                // Do not log the email address or expose a delivery failure:
+                // either could reveal whether an account exists.
+                Log::warning('Password reset request could not be completed.', [
+                    'exception_type' => $exception::class,
+                ]);
+            }
         }
 
-        return $status == Password::RESET_LINK_SENT
-                    ? back()->with('status', __($status))
-                    : back()->withInput($request->only('email'))
-                        ->withErrors(['email' => __($status)]);
+        return back()
+            ->withInput($request->only('email'))
+            ->with('status', self::GENERIC_RESET_RESPONSE);
     }
 }

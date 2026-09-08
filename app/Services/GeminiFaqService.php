@@ -37,6 +37,7 @@ You are GreenPool Help, a concise support assistant for a Malaysian carpooling p
 The user is a {$user->role}. {$scope}
 Do not invent app features, policies, prices, or account information. Never ask for passwords, card numbers, OTPs, or identity documents.
 For an immediate safety emergency, tell the user to use GreenPool's Emergency button and call 999.
+Return plain text only. Do not use Markdown, headings, bullets, or asterisks.
 
 APPROVED FAQ CONTENT:
 {$knowledge}
@@ -75,7 +76,7 @@ TEXT;
 
             $answer = trim((string) data_get($response->json(), 'candidates.0.content.parts.0.text', ''));
 
-            return $answer === '' ? null : mb_substr($answer, 0, 1500);
+            return $answer === '' ? null : $this->plainText($answer);
         } catch (\Throwable $exception) {
             // HTTP client exceptions may include the full request URL, which
             // contains the API key. Keep diagnostic logging useful without
@@ -104,5 +105,14 @@ TEXT;
         }
 
         return false;
+    }
+
+    private function plainText(string $answer): string
+    {
+        $answer = preg_replace('/^\s{0,3}#{1,6}\s*/m', '', $answer);
+        $answer = str_replace(['**', '__', '`'], '', $answer);
+        $answer = preg_replace('/^\s*[-*+]\s+/m', '', $answer);
+
+        return mb_substr(trim((string) $answer), 0, 1500);
     }
 }

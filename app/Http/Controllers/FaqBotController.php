@@ -43,6 +43,15 @@ class FaqBotController extends Controller
             ]);
         }
 
+        $match = $this->findFaqMatch($faqs, $question, $terms);
+
+        // Direct questions have approved, deterministic answers. Return those
+        // before Gemini so model wording or a deployment setting cannot hide a
+        // core GreenPool guide such as how to create a trip.
+        if ($match && ($match['keyword_score'] >= 8 || $match['exact_question'])) {
+            return $this->matchedFaqResponse($match['faq']);
+        }
+
         // When Gemini is configured, let it select the relevant approved FAQ
         // before the lightweight keyword fallback runs. This avoids a shared
         // word such as "keep" incorrectly sending an alerts question to the
@@ -59,11 +68,39 @@ class FaqBotController extends Controller
             ]);
         }
 
-        $match = $faqs
+        if (! $match) {
+            return response()->json([
+                'matched' => false,
+                'title' => 'I could not find an exact answer yet.',
+                'answer' => 'Try keywords such as booking, trip, payment, attractions, messages, notifications, or vehicle. You can also use the relevant menu page for more help.',
+                'suggestions' => $faqs->where('is_featured', true)->take(4)->map(fn (Faq $faq) => ['id' => $faq->id, 'question' => $faq->question])->values(),
+            ]);
+        }
+
+        return $this->matchedFaqResponse($match['faq']);
+    }
+
+    /** @return array{faq: Faq, score: int, keyword_score: int, exact_question: bool}|null */
+    private function findFaqMatch($faqs, string $question, array $terms): ?array
+    {
+        return $faqs
             ->map(function (Faq $faq) use ($question, $terms): array {
                 $faqKeywords = collect($faq->keywords ?? [])->map(fn ($keyword) => $this->normalise($keyword));
                 $haystack = $faqKeywords->concat([$this->normalise($faq->question), $this->normalise($faq->answer)])->implode(' ');
-                $keywordScore = $faqKeywords->sum(fn ($keyword) => $keyword !== '' && str_contains($question, $keyword) ? 8 : 0);
+                $keywordScore = $faqKeywords->sum(function (string $keyword) use ($question, $terms): int {
+                    if ($keyword === '') {
+                        return 0;
+                    }
+
+                    // Allow natural wording such as "create a trip" to match
+                    // the approved keyword "create trip" without treating an
+                    // unrelated single word as a direct match.
+                    $keywordTerms = array_filter(explode(' ', $keyword));
+                    $allKeywordTermsPresent = $keywordTerms !== []
+                        && collect($keywordTerms)->every(fn (string $term) => in_array($term, $terms, true));
+
+                    return str_contains($question, $keyword) || $allKeywordTermsPresent ? 8 : 0;
+                });
                 $keywordTermMatches = collect($terms)->filter(fn (string $term) => $faqKeywords->contains($term))->count();
                 $exactTermMatches = collect($terms)->filter(fn (string $term) => str_contains($haystack, $term))->count();
                 $score = $keywordScore + ($exactTermMatches * 2);
@@ -78,26 +115,23 @@ class FaqBotController extends Controller
 
                 // FAQ fallback is deliberately conservative. General words in
                 // the question or in an answer are not enough to claim a match.
-                return ['faq' => $faq, 'score' => $score, 'has_direct_match' => $keywordScore > 0 || $keywordTermMatches > 0];
+                return [
+                    'faq' => $faq,
+                    'score' => $score,
+                    'keyword_score' => $keywordScore,
+                    'exact_question' => $question === $this->normalise($faq->question),
+                    'has_direct_match' => $keywordScore > 0 || $keywordTermMatches > 0,
+                ];
             })
             // A fuzzy similarity by itself is not enough; words such as
             // "alerts" and "receipt" must never redirect a user to payment help.
-            ->filter(fn (array $result) => $result['has_direct_match'] && $result['score'] >= 2)
+            ->filter(fn (array $result) => ($result['has_direct_match'] || $result['exact_question']) && $result['score'] >= 2)
             ->sortByDesc('score')
             ->first();
+    }
 
-        if (! $match) {
-            return response()->json([
-                'matched' => false,
-                'title' => 'I could not find an exact answer yet.',
-                'answer' => 'Try keywords such as booking, trip, payment, attractions, messages, notifications, or vehicle. You can also use the relevant menu page for more help.',
-                'suggestions' => $faqs->where('is_featured', true)->take(4)->map(fn (Faq $faq) => ['id' => $faq->id, 'question' => $faq->question])->values(),
-            ]);
-        }
-
-        /** @var Faq $faq */
-        $faq = $match['faq'];
-
+    private function matchedFaqResponse(Faq $faq): JsonResponse
+    {
         return response()->json([
             'matched' => true,
             'faq' => [

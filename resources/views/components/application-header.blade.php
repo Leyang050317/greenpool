@@ -6,7 +6,7 @@
         request()->routeIs('driver.vehicles.*') => 'My Vehicles',
         request()->routeIs('passenger.booking') => 'Find a Ride',
         request()->routeIs('passenger.bookings.create') => 'Trip Details',
-        request()->routeIs('passenger.bookings.history') => 'My Bookings',
+        request()->routeIs('passenger.bookings.history', 'passenger.bookings.show') => 'My Bookings',
         request()->routeIs('attractions.show') => request()->route('attraction')->attraction_name,
         request()->routeIs('attractions.index') && request()->query('tab') === 'favourites' => 'Favourite Attractions',
         request()->routeIs('attractions.index', 'driver.attractions.*', 'passenger.attractions.*') => 'Tourist Attractions',

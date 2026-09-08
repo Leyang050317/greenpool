@@ -167,10 +167,17 @@
             <div class="mt-6 flex flex-wrap gap-3">
                 @if($booking->booking_status === 'Pending')
                     @if($canAcceptBooking)
-                        <button type="button" @click="acceptOpen = true" class="inline-flex items-center gap-2 rounded-xl bg-[#2E7D32] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#256b29]">
-                            <x-icons.lucide name="check" class="h-4 w-4" />
-                            Accept Booking
-                        </button>
+                        @if($booking->number_of_seats <= $booking->trip->available_seats)
+                            <button type="button" @click="acceptOpen = true" class="inline-flex items-center gap-2 rounded-xl bg-[#2E7D32] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#256b29]">
+                                <x-icons.lucide name="check" class="h-4 w-4" />
+                                Accept Booking
+                            </button>
+                        @else
+                            <span class="inline-flex items-center gap-2 rounded-xl bg-amber-50 px-5 py-2.5 text-sm font-semibold text-amber-800" role="status">
+                                <x-icons.lucide name="circle-alert" class="h-4 w-4" />
+                                Not enough available seats
+                            </span>
+                        @endif
                     @else
                         <a href="{{ route('driver.profile.edit', ['section' => 'licence']) }}" class="inline-flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-5 py-2.5 text-sm font-semibold text-amber-800 hover:bg-amber-100">
                             Renew licence to accept
@@ -185,6 +192,7 @@
             </div>
         </div>
 
+        @if($booking->number_of_seats <= $booking->trip->available_seats)
         <div x-cloak x-show="acceptOpen" x-transition.opacity class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
             <div class="w-full max-w-sm rounded-xl bg-white p-6 shadow-xl" @click.outside="acceptOpen = false">
                 <div class="mb-5 flex h-12 w-12 items-center justify-center rounded-full bg-green-50 text-[#2E7D32]">
@@ -202,6 +210,7 @@
                 </div>
             </div>
         </div>
+        @endif
 
         <div x-cloak x-show="rejectOpen" x-transition.opacity class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
             <div class="w-full max-w-sm rounded-xl bg-white p-6 shadow-xl" @click.outside="rejectOpen = false">

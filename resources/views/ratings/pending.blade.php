@@ -2,9 +2,12 @@
     <div class="min-h-screen bg-[#F8FAFC] px-4 py-8 sm:px-6 lg:px-8">
         <div class="mx-auto max-w-5xl">
             <a href="{{ route('ratings.index') }}" class="mb-6 inline-flex text-sm font-medium text-slate-500 hover:text-slate-700">← Back to Ratings</a>
+            @php
+                $revieweeRole = Auth::user()->role === 'driver' ? 'Passenger' : 'Driver';
+            @endphp
             <div class="mb-6">
-                <h1 class="text-2xl font-bold text-slate-900">Rate a Trip</h1>
-                <p class="mt-1 text-sm text-slate-400">Completed trips waiting for your rating.</p>
+                <h1 class="text-2xl font-bold text-slate-900">Rate a {{ $revieweeRole }}</h1>
+                <p class="mt-1 text-sm text-slate-400">Completed trips waiting for your rating of a {{ strtolower($revieweeRole) }}.</p>
             </div>
 
             <div class="space-y-3">

@@ -6,7 +6,8 @@
             currentUserId: {{ Js::from(Auth::id()) }},
             messages: {{ Js::from($messages) }},
             canSend: {{ Js::from($canSend) }},
-            endpoint: {{ Js::from(route('bookings.chat.store', $booking)) }}
+            endpoint: {{ Js::from(route('bookings.chat.store', $booking)) }},
+            loginUrl: {{ Js::from(route('login')) }}
         })"
     >
         <div class="mx-auto flex max-w-4xl flex-col">
@@ -60,19 +61,24 @@
                             <input
                                 type="text"
                                 x-model="message"
+                                :readonly="sessionExpired"
                                 maxlength="1000"
                                 placeholder="Type a message..."
                                 class="min-w-0 flex-1 rounded-xl border-gray-200 text-sm shadow-sm focus:border-[#2E7D32] focus:ring-[#2E7D32]"
                             >
                             <button
                                 type="submit"
-                                :disabled="sending || !message.trim()"
+                                :disabled="sending || sessionExpired || !message.trim()"
                                 class="inline-flex items-center justify-center gap-2 rounded-xl bg-[#2E7D32] px-4 py-2 text-sm font-semibold text-white hover:bg-[#256b29] disabled:cursor-not-allowed disabled:opacity-50"
                             >
                                 <x-icons.lucide name="send" class="h-4 w-4" />
                                 Send
                             </button>
                         </form>
+                        <div x-cloak x-show="sendError" class="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900" role="alert">
+                            <span x-text="sendError"></span>
+                            <a x-show="sessionExpired" :href="loginUrl" class="ml-1 font-semibold underline">Sign in</a>
+                        </div>
                     @else
                         <div class="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-500">
                             This chat is read-only because the booking or trip is no longer active.
