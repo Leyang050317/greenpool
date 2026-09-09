@@ -29,4 +29,15 @@ class PageMetadataTest extends TestCase
             ->assertOk()
             ->assertSee('<title>Archived Vehicles - GreenPool</title>', false);
     }
+
+    public function test_passenger_notifications_has_the_notifications_page_title(): void
+    {
+        $passenger = User::factory()->create(['role' => 'passenger']);
+
+        $this->actingAs($passenger)
+            ->get(route('notifications.index'))
+            ->assertOk()
+            ->assertSee('<title>Notifications - GreenPool</title>', false)
+            ->assertDontSee('<title>Ratings - GreenPool</title>', false);
+    }
 }

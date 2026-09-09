@@ -19,6 +19,7 @@
     class="font-sans antialiased"
     data-auth-id="{{ Auth::id() }}"
     data-auth-role="{{ Auth::user()?->role }}"
+    data-trip-start-early-minutes="{{ config('trips.start_early_minutes', 30) }}"
 >
     <div
         x-data="passengerNavigation"

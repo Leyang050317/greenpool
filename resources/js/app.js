@@ -47,9 +47,34 @@ const startDerivedTripExpiryBadges = () => {
 };
 
 const startJourneyExpiryCards = () => {
+    const earlyMinutes = Number.parseInt(document.body.dataset.tripStartEarlyMinutes, 10) || 30;
+
     document.querySelectorAll('[data-journey-expiry-card]').forEach((card) => {
         const departureAt = new Date(card.dataset.departureAt);
         if (Number.isNaN(departureAt.getTime())) return;
+
+        const earliestStartAt = new Date(departureAt.getTime() - earlyMinutes * 60000);
+        const startButton = card.querySelector('[data-journey-start-control] button');
+        const blockedByActiveTrip = Boolean(document.querySelector('[data-driver-location-tracker]'));
+        let earlyMessage = card.querySelector('[data-journey-early-message]');
+        if (!earlyMessage) {
+            earlyMessage = document.createElement('p');
+            earlyMessage.dataset.journeyEarlyMessage = '';
+            earlyMessage.className = 'mb-3 rounded-xl bg-blue-50 px-3 py-2 text-xs text-blue-700';
+            card.querySelector('[data-journey-expiry-message]')?.insertAdjacentElement('afterend', earlyMessage);
+        }
+
+        const setStartDisabled = (disabled, message = '') => {
+            if (!startButton) return;
+            startButton.disabled = disabled;
+            startButton.title = message;
+            startButton.classList.toggle('cursor-not-allowed', disabled);
+            startButton.classList.toggle('bg-gray-100', disabled);
+            startButton.classList.toggle('text-gray-400', disabled);
+            startButton.classList.toggle('bg-[#16A34A]', !disabled);
+            startButton.classList.toggle('text-white', !disabled);
+            startButton.classList.toggle('hover:bg-[#15803D]', !disabled);
+        };
 
         const expire = () => {
             if (Math.floor(Date.now() / 60000) <= Math.floor(departureAt.getTime() / 60000) || card.dataset.expired === 'true') return;
@@ -61,17 +86,49 @@ const startJourneyExpiryCards = () => {
             }
             card.querySelector('[data-journey-expiry-message]')?.classList.remove('hidden');
             card.querySelector('[data-journey-expiry-actions]')?.classList.remove('hidden');
-            const startButton = card.querySelector('[data-journey-start-control] button');
-            if (startButton) {
-                startButton.disabled = true;
-                startButton.title = 'The scheduled departure time has passed. Edit this trip to choose a future time, or cancel it.';
-                startButton.classList.remove('bg-[#16A34A]', 'text-white', 'hover:bg-[#15803D]');
-                startButton.classList.add('cursor-not-allowed', 'bg-gray-100', 'text-gray-400');
-            }
+            earlyMessage.classList.add('hidden');
+            setStartDisabled(true, 'The scheduled departure time has passed. Edit this trip to choose a future time, or cancel it.');
         };
 
+        const updateStartAvailability = () => {
+            if (card.dataset.expired === 'true') return;
+            if (blockedByActiveTrip) {
+                earlyMessage.classList.add('hidden');
+                setStartDisabled(true, 'Please complete the current trip before starting another trip.');
+                return;
+            }
+            if (Date.now() < earliestStartAt.getTime()) {
+                const formatted = earliestStartAt.toLocaleString([], { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+                const message = `This trip can be started from ${formatted}.`;
+                earlyMessage.textContent = message;
+                earlyMessage.classList.remove('hidden');
+                setStartDisabled(true, message);
+                return;
+            }
+
+            earlyMessage.classList.add('hidden');
+            setStartDisabled(false);
+        };
+
+        updateStartAvailability();
         expire();
+        if (Date.now() < earliestStartAt.getTime()) {
+            window.setTimeout(updateStartAvailability, Math.max(1, earliestStartAt.getTime() - Date.now()));
+        }
         window.setTimeout(expire, Math.max(1, (Math.floor(departureAt.getTime() / 60000) + 1) * 60000 - Date.now()));
+    });
+};
+
+const confirmPassengerPickup = () => {
+    document.querySelectorAll('form[action*="/bookings/"][action$="/pickup"]').forEach((form) => {
+        form.addEventListener('submit', (event) => {
+            if (form.dataset.pickupConfirmed === 'true') return;
+            event.preventDefault();
+            const passengerName = form.closest('li')?.querySelector('p.text-sm.font-semibold')?.textContent?.trim() || 'this passenger';
+            if (!window.confirm(`Confirm that ${passengerName} has been picked up? This updates the journey and payment eligibility and cannot be undone.`)) return;
+            form.dataset.pickupConfirmed = 'true';
+            form.requestSubmit();
+        });
     });
 };
 
@@ -449,8 +506,39 @@ const updateEmergencyStatus = (event) => {
             : 'rounded-full bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-700';
     });
     document.querySelectorAll(`[data-emergency-acknowledge-for="${event.emergency_id}"]`).forEach((form) => form.remove());
+
+    const report = document.getElementById(`emergency-${event.emergency_id}`);
+    if (report) report.dataset.emergencyStatus = event.status;
+
+    const formatEventTime = (value) => value
+        ? new Date(value).toLocaleString([], { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })
+        : '';
+
+    if (event.status === 'Acknowledged') {
+        document.querySelectorAll(`[data-emergency-resolve-for="${event.emergency_id}"]`).forEach((form) => form.classList.remove('hidden'));
+        document.querySelectorAll(`[data-emergency-acknowledged-meta-for="${event.emergency_id}"]`).forEach((meta) => {
+            meta.textContent = `Acknowledged by ${event.acknowledged_by || 'a trip participant'}${event.acknowledged_at ? ` · ${formatEventTime(event.acknowledged_at)}` : ''}`;
+            meta.classList.remove('hidden');
+        });
+    }
+
     if (event.status === 'Resolved') {
-        document.querySelectorAll(`[data-emergency-resolve-for="${event.emergency_id}"]`).forEach((form) => form.remove());
+        document.querySelectorAll(`[data-emergency-resolve-for="${event.emergency_id}"]`).forEach((form) => form.classList.add('hidden'));
+        document.querySelectorAll(`[data-emergency-acknowledged-meta-for="${event.emergency_id}"]`).forEach((meta) => meta.classList.add('hidden'));
+        document.querySelectorAll(`[data-emergency-resolved-meta-for="${event.emergency_id}"]`).forEach((meta) => {
+            meta.textContent = `Resolved by ${event.resolved_by || 'a trip participant'}${event.resolved_at ? ` · ${formatEventTime(event.resolved_at)}` : ''}`;
+            meta.classList.remove('hidden');
+        });
+    }
+
+    const panel = report?.closest('[data-emergency-panel]');
+    if (panel) {
+        const hasOpenReport = [...panel.querySelectorAll('[data-emergency-report]')]
+            .some((item) => ['Active', 'Acknowledged'].includes(item.dataset.emergencyStatus));
+        panel.querySelectorAll('[data-emergency-report-button]').forEach((button) => {
+            button.textContent = hasOpenReport ? 'Report another emergency' : 'Report Emergency';
+        });
+        panel.querySelector('[data-emergency-actions]')?.classList.toggle('hidden', !hasOpenReport);
     }
 };
 
@@ -503,7 +591,14 @@ const prepareEmergencyLocation = () => {
                         const data = await response.json().catch(() => ({}));
                         throw new Error(data.message || 'We could not submit the emergency report. Please try again.');
                     }
-                    window.dispatchEvent(new CustomEvent('greenpool:emergency-reported', { detail: await response.json() }));
+                    const data = await response.json();
+                    form.dataset.locationPrepared = '';
+                    form.reset();
+                    if (submitButton) {
+                        submitButton.disabled = false;
+                        submitButton.textContent = 'Report Emergency';
+                    }
+                    window.dispatchEvent(new CustomEvent('greenpool:emergency-reported', { detail: data }));
                 } catch (error) {
                     form.dataset.locationPrepared = '';
                     if (submitButton) {
@@ -548,14 +643,22 @@ const subscribeToTripLocations = () => {
 const startDriverLocationTracking = () => {
     const tracker = document.querySelector('[data-driver-location-tracker]');
 
-    if (!tracker || !navigator.geolocation) {
-        return;
-    }
+    if (!tracker) return;
 
     const tripId = tracker.dataset.tripId;
     const endpoint = tracker.dataset.locationEndpoint;
+    const status = tracker.querySelector('[data-driver-location-status]');
+    const retry = tracker.querySelector('[data-driver-location-retry]');
     let lastSent = null;
     let sending = false;
+    let watchId = null;
+    const setStatus = (message, failed = false) => {
+        if (status) {
+            status.textContent = message;
+            status.className = failed ? 'text-sm font-medium text-red-700' : 'text-sm text-slate-600';
+        }
+        retry?.classList.toggle('hidden', !failed);
+    };
     const distanceMeters = (from, to) => {
         const earthRadius = 6371000;
         const latitudeDelta = (to.latitude - from.latitude) * Math.PI / 180;
@@ -565,7 +668,14 @@ const startDriverLocationTracking = () => {
 
         return earthRadius * 2 * Math.atan2(Math.sqrt(value), Math.sqrt(1 - value));
     };
-    const watchId = navigator.geolocation.watchPosition(async (position) => {
+    const beginWatching = () => {
+        if (!navigator.geolocation) {
+            setStatus('Live location is not supported by this browser.', true);
+            return;
+        }
+        if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+        setStatus('Waiting for your live location…');
+        watchId = navigator.geolocation.watchPosition(async (position) => {
         const location = {
             trip_id: tripId,
             latitude: position.coords.latitude,
@@ -577,9 +687,11 @@ const startDriverLocationTracking = () => {
         };
 
         if (location.accuracy_meters > 150) {
+            setStatus('Location accuracy is too low. Move to an open area and retry.', true);
             return;
         }
 
+        setStatus(`Live location updated ${new Date(location.recorded_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}.`);
         dispatchTripLocation(location);
         const elapsed = lastSent ? Date.now() - lastSent.sentAt : Infinity;
         const moved = lastSent ? distanceMeters(lastSent, location) : Infinity;
@@ -601,13 +713,29 @@ const startDriverLocationTracking = () => {
 
             if (response.ok) {
                 lastSent = { ...location, sentAt: Date.now() };
+            } else {
+                setStatus('Your location was found but could not be shared. Please retry.', true);
             }
+        } catch {
+            setStatus('Your location was found but the network request failed. Please retry.', true);
         } finally {
             sending = false;
         }
-    }, () => {}, { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 });
+        }, (error) => {
+            const message = error.code === error.PERMISSION_DENIED
+                ? 'Location permission was denied. Allow location access, then retry.'
+                : (error.code === error.TIMEOUT
+                    ? 'Location request timed out. Please retry.'
+                    : 'Your current location is unavailable. Please retry.');
+            setStatus(message, true);
+        }, { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 });
+    };
 
-    window.addEventListener('pagehide', () => navigator.geolocation.clearWatch(watchId), { once: true });
+    retry?.addEventListener('click', beginWatching);
+    beginWatching();
+    window.addEventListener('pagehide', () => {
+        if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+    }, { once: true });
 };
 
 const subscribeToChatListUpdates = () => {
@@ -862,6 +990,7 @@ subscribeToEmergencyAcknowledgements();
 prepareEmergencyLocation();
 startDerivedTripExpiryBadges();
 startJourneyExpiryCards();
+confirmPassengerPickup();
 subscribeToTripLocations();
 startDriverLocationTracking();
 subscribeToRatingNotifications();

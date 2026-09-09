@@ -77,6 +77,7 @@ class Emergency extends Model
     {
         return match ($this->location_source) {
             'device' => 'Current device location',
+            'live_tracking' => 'Recent live driver location',
             'pickup' => 'Pickup location fallback',
             'departure' => 'Departure location fallback',
             'unavailable' => 'Location unavailable',

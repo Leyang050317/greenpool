@@ -1,3 +1,5 @@
+@props(['pageTitle' => 'Ratings'])
+
 @if(Auth::user()->role === 'driver')
     <x-app-layout>
         {{ $slot }}
@@ -5,6 +7,6 @@
 @else
     @include('passenger.booking.layout', [
         'slotContent' => $slot,
-        'pageTitle' => 'Ratings',
+        'pageTitle' => $pageTitle,
     ])
 @endif

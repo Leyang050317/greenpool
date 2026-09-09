@@ -207,6 +207,11 @@ class TripController extends Controller
             422,
             'Your driving licence is missing, unverified, or expired. Update it in My Profile before starting the trip.'
         );
+        abort_if(
+            $trip->isTooEarlyToStart(),
+            422,
+            'This trip can be started from '.$trip->earliestStartAt()->format('g:i A').' on '.$trip->earliestStartAt()->format('j M Y').'.'
+        );
         try {
             $bookingsToNotify = DB::transaction(function () use ($request, $trip) {
                 abort_if($request->user()->trips()->where('status', 'In Progress')->exists(), 422, 'Complete your current trip before starting another.');
