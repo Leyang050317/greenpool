@@ -2,16 +2,16 @@
 
 namespace Tests\Feature\Driver;
 
-use App\Models\Booking;
 use App\Events\BookingStatusUpdated;
+use App\Models\Booking;
 use App\Models\Emergency;
 use App\Models\Trip;
 use App\Models\TripLocation;
 use App\Models\User;
 use App\Models\Vehicle;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class TripJourneyTest extends TestCase
@@ -152,6 +152,7 @@ class TripJourneyTest extends TestCase
         $this->assertSame('In Progress', $trip->refresh()->status);
         Event::assertDispatched(BookingStatusUpdated::class, function (BookingStatusUpdated $event) use ($first) {
             $payload = $event->broadcastWith();
+
             return $event->pickedUpBookingId === $first->id
                 && collect($payload['pickup_progress'])->firstWhere('booking_id', $first->id)['picked_up_at'] !== null;
         });
@@ -172,7 +173,7 @@ class TripJourneyTest extends TestCase
     public function test_start_optimizes_and_persists_pickup_sequence_with_one_routes_request(): void
     {
         $driver = $this->driver();
-        $trip = $this->trip($driver, ['status' => 'Scheduled', 'started_at' => null]);
+        $trip = $this->trip($driver, ['status' => 'Scheduled', 'started_at' => null, 'departure_at' => now()->addMinutes(15)]);
         $first = $this->booking($trip, ['pickup_point' => 'First pickup']);
         $second = $this->booking($trip, ['pickup_point' => 'Second pickup', 'pickup_latitude' => 3.1390, 'pickup_longitude' => 101.6869]);
         Http::fake(['https://routes.googleapis.com/directions/v2:computeRoutes' => Http::response(['routes' => [[
@@ -201,7 +202,7 @@ class TripJourneyTest extends TestCase
     public function test_start_without_accepted_bookings_does_not_require_an_optimized_waypoint_order(): void
     {
         $driver = $this->driver();
-        $trip = $this->trip($driver, ['status' => 'Scheduled', 'started_at' => null]);
+        $trip = $this->trip($driver, ['status' => 'Scheduled', 'started_at' => null, 'departure_at' => now()->addMinutes(15)]);
         Http::fake(['https://routes.googleapis.com/directions/v2:computeRoutes' => Http::response(['routes' => [[
             'distanceMeters' => 35000,
             'duration' => '2400s',
@@ -249,6 +250,47 @@ class TripJourneyTest extends TestCase
         Http::assertNothingSent();
     }
 
+    public function test_trip_cannot_be_started_more_than_thirty_minutes_early_even_via_direct_request(): void
+    {
+        config()->set('trips.start_early_minutes', 30);
+        $driver = $this->driver();
+        $trip = $this->trip($driver, [
+            'status' => 'Scheduled',
+            'started_at' => null,
+            'departure_at' => now()->addMinutes(31),
+        ]);
+        Http::fake();
+
+        $this->actingAs($driver)
+            ->patch(route('driver.trips.start', $trip))
+            ->assertStatus(422);
+
+        $this->assertSame('Scheduled', $trip->refresh()->status);
+        $this->assertNull($trip->started_at);
+        Http::assertNothingSent();
+    }
+
+    public function test_trip_can_be_started_at_the_thirty_minute_boundary(): void
+    {
+        config()->set('trips.start_early_minutes', 30);
+        $driver = $this->driver();
+        $trip = $this->trip($driver, [
+            'status' => 'Scheduled',
+            'started_at' => null,
+            'departure_at' => now()->addMinutes(30),
+        ]);
+        Http::fake(['https://routes.googleapis.com/directions/v2:computeRoutes' => Http::response(['routes' => [[
+            'distanceMeters' => 1000,
+            'duration' => '300s',
+        ]]])]);
+
+        $this->actingAs($driver)
+            ->patch(route('driver.trips.start', $trip))
+            ->assertRedirect(route('driver.trips.journey'));
+
+        $this->assertSame('In Progress', $trip->refresh()->status);
+    }
+
     public function test_journey_lists_expired_scheduled_trips_after_upcoming_trips(): void
     {
         $driver = $this->driver();
@@ -274,7 +316,7 @@ class TripJourneyTest extends TestCase
     public function test_passenger_booking_persists_resolved_pickup_coordinates_and_place_id_without_routes_call(): void
     {
         $driver = $this->driver();
-        $trip = $this->trip($driver, ['status' => 'Scheduled', 'started_at' => null]);
+        $trip = $this->trip($driver, ['status' => 'Scheduled', 'started_at' => null, 'departure_at' => now()->addMinutes(15)]);
         $passenger = $this->passenger();
         Http::fake([
             'https://places.googleapis.com/v1/places/pickup-place' => Http::response([
@@ -293,7 +335,7 @@ class TripJourneyTest extends TestCase
     public function test_start_rejects_accepted_bookings_without_persisted_pickup_coordinates_before_calling_routes(): void
     {
         $driver = $this->driver();
-        $trip = $this->trip($driver, ['status' => 'Scheduled', 'started_at' => null]);
+        $trip = $this->trip($driver, ['status' => 'Scheduled', 'started_at' => null, 'departure_at' => now()->addMinutes(15)]);
         $this->booking($trip, ['pickup_latitude' => null, 'pickup_longitude' => null]);
         Http::fake();
 
@@ -306,7 +348,7 @@ class TripJourneyTest extends TestCase
     public function test_routes_failure_does_not_start_the_trip_or_persist_pickup_sequence(): void
     {
         $driver = $this->driver();
-        $trip = $this->trip($driver, ['status' => 'Scheduled', 'started_at' => null]);
+        $trip = $this->trip($driver, ['status' => 'Scheduled', 'started_at' => null, 'departure_at' => now()->addMinutes(15)]);
         $booking = $this->booking($trip);
         Http::fake(['https://routes.googleapis.com/directions/v2:computeRoutes' => Http::response(['error' => ['status' => 'PERMISSION_DENIED']], 403)]);
 

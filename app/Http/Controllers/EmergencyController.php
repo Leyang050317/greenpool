@@ -2,9 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use App\Events\EmergencyTriggered;
 use App\Events\EmergencyAcknowledged;
 use App\Events\EmergencyResolved;
+use App\Events\EmergencyTriggered;
 use App\Models\Booking;
 use App\Models\Emergency;
 use App\Models\Trip;
@@ -146,6 +146,16 @@ class EmergencyController extends Controller
             && array_key_exists('latitude', $validated) && array_key_exists('longitude', $validated)
             && $validated['latitude'] !== null && $validated['longitude'] !== null) {
             return [(float) $validated['latitude'], (float) $validated['longitude'], 'device'];
+        }
+
+        if ($participant === null) {
+            $latestLocation = $trip->latestLocation()
+                ->where('recorded_at', '>=', now()->subSeconds((int) config('trips.emergency_live_location_max_age_seconds', 60)))
+                ->first();
+
+            if ($latestLocation) {
+                return [(float) $latestLocation->latitude, (float) $latestLocation->longitude, 'live_tracking'];
+            }
         }
 
         if ($participant && is_numeric($participant->pickup_latitude) && is_numeric($participant->pickup_longitude)) {

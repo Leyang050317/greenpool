@@ -28,6 +28,10 @@
                     @endphp
                     <section aria-label="Active journey" data-driver-location-tracker data-trip-id="{{ $trip->trip_id }}" data-location-endpoint="{{ route('driver.trips.location.store', $trip) }}">
                         <div class="mb-4 flex items-center gap-2 text-base font-semibold text-gray-900"><span class="h-2.5 w-2.5 animate-pulse rounded-full bg-orange-500"></span>Active Journey</div>
+                        <div data-driver-location-feedback class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3" role="status" aria-live="polite">
+                            <p data-driver-location-status class="text-sm text-slate-600">Waiting for your live location…</p>
+                            <button data-driver-location-retry type="button" class="hidden rounded-lg border border-green-300 bg-green-50 px-3 py-2 text-sm font-semibold text-green-800 hover:bg-green-100">Retry location</button>
+                        </div>
                         <article class="overflow-hidden rounded-3xl border border-orange-200 bg-white shadow-sm">
                             <div class="border-b border-orange-100 bg-gradient-to-r from-orange-50 to-amber-50 px-5 py-5 sm:px-7"><div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><p class="text-xs font-bold uppercase tracking-widest text-orange-700">Active Journey</p><h2 class="mt-1 text-xl font-bold text-gray-900">{{ $trip->departure_location }} <span class="mx-1 text-gray-400">→</span> {{ $trip->destination }}</h2></div><span class="w-fit rounded-full px-3 py-1.5 text-xs font-semibold {{ $badge['In Progress'] }}">In Progress</span></div></div>
                             <div class="p-5 pb-0 sm:px-7 sm:pt-7"><x-trip-static-map :trip="$trip" :bookings="$pickups" :route="$mapRoutes[$trip->trip_id] ?? null" :live-location="$trip->latestLocation" :live-tracking="true" /></div>

@@ -8,6 +8,7 @@ use App\Events\EmergencyTriggered;
 use App\Models\Booking;
 use App\Models\Emergency;
 use App\Models\Trip;
+use App\Models\TripLocation;
 use App\Models\User;
 use App\Models\Vehicle;
 use App\Notifications\EmergencyAlertNotification;
@@ -115,6 +116,55 @@ class EmergencyModuleTest extends TestCase
         ])->assertRedirect();
 
         $this->assertDatabaseHas('emergencies', ['trip_id' => $trip->trip_id, 'location_source' => 'departure', 'latitude' => 3.1500, 'longitude' => 101.7000]);
+    }
+
+    public function test_driver_emergency_uses_a_recent_live_tracking_location_before_departure_fallback(): void
+    {
+        [$driver, $trip] = $this->trip(['status' => 'In Progress', 'started_at' => now(), 'departure_latitude' => 3.1500, 'departure_longitude' => 101.7000]);
+        TripLocation::create([
+            'trip_id' => $trip->trip_id,
+            'driver_id' => $driver->id,
+            'latitude' => 3.1390,
+            'longitude' => 101.6869,
+            'recorded_at' => now()->subSeconds(30),
+        ]);
+
+        $this->actingAs($driver)->post(route('trips.emergencies.store', $trip), [
+            'issue_type' => 'other_emergency',
+            'location_source' => 'unavailable',
+        ])->assertRedirect();
+
+        $this->assertDatabaseHas('emergencies', [
+            'trip_id' => $trip->trip_id,
+            'location_source' => 'live_tracking',
+            'latitude' => 3.1390,
+            'longitude' => 101.6869,
+        ]);
+    }
+
+    public function test_driver_emergency_does_not_use_a_stale_live_tracking_location(): void
+    {
+        config()->set('trips.emergency_live_location_max_age_seconds', 60);
+        [$driver, $trip] = $this->trip(['status' => 'In Progress', 'started_at' => now(), 'departure_latitude' => 3.1500, 'departure_longitude' => 101.7000]);
+        TripLocation::create([
+            'trip_id' => $trip->trip_id,
+            'driver_id' => $driver->id,
+            'latitude' => 3.1390,
+            'longitude' => 101.6869,
+            'recorded_at' => now()->subSeconds(61),
+        ]);
+
+        $this->actingAs($driver)->post(route('trips.emergencies.store', $trip), [
+            'issue_type' => 'other_emergency',
+            'location_source' => 'unavailable',
+        ])->assertRedirect();
+
+        $this->assertDatabaseHas('emergencies', [
+            'trip_id' => $trip->trip_id,
+            'location_source' => 'departure',
+            'latitude' => 3.1500,
+            'longitude' => 101.7000,
+        ]);
     }
 
     public function test_multiple_reports_are_stored_without_overwriting_each_other(): void

@@ -93,4 +93,14 @@ class Trip extends Model
         return ($currentTime ?? now())->copy()->startOfMinute()
             ->gt($this->departure_at->copy()->startOfMinute());
     }
+
+    public function earliestStartAt(): Carbon
+    {
+        return $this->departure_at->copy()->subMinutes((int) config('trips.start_early_minutes', 30));
+    }
+
+    public function isTooEarlyToStart(?Carbon $currentTime = null): bool
+    {
+        return ($currentTime ?? now())->lt($this->earliestStartAt());
+    }
 }

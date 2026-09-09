@@ -411,7 +411,7 @@ class TripLifecycleRulesTest extends TestCase
         $inProgress = $this->trip($driver, ['status' => 'In Progress', 'started_at' => now()]);
         $onboardPassenger = $this->passenger();
         Booking::create(['trip_id' => $inProgress->trip_id, 'passenger_id' => $onboardPassenger->id, 'booking_status' => 'Accepted', 'number_of_seats' => 1, 'pickup_point' => 'Main Gate', 'picked_up_at' => now()]);
-        $next = $this->trip($driver);
+        $next = $this->trip($driver, ['departure_at' => now()->addMinutes(15)]);
         $this->actingAs($driver)->patch(route('driver.trips.start', $next))->assertStatus(422);
 
         $this->actingAs($driver)->patch(route('driver.trips.complete', $inProgress))->assertRedirect();
@@ -428,7 +428,7 @@ class TripLifecycleRulesTest extends TestCase
         Event::fake([BookingStatusUpdated::class]);
 
         $driver = $this->driver();
-        $trip = $this->trip($driver);
+        $trip = $this->trip($driver, ['departure_at' => now()->addMinutes(15)]);
         $acceptedPassenger = $this->passenger();
         $pendingPassenger = $this->passenger();
         $acceptedBooking = Booking::create(['trip_id' => $trip->trip_id, 'passenger_id' => $acceptedPassenger->id, 'booking_status' => 'Accepted', 'number_of_seats' => 1, 'pickup_point' => 'Main Gate', 'pickup_place_id' => 'main-gate', 'pickup_latitude' => 3.1390, 'pickup_longitude' => 101.6869]);

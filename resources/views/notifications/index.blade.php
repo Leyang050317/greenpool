@@ -1,4 +1,4 @@
-<x-ratings.shell>
+<x-ratings.shell page-title="Notifications">
     @php
         $activeFilter = request('filter', 'all');
         $activeType = request('type');
