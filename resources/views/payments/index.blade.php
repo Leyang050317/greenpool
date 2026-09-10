@@ -50,7 +50,7 @@
                                 @elseif(!$isDriver && $payment->payment_status === 'Pending' && $payment->payment_method !== 'cash')
                                     <a href="{{ route('payments.checkout', $payment->booking) }}" class="mt-2 inline-flex rounded-xl bg-[#22C55E] px-5 py-2.5 text-sm font-bold text-white hover:bg-green-600">Pay Now</a>
                                 @elseif($isDriver && $payment->isPaid())
-                                    <a href="{{ route('payments.receipt', $payment) }}" class="mt-2 inline-flex rounded-xl border border-green-200 bg-green-50 px-5 py-2.5 text-sm font-semibold text-green-700 hover:bg-green-100">View E-Receipt</a>
+                                    <a href="{{ route('payments.show', $payment) }}" class="mt-2 inline-flex rounded-xl border border-green-200 bg-green-50 px-5 py-2.5 text-sm font-semibold text-green-700 hover:bg-green-100">View Payment</a>
                                 @else
                                     <a href="{{ route('payments.show', $payment) }}" class="mt-2 inline-flex rounded-xl border border-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50">{{ !$isDriver && $payment->payment_method === 'cash' && !$payment->isPaid() ? 'View Cash Status' : 'View Details' }}</a>
                                 @endif

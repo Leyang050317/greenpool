@@ -190,8 +190,9 @@ class PaymentModuleTest extends TestCase
 
         $this->actingAs($driver)->get(route('payments.index'))
             ->assertOk()
-            ->assertSee('View E-Receipt')
-            ->assertSee(route('payments.receipt', $payment), false);
+            ->assertSee('View Payment')
+            ->assertSee(route('payments.show', $payment), false)
+            ->assertDontSee(route('payments.receipt', $payment), false);
         $this->actingAs($driver)->get(route('payments.receipt', $payment))
             ->assertOk()
             ->assertSee('GreenPool E-Receipt');
