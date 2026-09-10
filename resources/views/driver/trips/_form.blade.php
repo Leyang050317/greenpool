@@ -8,7 +8,10 @@
 
 <form method="POST" action="{{ $isEditing ? route('driver.trips.update', ['trip' => $trip, 'return_to' => $returnTo]) : route('driver.trips.store') }}" class="max-w-2xl space-y-6" x-data="tripLocationForm({{ Js::from(route('driver.trips.locations.autocomplete')) }}, {{ Js::from(route('driver.trips.fare-estimate')) }}, {{ Js::from($isEditing) }}, {{ Js::from($value('departure_location', $trip->departure_location ?? '')) }}, {{ Js::from($value('destination', $prefilledDestination)) }}, {{ Js::from(old('departure_place_id', '')) }}, {{ Js::from(old('destination_place_id', $prefilledDestinationPlaceId)) }}, {{ Js::from((string) $value('price_per_passenger', $trip->price_per_passenger ?? '')) }})" x-ref="tripForm" @submit.prevent="submitForm()">
     @csrf
-    @if ($isEditing) @method('PATCH') @endif
+    @if ($isEditing)
+        @method('PATCH')
+        <input type="hidden" name="version" value="{{ old('version', $trip->version) }}" />
+    @endif
 
     @if($errors->any())
         <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">

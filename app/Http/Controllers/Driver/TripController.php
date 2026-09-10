@@ -24,6 +24,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Throwable;
 
@@ -184,7 +185,27 @@ class TripController extends Controller
             $data = [...$data, ...$locations['attributes'], ...$this->routingDataOrEmpty($locations)];
         }
 
-        $trip->update($data);
+        $trip = DB::transaction(function () use ($request, $trip, $data): Trip {
+            $lockedTrip = Trip::query()
+                ->whereKey($trip->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $this->ensureEditable($request, $lockedTrip);
+
+            if ((int) $request->input('version') !== $lockedTrip->version) {
+                throw ValidationException::withMessages([
+                    'version' => 'This trip was changed in another tab. Refresh the page, review the latest details, and try again.',
+                ]);
+            }
+
+            $lockedTrip->update([
+                ...$data,
+                'version' => $lockedTrip->version + 1,
+            ]);
+
+            return $lockedTrip;
+        });
 
         $changedAttributes = array_keys($trip->getChanges());
         $tripChanged = (bool) array_intersect($changedAttributes, ['departure_location', 'destination', 'departure_at', 'available_seats', 'price_per_passenger', 'vehicle_id']);

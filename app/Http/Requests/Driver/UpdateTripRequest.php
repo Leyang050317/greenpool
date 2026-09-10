@@ -14,6 +14,7 @@ class UpdateTripRequest extends StoreTripRequest
             return [
                 'departure_date' => ['required', 'date'],
                 'departure_time' => ['required', 'date_format:H:i'],
+                'version' => ['required', 'integer', 'min:1'],
             ];
         }
 
@@ -21,6 +22,7 @@ class UpdateTripRequest extends StoreTripRequest
             ...parent::rules(),
             'departure_place_id' => ['nullable', 'string', 'max:255'],
             'destination_place_id' => ['nullable', 'string', 'max:255'],
+            'version' => ['required', 'integer', 'min:1'],
         ];
     }
 

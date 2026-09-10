@@ -344,7 +344,7 @@ class TripLifecycleRulesTest extends TestCase
         $booking = Booking::create(['trip_id' => $trip->trip_id, 'passenger_id' => $passenger->id, 'booking_status' => 'Accepted', 'number_of_seats' => 1, 'pickup_point' => 'Main Gate']);
         $newDeparture = now()->addHour()->startOfMinute();
         $this->actingAs($driver)->get(route('driver.trips.edit', $trip))->assertOk()->assertSee('Edit Departure Time')->assertDontSee('Available seats');
-        $this->actingAs($driver)->patch(route('driver.trips.update', $trip), ['departure_date' => $newDeparture->toDateString(), 'departure_time' => $newDeparture->format('H:i')])->assertSessionHasNoErrors();
+        $this->actingAs($driver)->patch(route('driver.trips.update', $trip), ['departure_date' => $newDeparture->toDateString(), 'departure_time' => $newDeparture->format('H:i'), 'version' => $trip->version])->assertSessionHasNoErrors();
 
         $this->assertSame('Scheduled', $trip->refresh()->status);
         $this->assertSame(3, $trip->available_seats);
@@ -401,7 +401,38 @@ class TripLifecycleRulesTest extends TestCase
             ...$this->requestData($vehicle, $second->departure_at),
             'departure_place_id' => null,
             'destination_place_id' => null,
+            'version' => $second->version,
         ])->assertSessionHasNoErrors();
+    }
+
+    public function test_stale_trip_edit_is_rejected_without_overwriting_the_first_update(): void
+    {
+        $driver = $this->driver();
+        $trip = $this->trip($driver, ['description' => 'Original instructions']);
+        $vehicle = $this->vehicle($driver);
+        $originalVersion = $trip->version;
+        $baseRequest = [
+            ...$this->requestData($vehicle, $trip->departure_at),
+            'departure_place_id' => null,
+            'destination_place_id' => null,
+            'version' => $originalVersion,
+        ];
+
+        $this->actingAs($driver)
+            ->patch(route('driver.trips.update', $trip), [...$baseRequest, 'description' => 'Saved from tab A'])
+            ->assertSessionHasNoErrors();
+
+        $this->actingAs($driver)
+            ->from(route('driver.trips.edit', $trip))
+            ->patch(route('driver.trips.update', $trip), [...$baseRequest, 'description' => 'Stale tab B overwrite'])
+            ->assertRedirect(route('driver.trips.edit', $trip))
+            ->assertSessionHasErrors([
+                'version' => 'This trip was changed in another tab. Refresh the page, review the latest details, and try again.',
+            ]);
+
+        $trip->refresh();
+        $this->assertSame('Saved from tab A', $trip->description);
+        $this->assertSame($originalVersion + 1, $trip->version);
     }
 
     public function test_start_trip_lifecycle_remains_unchanged(): void
