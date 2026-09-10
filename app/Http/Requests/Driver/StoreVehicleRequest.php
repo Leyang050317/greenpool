@@ -36,6 +36,7 @@ class StoreVehicleRequest extends FormRequest
             'rear_image_validation_token' => [$requiredAiToken, 'nullable', 'string'],
             'side_image_validation_token' => [$requiredAiToken, 'nullable', 'string'],
             'vehicle_geran' => $this->documentImageRules($requiredForDocuments),
+            'geran_plate_number' => [$requiredForDocuments, 'nullable', 'string', 'max:20', 'regex:/^[A-Za-z0-9 -]+$/'],
             'voc_reference_no' => ['nullable', 'string', 'max:30', 'regex:/^[A-Z0-9]+$/'],
             'registered_owner_name' => [$requiredForDocuments, 'nullable', 'string', 'max:150'],
             'owner_identity_no' => [$requiredForDocuments, 'nullable', 'regex:/^\d{12}$/'],
@@ -122,11 +123,25 @@ class StoreVehicleRequest extends FormRequest
                         $validator->errors()->add($field, 'The vehicle colour does not match across the front, rear, and side photos. Upload photos of the same vehicle.');
                     }
                 }
+
+                $submittedPlate = $this->canonicalPlate($this->input('plate_number'));
+                foreach ($photoContexts as $field => $context) {
+                    $detectedPlate = $this->canonicalPlate($context['plate_number'] ?? null);
+                    if ($detectedPlate !== '' && $submittedPlate !== '' && $detectedPlate !== $submittedPlate) {
+                        $validator->errors()->add($field, 'The detected vehicle photo plate number does not match the submitted plate number.');
+                    }
+                }
             }
 
             if (! $this->hasFile('vehicle_geran')) {
                 return;
             }
+            $submittedPlate = $this->canonicalPlate($this->input('plate_number'));
+            $geranPlate = $this->canonicalPlate($this->input('geran_plate_number'));
+            if ($submittedPlate === '' || $geranPlate === '' || $submittedPlate !== $geranPlate) {
+                $validator->errors()->add('geran_plate_number', 'The plate number from the vehicle photos must match the registration number extracted from the Vehicle Geran/VOC.');
+            }
+
             $accountName = DocumentIdentity::normalizeName($this->user()?->name);
             if (DocumentIdentity::normalizeName($this->input('registered_owner_name')) !== $accountName) {
                 $validator->errors()->add('registered_owner_name', 'Geran registered owner name does not match your driver account name. Update your profile to your legal name or upload the correct Geran.');
@@ -142,5 +157,10 @@ class StoreVehicleRequest extends FormRequest
     private function documentImageRules(mixed $required): array
     {
         return [$required, 'nullable', 'file', 'image', 'mimes:jpg,jpeg,png', 'max:8192', 'dimensions:min_width=500,min_height=300'];
+    }
+
+    private function canonicalPlate(mixed $value): string
+    {
+        return preg_replace('/[^A-Z0-9]/', '', mb_strtoupper((string) $value)) ?? '';
     }
 }
