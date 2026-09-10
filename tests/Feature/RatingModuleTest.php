@@ -69,6 +69,7 @@ class RatingModuleTest extends TestCase
             ->get(route('ratings.history'))
             ->assertOk()
             ->assertSee('Pending Ratings')
+            ->assertSee(route('ratings.pending'), false)
             ->assertSee('Newest first')
             ->assertSee('Oldest first')
             ->assertDontSee('Drivers Rated')

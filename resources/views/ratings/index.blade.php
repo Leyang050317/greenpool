@@ -10,9 +10,8 @@
                 <button class="rounded-xl bg-[#22C55E] px-5 py-2 text-sm font-semibold text-white">Apply</button>
             </form>
             <div class="mb-5 grid gap-4 sm:grid-cols-2">
-                @foreach([['Total Ratings',$stats['total']],['Pending Ratings',$stats['pending']]] as [$label,$value])
-                    <div class="rounded-2xl border border-slate-200 bg-white p-5 text-center shadow-sm"><div class="text-2xl font-bold text-slate-900">{{ $value }}</div><div class="mt-1 text-xs text-slate-400">{{ $label }}</div></div>
-                @endforeach
+                <div class="rounded-2xl border border-slate-200 bg-white p-5 text-center shadow-sm"><div class="text-2xl font-bold text-slate-900">{{ $stats['total'] }}</div><div class="mt-1 text-xs text-slate-400">Total Ratings</div></div>
+                <a href="{{ route('ratings.pending') }}" class="rounded-2xl border border-green-200 bg-white p-5 text-center shadow-sm transition hover:border-green-400 hover:bg-green-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-600 focus-visible:ring-offset-2"><div class="text-2xl font-bold text-slate-900">{{ $stats['pending'] }}</div><div class="mt-1 text-xs text-slate-400">Pending Ratings</div><div class="mt-2 text-xs font-semibold text-green-700">Rate now →</div></a>
             </div>
             <div class="space-y-3">
                 @forelse($ratings as $rating)
