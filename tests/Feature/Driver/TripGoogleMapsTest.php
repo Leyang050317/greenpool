@@ -93,6 +93,36 @@ class TripGoogleMapsTest extends TestCase
         Event::assertDispatched(TripCreated::class);
     }
 
+    public function test_published_trip_keeps_a_snapshot_of_driver_preferences(): void
+    {
+        $driver = $this->driver();
+        $driver->driverPreference()->create([
+            'smoking_allowed' => true,
+            'pets_allowed' => true,
+            'conversation_preference' => 'Chatty',
+        ]);
+        $vehicle = $this->vehicle($driver);
+        $this->fakeGooglePlacesAndRoute();
+
+        $this->actingAs($driver)->post(route('driver.trips.store'), $this->tripData($vehicle))
+            ->assertRedirect(route('driver.trips.index'));
+
+        $trip = Trip::query()->sole();
+        $this->assertTrue($trip->smoking_allowed);
+        $this->assertTrue($trip->pets_allowed);
+        $this->assertSame('Chatty', $trip->conversation_preference);
+
+        $driver->driverPreference()->update([
+            'smoking_allowed' => false,
+            'pets_allowed' => false,
+            'conversation_preference' => 'Quiet',
+        ]);
+
+        $this->assertTrue($trip->fresh()->smoking_allowed);
+        $this->assertTrue($trip->fresh()->pets_allowed);
+        $this->assertSame('Chatty', $trip->fresh()->conversation_preference);
+    }
+
     public function test_fare_estimate_uses_actual_google_route_distance(): void
     {
         $driver = $this->driver();

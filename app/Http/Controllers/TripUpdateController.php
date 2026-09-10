@@ -51,6 +51,6 @@ class TripUpdateController extends Controller
             );
         }
 
-        return back()->with('success', 'Trip update sent.');
+        return back()->with('success', 'Update sent.');
     }
 }

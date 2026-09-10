@@ -20,9 +20,11 @@ class PhoneVerificationController extends Controller
             'phone_number' => [
                 'required',
                 'string',
-                'regex:/^[0-9]{10,11}$/',
+                'regex:/^01[0-9]{8,9}$/',
                 Rule::unique('users', 'phone_number')->ignore($user->id),
             ],
+        ], [
+            'phone_number.regex' => 'Enter a valid Malaysian mobile number: 10 or 11 digits starting with 01.',
         ]);
 
         $phoneNumber = trim($validated['phone_number']);

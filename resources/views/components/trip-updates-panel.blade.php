@@ -28,7 +28,7 @@
         </fieldset>
         <div class="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <button type="button" @click="open = false; selected = ''" class="min-h-11 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
-            <button :disabled="!selected" class="min-h-11 rounded-xl bg-[#16A34A] px-4 py-2 text-sm font-semibold text-white hover:bg-[#15803D] disabled:cursor-not-allowed disabled:bg-gray-300">Send update</button>
+            <button :disabled="!selected" class="min-h-11 rounded-xl bg-[#16A34A] px-4 py-2 text-sm font-semibold text-white hover:bg-[#15803D] disabled:cursor-not-allowed disabled:bg-gray-300">Send</button>
         </div>
     </form>
 </section>

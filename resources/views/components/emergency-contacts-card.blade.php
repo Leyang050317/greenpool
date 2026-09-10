@@ -74,11 +74,7 @@
                 </div>
                 <div class="flex items-center gap-2">
                     <button type="button" @click="openEdit(contacts.find(contact => contact.id === {{ $contact->id }}))" class="rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">Edit</button>
-                    <form method="POST" action="{{ route('emergency-contacts.destroy', $contact) }}" onsubmit="return confirm('Remove this emergency contact?')">
-                        @csrf
-                        @method('DELETE')
-                        <button type="submit" class="rounded-lg border border-red-200 px-3 py-2 text-sm font-semibold text-red-600 hover:bg-red-50">Delete</button>
-                    </form>
+                    <x-trip-confirmation name="delete-emergency-contact-{{ $contact->id }}" title="Remove emergency contact?" message="{{ $contact->name }} will no longer be available as an emergency contact." confirm-label="Remove" :action="route('emergency-contacts.destroy', $contact)" method="DELETE" variant="danger" class="rounded-lg px-3 py-2 text-sm font-semibold">Delete</x-trip-confirmation>
                 </div>
             </article>
         @empty

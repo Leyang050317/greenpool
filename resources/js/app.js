@@ -119,19 +119,6 @@ const startJourneyExpiryCards = () => {
     });
 };
 
-const confirmPassengerPickup = () => {
-    document.querySelectorAll('form[action*="/bookings/"][action$="/pickup"]').forEach((form) => {
-        form.addEventListener('submit', (event) => {
-            if (form.dataset.pickupConfirmed === 'true') return;
-            event.preventDefault();
-            const passengerName = form.closest('li')?.querySelector('p.text-sm.font-semibold')?.textContent?.trim() || 'this passenger';
-            if (!window.confirm(`Confirm that ${passengerName} has been picked up? This updates the journey and payment eligibility and cannot be undone.`)) return;
-            form.dataset.pickupConfirmed = 'true';
-            form.requestSubmit();
-        });
-    });
-};
-
 const updateNotificationBadge = (count) => {
     const notificationLink = document.querySelector('[data-notification-link]');
     const notificationBadge = document.querySelector('[data-notification-badge]');
@@ -1037,7 +1024,6 @@ subscribeToEmergencyAcknowledgements();
 prepareEmergencyLocation();
 startDerivedTripExpiryBadges();
 startJourneyExpiryCards();
-confirmPassengerPickup();
 subscribeToTripLocations();
 startDriverLocationTracking();
 subscribeToRatingNotifications();

@@ -198,7 +198,7 @@ class FaqBotTest extends TestCase
             $prompt = data_get($request->data(), 'contents.0.parts.0.text', '');
 
             return str_contains($prompt, 'WEBSITE CAPABILITY MAP:')
-                && str_contains($prompt, 'Trip creation requires a verified valid driving licence');
+                && str_contains($prompt, 'Drivers need a verified, valid driving licence');
         });
     }
 
@@ -230,5 +230,51 @@ class FaqBotTest extends TestCase
             ->assertOk()
             ->assertJsonPath('matched', true)
             ->assertJsonPath('faq.question', 'How do notification settings work?');
+    }
+
+    public function test_bot_answers_tng_question_with_the_actual_supported_payment_methods(): void
+    {
+        $this->seed(FaqSeeder::class);
+        config()->set('services.gemini.enabled', true);
+        config()->set('services.gemini.key', 'test-key');
+        $user = User::factory()->create(['email_verified_at' => now(), 'role' => 'passenger']);
+
+        $this->actingAs($user)
+            ->postJson(route('faq-bot.answer'), ['question' => 'Can I pay with TNG?'])
+            ->assertOk()
+            ->assertJsonPath('ai', true)
+            ->assertJsonPath('answer', 'TNG eWallet and other e-wallet or bank-transfer methods are not currently available in GreenPool. After a completed trip, open Payments or My Bookings and choose Pay by Card through Stripe Checkout, or Pay Cash and hand the amount to your driver for confirmation.');
+
+        Http::assertNothingSent();
+    }
+
+    public function test_gemini_is_given_relevant_cross_module_context_for_a_natural_language_question(): void
+    {
+        $this->seed(FaqSeeder::class);
+        config()->set('services.gemini.enabled', true);
+        config()->set('services.gemini.key', 'test-key');
+        config()->set('services.gemini.model', 'gemini-test');
+        Http::fake([
+            'generativelanguage.googleapis.com/*' => Http::response([
+                'candidates' => [
+                    ['content' => ['parts' => [['text' => 'During an active trip, use the Emergency button and call 999 if anyone is in immediate danger.']]]],
+                ],
+            ]),
+        ]);
+        $user = User::factory()->create(['email_verified_at' => now(), 'role' => 'passenger']);
+
+        $this->actingAs($user)
+            ->postJson(route('faq-bot.answer'), ['question' => 'What should I do if there is an emergency during my ride?'])
+            ->assertOk()
+            ->assertJsonPath('ai', true)
+            ->assertJsonPath('answer', 'During an active trip, use the Emergency button and call 999 if anyone is in immediate danger.');
+
+        Http::assertSent(function ($request): bool {
+            $prompt = data_get($request->data(), 'contents.0.parts.0.text', '');
+
+            return str_contains($prompt, 'First identify the user\'s specific intent')
+                && str_contains($prompt, 'What should I do in an emergency?')
+                && str_contains($prompt, 'call 999');
+        });
     }
 }

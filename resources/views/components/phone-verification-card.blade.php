@@ -52,12 +52,14 @@
                 <input
                     id="phone_number"
                     name="phone_number"
-                    type="tel"
+                    type="text"
                     inputmode="numeric"
                     autocomplete="tel"
                     minlength="10"
                     maxlength="11"
-                    pattern="[0-9]{10,11}"
+                    pattern="01[0-9]{8,9}"
+                    title="Enter a 10 or 11 digit Malaysian mobile number starting with 01."
+                    x-on:input="$event.target.value = $event.target.value.replace(/\D/g, '').slice(0, 11)"
                     value="{{ old('phone_number', $user->phone_number) }}"
                     placeholder="0123456789"
                     :readonly="{{ $user->phone_verified_at ? '!editingPhone' : 'false' }}"
@@ -80,7 +82,7 @@
                 <button type="submit" class="inline-flex min-h-10 items-center justify-center rounded-lg bg-[#2E7D32] px-4 py-2 text-sm font-semibold text-white hover:bg-[#256b29]">Verify Number</button>
             @endif
         </div>
-        <p class="mt-2 text-xs text-gray-500">{{ $user->phone_verified_at ? 'Your verified number is locked until you confirm a change.' : 'Enter 10 or 11 digits without spaces or symbols. Verification is required before the number can be used for trip communication.' }}</p>
+        <p class="mt-2 text-xs text-gray-500">{{ $user->phone_verified_at ? 'Your verified number is locked until you confirm a change.' : 'Enter a Malaysian mobile number starting with 01 (10 or 11 digits). Letters, spaces, and symbols are not accepted. Verification is required before the number can be used for trip communication.' }}</p>
         @if (!$user->telegram_chat_id)
             <p class="mt-2 text-xs font-medium text-amber-700">Link Telegram first so GreenPool can deliver your verification code.</p>
         @endif
