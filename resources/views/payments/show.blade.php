@@ -1,6 +1,9 @@
 <x-payments.shell>
     @php
         $isPaid = $payment->isPaid();
+        $canRate = $isPaid
+            && ! $payment->booking->ratings->contains('reviewer_id', Auth::id())
+            && ! ($payment->booking->trip->completed_at?->addDays(7)->isPast() ?? true);
     @endphp
     <div class="min-h-screen bg-[#F8FAFC] px-4 py-8 sm:px-6 lg:px-8" data-payment-detail data-payment-id="{{ $payment->id }}" data-payment-status="{{ $payment->payment_status }}">
         <div class="mx-auto max-w-xl">
@@ -58,8 +61,8 @@
                     </div>
                 @elseif(Auth::id() === $payment->payer_id && !$isPaid)
                     <a href="{{ route('payments.checkout', $payment->booking) }}" class="mt-6 block w-full rounded-xl bg-[#22C55E] py-3 text-center text-sm font-bold text-white hover:bg-green-600">{{ $payment->payment_method === 'cash' ? 'Change Payment Method' : 'Pay Now' }}</a>
-                @elseif(Auth::id() === $payment->payer_id && $isPaid && !$payment->booking->ratings->contains('reviewer_id', Auth::id()))
-                    <a href="{{ route('ratings.create', $payment->booking) }}" class="mt-6 block w-full rounded-xl bg-[#22C55E] py-3 text-center text-sm font-bold text-white hover:bg-green-600">Rate Driver</a>
+                @elseif($canRate)
+                    <a href="{{ route('ratings.create', $payment->booking) }}" class="mt-6 block w-full rounded-xl bg-[#22C55E] py-3 text-center text-sm font-bold text-white hover:bg-green-600">Rate {{ Auth::id() === $payment->payee_id ? 'Passenger' : 'Driver' }}</a>
                 @endif
                 @if($isPaid)
                     <a href="{{ route(Auth::user()->role === 'driver' ? 'driver.home' : 'passenger.home') }}" class="mt-3 block w-full rounded-xl bg-[#22C55E] py-3 text-center text-sm font-bold text-white hover:bg-green-600">Back to Dashboard</a>

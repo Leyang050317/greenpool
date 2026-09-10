@@ -95,6 +95,11 @@ class PaymentModuleTest extends TestCase
         $this->actingAs($driver)->get(route('driver.home'))
             ->assertOk()
             ->assertSee('RM 25.00');
+
+        $this->actingAs($driver)->get(route('payments.show', $payment))
+            ->assertOk()
+            ->assertSee('Rate Passenger')
+            ->assertSee(route('ratings.create', $booking), false);
     }
 
     public function test_only_the_assigned_driver_can_confirm_a_cash_payment(): void
