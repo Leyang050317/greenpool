@@ -130,7 +130,7 @@ class RatingController extends Controller
     public function pending(Request $request): View
     {
         $user = $request->user();
-        $bookings = $this->pendingBookingsQuery($user)
+        $bookings = $this->pendingBookingsQuery($user, includeExpired: true)
             ->latest('updated_at')
             ->paginate(8);
 
@@ -237,15 +237,18 @@ class RatingController extends Controller
         abort(403);
     }
 
-    private function pendingBookingsQuery(User $user): Builder
+    private function pendingBookingsQuery(User $user, bool $includeExpired = false): Builder
     {
         $query = Booking::query()
             ->with(['passenger', 'trip.user'])
             ->where('booking_status', 'Accepted')
             ->whereHas('trip', fn ($trip) => $trip
-                ->where('status', 'Completed')
-                ->where('completed_at', '>=', now()->subDays(7)))
+                ->where('status', 'Completed'))
             ->whereDoesntHave('ratings', fn ($rating) => $rating->where('reviewer_id', $user->id));
+
+        if (! $includeExpired) {
+            $query->whereHas('trip', fn ($trip) => $trip->where('completed_at', '>=', now()->subDays(7)));
+        }
 
         if ($user->role === 'passenger') {
             return $query

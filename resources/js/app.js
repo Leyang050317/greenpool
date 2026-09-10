@@ -224,8 +224,6 @@ const bookingUpdateNotification = (event, role) => {
     };
     const driverMessages = {
         booking_request_cancelled: ['Booking Request Cancelled', `A passenger cancelled their booking request for ${route}.`, '×'],
-        booking_confirmed_cancelled: ['Confirmed Booking Cancelled', `A passenger cancelled their confirmed booking for ${route}.`, '×'],
-        passenger_not_boarding: ['Passenger Will Not Board', `A passenger will not board ${route}. You can skip their pickup.`, '×'],
     };
     const [title, message, icon] = (role === 'passenger' ? passengerMessages : driverMessages)[type] || [];
 
@@ -409,7 +407,7 @@ const subscribeToBookingUpdates = () => {
                     }
                     return;
                 }
-                if (['booking_request_cancelled', 'booking_confirmed_cancelled', 'passenger_not_boarding'].includes(event.driver_notification_type)) {
+                if (event.driver_notification_type === 'booking_request_cancelled') {
                     incrementNotificationBadge();
                     const notification = bookingUpdateNotification(event, 'driver');
                     if (notification) showRealtimeNotification(notification, notification.icon);
@@ -496,6 +494,31 @@ const subscribeToTripReminders = () => {
         });
 };
 
+const refreshEmergencyPanel = async (tripId, panelUrl = null) => {
+    const panel = [...document.querySelectorAll('[data-emergency-panel]')]
+        .find((element) => String(element.dataset.tripId) === String(tripId));
+
+    if (!panel) return false;
+
+    const response = await fetch(panelUrl || panel.dataset.panelUrl, {
+        headers: { Accept: 'text/html', 'X-Requested-With': 'XMLHttpRequest' },
+        credentials: 'same-origin',
+    });
+
+    if (!response.ok) throw new Error('The emergency panel could not be refreshed.');
+
+    const template = document.createElement('template');
+    template.innerHTML = (await response.text()).trim();
+    const replacement = template.content.firstElementChild;
+    if (!replacement) throw new Error('The emergency panel response was empty.');
+
+    panel.replaceWith(replacement);
+    window.Alpine?.initTree?.(replacement);
+    prepareEmergencyLocation(replacement);
+
+    return true;
+};
+
 const subscribeToEmergencyAlerts = () => {
     const userId = document.body.dataset.authId;
     const userRole = document.body.dataset.authRole;
@@ -505,8 +528,13 @@ const subscribeToEmergencyAlerts = () => {
     }
 
     window.Echo.private(`${userRole}.${userId}`)
-        .listen('EmergencyTriggered', (notification) => {
+        .listen('EmergencyTriggered', async (notification) => {
             showRealtimeNotification(notification, '⚠');
+            try {
+                await refreshEmergencyPanel(notification.trip_id, notification.panel_url);
+            } catch (error) {
+                console.warn(error.message);
+            }
         });
 };
 
@@ -568,8 +596,10 @@ const subscribeToEmergencyAcknowledgements = () => {
     });
 };
 
-const prepareEmergencyLocation = () => {
-    document.querySelectorAll('[data-emergency-report-form]').forEach((form) => {
+const prepareEmergencyLocation = (root = document) => {
+    root.querySelectorAll('[data-emergency-report-form]').forEach((form) => {
+        if (form.dataset.emergencySubmitBound === 'true') return;
+        form.dataset.emergencySubmitBound = 'true';
         form.addEventListener('submit', (event) => {
             event.preventDefault();
 
@@ -609,6 +639,11 @@ const prepareEmergencyLocation = () => {
                     if (submitButton) {
                         submitButton.disabled = false;
                         submitButton.textContent = 'Report Emergency';
+                    }
+                    try {
+                        await refreshEmergencyPanel(data.trip_id, data.panel_url);
+                    } catch (refreshError) {
+                        console.warn(refreshError.message);
                     }
                     window.dispatchEvent(new CustomEvent('greenpool:emergency-reported', { detail: data }));
                 } catch (error) {

@@ -24,7 +24,13 @@
         request()->routeIs('attractions.*') => 'Tourist Attractions',
         default => config('app.name', 'GreenPool'),
     } : match (true) {
+        request()->routeIs('settings.*') => 'Settings',
+        request()->routeIs('help.*') => 'Help & Support',
+        request()->routeIs('notifications.*') => 'Notifications',
         request()->routeIs('messages.*', 'bookings.chat.*') => 'Messages',
+        request()->routeIs('payments.*') => 'Payments',
+        request()->routeIs('ratings.*') => 'Ratings',
+        request()->routeIs('attractions.*') => 'Tourist Attractions',
         default => config('app.name', 'GreenPool'),
     });
 @endphp

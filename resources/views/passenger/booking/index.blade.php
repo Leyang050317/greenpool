@@ -39,7 +39,7 @@
             >
                 <div class="grid gap-4 md:grid-cols-3">
                     <div class="relative">
-                        <label for="destination" class="mb-1.5 block text-xs font-semibold text-gray-500">Destination</label>
+                        <label for="destination" class="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-gray-500"><x-icons.lucide name="map-pinned" class="h-3.5 w-3.5" />Destination</label>
                         <input id="destination" name="destination" x-model="destination.text" @input="search()" @focus="destination.open = true" autocomplete="off" class="block w-full rounded-xl border-gray-200 text-sm focus:border-[#16A34A] focus:ring-[#16A34A]" placeholder="Search a Malaysian address or place" />
                         <input type="hidden" name="destination_place_id" :value="destination.placeId" />
                         <div x-cloak x-show="destination.open && destination.suggestions.length" class="absolute z-20 mt-1 w-full overflow-hidden rounded-xl border border-gray-200 bg-white py-1 shadow-lg">

@@ -26,6 +26,7 @@ class EmergencyTriggered implements ShouldBroadcastNow
     public function broadcastWith(): array
     {
         $trip = $this->emergency->trip;
+
         return [
             'emergency_id' => $this->emergency->id,
             'trip_id' => $trip->trip_id,
@@ -33,6 +34,7 @@ class EmergencyTriggered implements ShouldBroadcastNow
             'title' => 'Emergency Alert',
             'message' => $this->emergency->notificationMessage(),
             'url' => $this->booking ? route('passenger.bookings.show', $this->booking) : route('driver.trips.show', $trip),
+            'panel_url' => route('trips.emergencies.panel', $trip),
         ];
     }
 }

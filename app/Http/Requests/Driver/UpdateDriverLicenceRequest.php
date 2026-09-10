@@ -5,6 +5,7 @@ namespace App\Http\Requests\Driver;
 use App\Support\DocumentIdentity;
 use App\Support\MalaysianDrivingLicenceClass;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
 class UpdateDriverLicenceRequest extends FormRequest
@@ -19,7 +20,11 @@ class UpdateDriverLicenceRequest extends FormRequest
         return [
             'driving_licence' => ['required', 'file', 'image', 'mimes:jpg,jpeg,png', 'max:8192', 'dimensions:min_width=500,min_height=300'],
             'holder_name' => ['required', 'string', 'max:150'],
-            'identity_no' => ['required', 'regex:/^\d{12}$/'],
+            'identity_no' => [
+                'required',
+                'regex:/^\d{12}$/',
+                Rule::unique('driver_licences', 'identity_no')->ignore($this->user()?->driverLicence?->getKey()),
+            ],
             'licence_class' => ['nullable', 'string', 'max:20'],
             'valid_from' => ['nullable', 'date'],
             'valid_until' => ['required', 'date', 'after_or_equal:valid_from', 'after_or_equal:today'],
@@ -88,6 +93,7 @@ class UpdateDriverLicenceRequest extends FormRequest
     {
         return [
             'identity_no.regex' => 'Identity number must contain exactly 12 digits.',
+            'identity_no.unique' => 'This identity number has already been registered by another driver.',
             'valid_until.after_or_equal' => 'The driving licence has expired. Upload a renewed licence.',
         ];
     }

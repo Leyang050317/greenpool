@@ -24,7 +24,7 @@ class BookingRequestNotification extends Notification
     {
         $this->booking->loadMissing(['passenger', 'trip']);
 
-        $isCancelled = in_array($this->action, ['cancelled', 'cancelled_confirmed', 'not_boarding'], true);
+        $isCancelled = $this->action === 'cancelled';
         $passengerName = $this->booking->passenger->name;
         $route = $this->booking->trip->departure_location.' → '.$this->booking->trip->destination;
 
@@ -36,19 +36,11 @@ class BookingRequestNotification extends Notification
             'pickup_point' => $this->booking->pickup_point,
             'booking_status' => $this->booking->booking_status,
             'type' => 'booking_request_'.$this->action,
-            'title' => match ($this->action) {
-                'cancelled_confirmed' => 'Confirmed booking cancelled',
-                'not_boarding' => 'Passenger will not board',
-                'cancelled' => 'Booking request cancelled',
-                default => 'New booking request',
-            },
+            'title' => $this->action === 'cancelled' ? 'Booking request cancelled' : 'New booking request',
             'icon' => $isCancelled ? 'circle-x' : 'clipboard-list',
-            'message' => match ($this->action) {
-                'cancelled_confirmed' => "{$passengerName} cancelled their confirmed booking for {$route}. The seats are available again.",
-                'not_boarding' => "{$passengerName} will not board {$route}. Please skip their pickup point.",
-                'cancelled' => "{$passengerName} cancelled their booking request for {$route}.",
-                default => "{$passengerName} requested a seat on your trip from {$route}.",
-            },
+            'message' => $this->action === 'cancelled'
+                ? "{$passengerName} cancelled their booking request for {$route}."
+                : "{$passengerName} requested a seat on your trip from {$route}.",
             'url' => route('driver.booking-requests.show', $this->booking),
         ];
     }

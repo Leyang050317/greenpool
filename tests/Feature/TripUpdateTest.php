@@ -51,6 +51,21 @@ class TripUpdateTest extends TestCase
         $this->assertDatabaseCount('messages', 0);
     }
 
+    public function test_active_journey_exposes_inline_quick_replies_without_a_fixed_dialog(): void
+    {
+        [$driver, $trip] = $this->trip();
+        $passenger = User::factory()->create(['role' => 'passenger']);
+        $booking = $this->booking($trip, $passenger, 'Accepted');
+
+        $this->actingAs($passenger)
+            ->get(route('passenger.bookings.show', $booking))
+            ->assertOk()
+            ->assertSee('Quick replies')
+            ->assertSee('Need Pickup Clarification')
+            ->assertSee('Trip quick replies')
+            ->assertDontSee('Send Trip Update');
+    }
+
     private function trip(): array
     {
         $driver = User::factory()->create(['role' => 'driver']);

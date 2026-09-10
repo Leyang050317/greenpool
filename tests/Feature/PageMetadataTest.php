@@ -40,4 +40,17 @@ class PageMetadataTest extends TestCase
             ->assertSee('<title>Notifications - GreenPool</title>', false)
             ->assertDontSee('<title>Ratings - GreenPool</title>', false);
     }
+
+    public function test_tourist_attractions_has_the_correct_title_for_both_roles(): void
+    {
+        foreach (['passenger', 'driver'] as $role) {
+            $user = User::factory()->create(['role' => $role]);
+
+            $this->actingAs($user)
+                ->get(route('attractions.index'))
+                ->assertOk()
+                ->assertSee('<title>Tourist Attractions - GreenPool</title>', false)
+                ->assertDontSee('<title>Laravel - GreenPool</title>', false);
+        }
+    }
 }

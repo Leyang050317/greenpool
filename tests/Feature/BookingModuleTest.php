@@ -577,14 +577,12 @@ class BookingModuleTest extends TestCase
         ]);
     }
 
-    public function test_passenger_can_cancel_pending_or_confirmed_booking_before_trip_starts(): void
+    public function test_passenger_can_cancel_a_pending_booking_request(): void
     {
         Event::fake([BookingStatusUpdated::class]);
 
         $passenger = User::factory()->create(['role' => 'passenger']);
         $pendingBooking = $this->createBooking($passenger, bookingStatus: 'Pending');
-        $confirmedTrip = $this->createTrip(['available_seats' => 1]);
-        $acceptedBooking = $this->createBooking($passenger, $confirmedTrip, bookingStatus: 'Accepted');
 
         $this->actingAs($passenger)
             ->patch(route('passenger.bookings.cancel', $pendingBooking))
@@ -601,17 +599,63 @@ class BookingModuleTest extends TestCase
                 && $event->booking->booking_status === 'Cancelled'
                 && collect($event->broadcastOn())->contains(fn ($channel) => (string) $channel === 'private-driver.'.$pendingBooking->trip->user_id)
         );
+    }
+
+    public function test_accepted_booking_does_not_show_a_cancel_action(): void
+    {
+        $passenger = User::factory()->create(['role' => 'passenger']);
+        $booking = $this->createBooking($passenger, bookingStatus: 'Accepted');
 
         $this->actingAs($passenger)
-            ->patch(route('passenger.bookings.cancel', $acceptedBooking))
+            ->get(route('passenger.bookings.history'))
+            ->assertOk()
+            ->assertDontSee('cancel-confirmed-booking-'.$booking->id, false)
+            ->assertDontSee('cancel-booking-'.$booking->id, false);
+
+        $this->actingAs($passenger)
+            ->get(route('passenger.bookings.show', $booking))
+            ->assertOk()
+            ->assertDontSee('Cancel confirmed booking')
+            ->assertDontSee('Cancel booking request');
+    }
+
+    public function test_passenger_cannot_cancel_an_accepted_booking_by_direct_request(): void
+    {
+        Event::fake([BookingStatusUpdated::class]);
+
+        $passenger = User::factory()->create(['role' => 'passenger']);
+        $trip = $this->createTrip(['available_seats' => 1]);
+        $booking = $this->createBooking($passenger, $trip, bookingStatus: 'Accepted');
+
+        $this->actingAs($passenger)
+            ->from(route('passenger.bookings.history'))
+            ->patch(route('passenger.bookings.cancel', $booking))
             ->assertRedirect(route('passenger.bookings.history'))
-            ->assertSessionHas('success');
+            ->assertSessionHas('error', 'Only pending booking requests can be cancelled.');
 
         $this->assertDatabaseHas('bookings', [
-            'id' => $acceptedBooking->id,
-            'booking_status' => 'Cancelled',
+            'id' => $booking->id,
+            'booking_status' => 'Accepted',
         ]);
-        $this->assertSame(2, $confirmedTrip->fresh()->available_seats);
+        $this->assertSame(1, $trip->fresh()->available_seats);
+        Event::assertNotDispatched(BookingStatusUpdated::class);
+    }
+
+    public function test_cancelled_booking_cannot_be_cancelled_again(): void
+    {
+        Event::fake([BookingStatusUpdated::class]);
+
+        $passenger = User::factory()->create(['role' => 'passenger']);
+        $booking = $this->createBooking($passenger, bookingStatus: 'Cancelled');
+
+        $this->actingAs($passenger)
+            ->from(route('passenger.bookings.history'))
+            ->patch(route('passenger.bookings.cancel', $booking))
+            ->assertRedirect(route('passenger.bookings.history'))
+            ->assertSessionHas('error', 'Only pending booking requests can be cancelled.');
+
+        $this->assertSame('Cancelled', $booking->fresh()->booking_status);
+        Event::assertNotDispatched(BookingStatusUpdated::class);
     }
 
     public function test_driver_receives_notification_when_passenger_cancels_booking_request(): void
