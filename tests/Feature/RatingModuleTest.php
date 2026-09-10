@@ -68,9 +68,10 @@ class RatingModuleTest extends TestCase
         $this->actingAs($passenger)
             ->get(route('ratings.history'))
             ->assertOk()
-            ->assertSee('Drivers Rated')
+            ->assertSee('Editable Ratings')
             ->assertSee('Newest first')
             ->assertSee('Oldest first')
+            ->assertDontSee('Drivers Rated')
             ->assertDontSee('All roles')
             ->assertDontSee('Passengers Rated')
             ->assertDontSee('name="role"', false);

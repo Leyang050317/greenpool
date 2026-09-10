@@ -33,15 +33,14 @@ class RatingController extends Controller
 
         $query->orderBy('created_at', $request->input('sort') === 'oldest' ? 'asc' : 'desc');
         $ratings = $query->paginate(8)->withQueryString();
-        $targetRole = $request->user()->role === 'passenger' ? 'driver' : 'passenger';
         $stats = [
             'total' => $request->user()->ratingsGiven()->count(),
-            'rated' => $request->user()->ratingsGiven()
-                ->whereHas('reviewee', fn ($q) => $q->where('role', $targetRole))
+            'editable' => $request->user()->ratingsGiven()
+                ->where('created_at', '>=', now()->subDays(Rating::EDIT_WINDOW_DAYS))
                 ->count(),
         ];
 
-        return view('ratings.index', compact('ratings', 'stats', 'targetRole'));
+        return view('ratings.index', compact('ratings', 'stats'));
     }
 
     public function people(Request $request): View
