@@ -30,6 +30,7 @@ class BookingDetailsTest extends TestCase
             ->assertSee('Booking Details')
             ->assertSee($trip->departure_location)
             ->assertSee($booking->pickup_point)
+            ->assertSee('Accepted')
             ->assertSee('Upcoming trip')
             ->assertDontSee('Trip map');
     }
@@ -60,7 +61,7 @@ class BookingDetailsTest extends TestCase
         foreach ([0, 30, 59] as $second) {
             Carbon::setTestNow($departureAt->copy()->addSeconds($second));
             $this->actingAs($passenger)->get(route('passenger.bookings.history'))
-                ->assertOk()->assertSee('Scheduled')->assertDontSee('Expired');
+                ->assertOk()->assertSee('Accepted')->assertDontSee('Expired');
         }
 
         Carbon::setTestNow($departureAt->copy()->addMinute());

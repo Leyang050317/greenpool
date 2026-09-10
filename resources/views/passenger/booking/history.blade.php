@@ -56,9 +56,11 @@
                             <tbody class="divide-y divide-gray-50">
                                 @foreach($bookings as $booking)
                                     @php
+                                        // A driver accepting a request changes the booking to Accepted.
+                                        // Scheduled describes the trip timetable, not the passenger's request.
                                         $displayStatus = $booking->booking_status === 'Accepted' && $booking->trip->status === 'Scheduled'
-                                            ? ($booking->trip->hasExpiredDeparture() ? 'Expired' : 'Scheduled')
-                                            : ($booking->booking_status === 'Accepted' && $booking->trip->status !== 'Scheduled' ? $booking->trip->status : $booking->booking_status);
+                                            ? ($booking->trip->hasExpiredDeparture() ? 'Expired' : 'Accepted')
+                                            : ($booking->booking_status === 'Accepted' ? $booking->trip->status : $booking->booking_status);
                                     @endphp
                                     <tr x-data data-booking-url="{{ route('passenger.bookings.show', $booking) }}" tabindex="0" role="link" @click="window.location.href = $el.dataset.bookingUrl" @keydown.enter="window.location.href = $el.dataset.bookingUrl" class="cursor-pointer transition hover:bg-green-50/50 focus:outline-none focus-visible:bg-green-50">
                                         <td class="px-4 py-3 text-sm">

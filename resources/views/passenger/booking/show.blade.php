@@ -5,7 +5,8 @@
 @section('content')
     @php
         $trip = $booking->trip;
-        $displayStatus = $booking->booking_status === 'Accepted' && $trip->status === 'Scheduled' ? ($trip->hasExpiredDeparture() ? 'Expired' : 'Scheduled') : ($booking->booking_status === 'Accepted' && $trip->status !== 'Scheduled' ? $trip->status : $booking->booking_status);
+        // Booking status is the passenger's request outcome; trip status is shown separately below.
+        $displayStatus = $booking->booking_status === 'Accepted' && $trip->status === 'Scheduled' ? ($trip->hasExpiredDeparture() ? 'Expired' : 'Accepted') : ($booking->booking_status === 'Accepted' ? $trip->status : $booking->booking_status);
         $statusStyle = match ($displayStatus) { 'Accepted' => 'bg-green-50 text-green-700', 'Scheduled' => 'bg-blue-50 text-blue-700', 'In Progress' => 'bg-orange-50 text-orange-700', 'Completed' => 'bg-slate-100 text-slate-700', 'Pending' => 'bg-amber-50 text-amber-700', default => 'bg-red-50 text-red-700' };
         $acceptedPickups = $trip->bookings;
         $nextPickup = $acceptedPickups->firstWhere('picked_up_at', null);

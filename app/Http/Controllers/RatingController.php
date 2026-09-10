@@ -25,7 +25,8 @@ class RatingController extends Controller
 
     public function index(Request $request): View
     {
-        $query = $request->user()->ratingsGiven()->with(['reviewee', 'booking.trip']);
+        $user = $request->user();
+        $query = $user->ratingsGiven()->with(['reviewee', 'booking.trip']);
         if ($request->filled('search')) {
             $search = $request->string('search')->trim();
             $query->whereHas('reviewee', fn ($q) => $q->where('name', 'like', "%{$search}%"));
@@ -34,10 +35,8 @@ class RatingController extends Controller
         $query->orderBy('created_at', $request->input('sort') === 'oldest' ? 'asc' : 'desc');
         $ratings = $query->paginate(8)->withQueryString();
         $stats = [
-            'total' => $request->user()->ratingsGiven()->count(),
-            'editable' => $request->user()->ratingsGiven()
-                ->where('created_at', '>=', now()->subDays(Rating::EDIT_WINDOW_DAYS))
-                ->count(),
+            'total' => $user->ratingsGiven()->count(),
+            'pending' => $this->pendingBookingsQuery($user)->count(),
         ];
 
         return view('ratings.index', compact('ratings', 'stats'));
@@ -243,7 +242,9 @@ class RatingController extends Controller
         $query = Booking::query()
             ->with(['passenger', 'trip.user'])
             ->where('booking_status', 'Accepted')
-            ->whereHas('trip', fn ($trip) => $trip->where('status', 'Completed'))
+            ->whereHas('trip', fn ($trip) => $trip
+                ->where('status', 'Completed')
+                ->where('completed_at', '>=', now()->subDays(7)))
             ->whereDoesntHave('ratings', fn ($rating) => $rating->where('reviewer_id', $user->id));
 
         if ($user->role === 'passenger') {

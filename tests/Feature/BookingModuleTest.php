@@ -345,6 +345,19 @@ class BookingModuleTest extends TestCase
             ->assertDontSee('Accepted</span>', false);
     }
 
+    public function test_passenger_history_shows_accepted_after_driver_accepts_a_scheduled_trip(): void
+    {
+        $passenger = User::factory()->create(['role' => 'passenger']);
+        $trip = $this->createTrip(['status' => 'Scheduled']);
+        $this->createBooking($passenger, $trip, bookingStatus: 'Accepted');
+
+        $this->actingAs($passenger)
+            ->get(route('passenger.bookings.history'))
+            ->assertOk()
+            ->assertSee('Accepted</span>', false)
+            ->assertDontSee('Scheduled</span>', false);
+    }
+
     public function test_passenger_can_submit_booking_request(): void
     {
         $passenger = User::factory()->create(['role' => 'passenger']);
