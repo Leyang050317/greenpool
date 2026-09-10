@@ -495,6 +495,78 @@ class VehicleManagementTest extends TestCase
         $this->assertSame('Verified', $vehicle->refresh()->verification_status);
     }
 
+    public function test_plate_redetection_requires_every_vehicle_photo_to_have_a_readable_plate(): void
+    {
+        $driver = User::factory()->create(['role' => 'driver', 'name' => 'TEST DRIVER']);
+        $vehicle = Vehicle::factory()->verified()->create(['user_id' => $driver->id]);
+        $data = $this->revalidationData($driver, $vehicle, ['plate_number' => 'NEW 1234']);
+        $data['side_image_validation_token'] = $this->vehicleValidationToken(
+            $data['side_image'], 'SIDE', null, $data['colour']
+        );
+
+        $this->actingAs($driver)
+            ->put(route('driver.vehicles.update', $vehicle), $data)
+            ->assertSessionHasErrors('side_image');
+
+        $this->assertSame($vehicle->plate_number, $vehicle->fresh()->plate_number);
+    }
+
+    public function test_colour_redetection_requires_every_vehicle_photo_to_have_a_detected_colour(): void
+    {
+        $driver = User::factory()->create(['role' => 'driver', 'name' => 'TEST DRIVER']);
+        $vehicle = Vehicle::factory()->verified()->create(['user_id' => $driver->id, 'colour' => 'Silver']);
+        $data = [
+            ...$this->vehicleDataFrom($vehicle),
+            'colour' => 'Black',
+            'front_image' => UploadedFile::fake()->image('front.jpg', 800, 450),
+            'rear_image' => UploadedFile::fake()->image('rear.jpg', 800, 450),
+            'side_image' => UploadedFile::fake()->image('side.jpg', 800, 450),
+        ];
+        $data = $this->withVehicleValidationTokens($data);
+        $data['rear_image_validation_token'] = $this->vehicleValidationToken(
+            $data['rear_image'], 'REAR', $data['plate_number'], ''
+        );
+
+        $this->actingAs($driver)
+            ->put(route('driver.vehicles.update', $vehicle), $data)
+            ->assertSessionHasErrors('rear_image');
+
+        $this->assertSame('Silver', $vehicle->fresh()->colour);
+    }
+
+    public function test_model_rescan_rejects_geran_when_model_was_not_detected(): void
+    {
+        Storage::fake('local');
+        $driver = User::factory()->create(['role' => 'driver', 'name' => 'TEST DRIVER']);
+        $vehicle = Vehicle::factory()->verified()->create([
+            'user_id' => $driver->id,
+            'plate_number' => 'VNU 8601',
+            'model' => 'SAGA',
+        ]);
+        $data = $this->revalidationData($driver, $vehicle, [
+            'plate_number' => $vehicle->plate_number,
+            'model' => 'PERSONA',
+            'model_name' => 'PERSONA',
+            'geran_plate_number' => $vehicle->plate_number,
+        ]);
+        $this->withSession(['vehicle_geran_ocr' => [
+            'hash' => hash_file('sha256', $data['vehicle_geran']->getRealPath()),
+            'fields' => [
+                'registered_owner_name' => $data['registered_owner_name'],
+                'owner_identity_no' => $data['owner_identity_no'],
+                'manufacturer' => $data['manufacturer'],
+                'model_name' => null,
+                'registration_no' => $data['geran_plate_number'],
+            ],
+        ]]);
+
+        $this->actingAs($driver)
+            ->put(route('driver.vehicles.update', $vehicle), $data)
+            ->assertSessionHasErrors('vehicle_geran');
+
+        $this->assertSame('SAGA', $vehicle->fresh()->model);
+    }
+
     public function test_soft_deleting_vehicle_retains_picture_and_hides_vehicle_from_normal_access(): void
     {
         Storage::fake('public');

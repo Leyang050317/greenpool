@@ -232,10 +232,14 @@ class VehicleController extends Controller
                 }
             }
 
-            if (($imageResult['accepted'] ?? false) && $validated['expected_view'] === 'FRONT' && blank($plateNumber)) {
+            if (($imageResult['accepted'] ?? false)
+                && in_array($validated['expected_view'], ['FRONT', 'REAR'], true)
+                && blank($plateNumber)) {
+                $view = strtolower($validated['expected_view']);
+
                 return response()->json([
                     'success' => false,
-                    'message' => 'Inappropriate image. Please upload a clear front car image with a readable plate number.',
+                    'message' => "Inappropriate image. Please upload a clear {$view} car image with a readable plate number.",
                 ], 422);
             }
 
