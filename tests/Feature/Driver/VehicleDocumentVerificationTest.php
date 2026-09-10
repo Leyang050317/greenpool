@@ -72,6 +72,19 @@ class VehicleDocumentVerificationTest extends TestCase
         $this->assertDatabaseCount('vehicles', 0);
     }
 
+    public function test_vehicle_photo_plate_must_match_geran_registration_number(): void
+    {
+        $driver = User::factory()->create(['role' => 'driver', 'name' => 'ER KIM WEN']);
+        $this->addValidDrivingLicence($driver);
+
+        $this->actingAs($driver)->post(route('driver.vehicles.store'), $this->payload([
+            'plate_number' => 'VAB 1234',
+            'geran_plate_number' => 'WXY 9876',
+        ]))->assertSessionHasErrors('geran_plate_number');
+
+        $this->assertDatabaseCount('vehicles', 0);
+    }
+
     private function payload(array $overrides = []): array
     {
         return $this->withVehicleValidationTokens(array_replace([
@@ -81,6 +94,7 @@ class VehicleDocumentVerificationTest extends TestCase
             'rear_image' => UploadedFile::fake()->image('rear.jpg', 800, 450),
             'side_image' => UploadedFile::fake()->image('side.jpg', 800, 450),
             'vehicle_geran' => UploadedFile::fake()->image('geran.jpg', 500, 300),
+            'geran_plate_number' => 'VAB 1234',
             'registered_owner_name' => 'ER KIM WEN', 'owner_identity_no' => '991109040290',
             'manufacturer' => 'PROTON', 'model_name' => 'SAGA 1.3 PREMIUM',
         ], $overrides));

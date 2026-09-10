@@ -88,7 +88,7 @@ class VehicleController extends Controller
         $files = [...$publicFiles, ...$privateFiles];
         try {
             $vehicle = $request->user()->vehicles()->create([
-                ...$request->safe()->except(['front_image', 'rear_image', 'side_image', 'vehicle_geran', 'front_image_validation_token', 'rear_image_validation_token', 'side_image_validation_token']),
+                ...$request->safe()->except(['front_image', 'rear_image', 'side_image', 'vehicle_geran', 'front_image_validation_token', 'rear_image_validation_token', 'side_image_validation_token', 'geran_plate_number']),
                 ...$files,
                 'vehicle_image_path' => $files['front_image_path'],
                 'verification_status' => 'Verified',
