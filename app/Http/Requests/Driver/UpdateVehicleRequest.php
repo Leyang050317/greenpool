@@ -93,7 +93,7 @@ class UpdateVehicleRequest extends StoreVehicleRequest
 
                 if ($this->fieldChanged($vehicle, 'plate_number')) {
                     foreach ($photoContexts as $field => $context) {
-                        if (blank($context['plate_number'] ?? null)) {
+                        if ($field !== 'side_image' && blank($context['plate_number'] ?? null)) {
                             $validator->errors()->add($field, 'Inappropriate image. Please upload a clear vehicle photo with a readable plate number.');
                         }
                     }
