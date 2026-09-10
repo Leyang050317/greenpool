@@ -4,6 +4,7 @@ namespace Tests\Feature\Driver;
 
 use App\Models\User;
 use App\Services\Ocr\DocumentOcrService;
+use App\Services\Ocr\OcrException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Mockery\MockInterface;
@@ -45,5 +46,20 @@ class VehicleDocumentOcrEndpointTest extends TestCase
             ->assertUnprocessable()->assertJsonValidationErrors('document');
         $this->actingAs($passenger)->postJson(route('driver.vehicles.documents.ocr'), $payload)
             ->assertForbidden();
+    }
+
+    public function test_vehicle_geran_scan_without_readable_text_uses_inappropriate_image_message(): void
+    {
+        $driver = User::factory()->create(['role' => 'driver']);
+        $this->mock(DocumentOcrService::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('process')->once()
+                ->andThrow(new OcrException('No readable text was detected. Please upload a clearer document image.'));
+        });
+
+        $this->actingAs($driver)->postJson(route('driver.vehicles.documents.ocr'), [
+            'document' => UploadedFile::fake()->image('parking.jpg', 800, 500),
+            'expected_document_type' => 'VEHICLE_GERAN',
+        ])->assertUnprocessable()
+            ->assertJsonPath('message', DocumentOcrService::INAPPROPRIATE_VEHICLE_GERAN_MESSAGE);
     }
 }

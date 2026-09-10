@@ -188,7 +188,13 @@ class VehicleController extends Controller
                 ...$result,
             ]);
         } catch (OcrException $exception) {
-            return response()->json(['success' => false, 'message' => $exception->getMessage()], 422);
+            $message = $exception->getMessage();
+            if ($validated['expected_document_type'] === 'VEHICLE_GERAN'
+                && $message === 'No readable text was detected. Please upload a clearer document image.') {
+                $message = DocumentOcrService::INAPPROPRIATE_VEHICLE_GERAN_MESSAGE;
+            }
+
+            return response()->json(['success' => false, 'message' => $message], 422);
         }
     }
 
@@ -222,8 +228,15 @@ class VehicleController extends Controller
                 try {
                     $plateNumber = $this->plateNumberExtractor->extract($validated['image']);
                 } catch (OcrException) {
-                    // Photo validation still succeeds when the plate is not readable.
+                    // Non-front views may not expose a readable plate.
                 }
+            }
+
+            if (($imageResult['accepted'] ?? false) && $validated['expected_view'] === 'FRONT' && blank($plateNumber)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Inappropriate image. Please upload a clear front car image with a readable plate number.',
+                ], 422);
             }
 
             if (filled($imageResult['token'] ?? null)) {

@@ -38,20 +38,68 @@ class VehicleImageConcurrencyTest extends TestCase
         $this->assertSame(422, $this->controller($validator)->validateImage($this->request())->status());
     }
 
-    private function controller(VehicleImageValidationService $validator): VehicleController
+    public function test_front_photo_without_a_detectable_plate_is_rejected(): void
+    {
+        $lock = Mockery::mock(Lock::class);
+        $lock->shouldReceive('get')->once()->andReturnTrue();
+        $lock->shouldReceive('release')->once();
+        Cache::shouldReceive('store->lock')->once()->andReturn($lock);
+
+        $validator = Mockery::mock(VehicleImageValidationService::class);
+        $validator->shouldReceive('validate')->once()->andReturn([
+            'accepted' => true,
+            'token' => 'token-value',
+        ]);
+        $validator->shouldNotReceive('attachPlateNumber');
+
+        $plateExtractor = Mockery::mock(PlateNumberExtractionService::class);
+        $plateExtractor->shouldReceive('extract')->once()->andReturnNull();
+
+        $response = $this->controller($validator, $plateExtractor)->validateImage($this->request());
+
+        $this->assertSame(422, $response->status());
+        $this->assertSame('Inappropriate image. Please upload a clear front car image with a readable plate number.', $response->getData(true)['message']);
+    }
+
+    public function test_non_front_photo_without_a_detectable_plate_can_still_pass(): void
+    {
+        $lock = Mockery::mock(Lock::class);
+        $lock->shouldReceive('get')->once()->andReturnTrue();
+        $lock->shouldReceive('release')->once();
+        Cache::shouldReceive('store->lock')->once()->andReturn($lock);
+
+        $validator = Mockery::mock(VehicleImageValidationService::class);
+        $validator->shouldReceive('validate')->once()->andReturn([
+            'accepted' => true,
+            'token' => 'token-value',
+        ]);
+        $validator->shouldReceive('attachPlateNumber')->once()->with('token-value', null)->andReturn('token-without-plate');
+
+        $plateExtractor = Mockery::mock(PlateNumberExtractionService::class);
+        $plateExtractor->shouldReceive('extract')->once()->andReturnNull();
+
+        $response = $this->controller($validator, $plateExtractor)->validateImage($this->request('SIDE'));
+
+        $this->assertSame(200, $response->status());
+        $this->assertTrue($response->getData(true)['success']);
+        $this->assertNull($response->getData(true)['plate_number']);
+        $this->assertSame('token-without-plate', $response->getData(true)['token']);
+    }
+
+    private function controller(VehicleImageValidationService $validator, ?PlateNumberExtractionService $plateExtractor = null): VehicleController
     {
         return new VehicleController(
             Mockery::mock(DocumentOcrService::class), $validator,
-            Mockery::mock(PlateNumberExtractionService::class),
+            $plateExtractor ?? Mockery::mock(PlateNumberExtractionService::class),
         );
     }
 
-    private function request(): Request
+    private function request(string $expectedView = 'FRONT'): Request
     {
         $request = Mockery::mock(Request::class);
         $request->shouldReceive('validate')->once()->andReturn([
-            'image' => UploadedFile::fake()->create('front.jpg', 1, 'image/jpeg'),
-            'expected_view' => 'FRONT',
+            'image' => UploadedFile::fake()->create(strtolower($expectedView).'.jpg', 1, 'image/jpeg'),
+            'expected_view' => $expectedView,
         ]);
 
         return $request;
