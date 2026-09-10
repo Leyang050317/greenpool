@@ -495,20 +495,38 @@ class VehicleManagementTest extends TestCase
         $this->assertSame('Verified', $vehicle->refresh()->verification_status);
     }
 
-    public function test_plate_redetection_requires_every_vehicle_photo_to_have_a_readable_plate(): void
+    public function test_plate_redetection_requires_front_and_rear_photos_to_have_a_readable_plate(): void
     {
         $driver = User::factory()->create(['role' => 'driver', 'name' => 'TEST DRIVER']);
         $vehicle = Vehicle::factory()->verified()->create(['user_id' => $driver->id]);
         $data = $this->revalidationData($driver, $vehicle, ['plate_number' => 'NEW 1234']);
-        $data['side_image_validation_token'] = $this->vehicleValidationToken(
-            $data['side_image'], 'SIDE', null, $data['colour']
+        $data['rear_image_validation_token'] = $this->vehicleValidationToken(
+            $data['rear_image'], 'REAR', null, $data['colour']
         );
 
         $this->actingAs($driver)
             ->put(route('driver.vehicles.update', $vehicle), $data)
-            ->assertSessionHasErrors('side_image');
+            ->assertSessionHasErrors('rear_image');
 
         $this->assertSame($vehicle->plate_number, $vehicle->fresh()->plate_number);
+    }
+
+    public function test_plate_redetection_allows_side_photo_without_a_readable_plate(): void
+    {
+        Storage::fake('public');
+        Storage::fake('local');
+        $driver = User::factory()->create(['role' => 'driver', 'name' => 'TEST DRIVER']);
+        $vehicle = Vehicle::factory()->verified()->create(['user_id' => $driver->id]);
+        $data = $this->revalidationData($driver, $vehicle, ['plate_number' => 'NEW 1234']);
+        $data['side_image_validation_token'] = $this->vehicleValidationToken(
+            $data['side_image'], 'SIDE', null, mb_strtoupper($data['colour'])
+        );
+
+        $this->actingAs($driver)
+            ->put(route('driver.vehicles.update', $vehicle), $data)
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame('NEW 1234', $vehicle->fresh()->plate_number);
     }
 
     public function test_colour_redetection_requires_every_vehicle_photo_to_have_a_detected_colour(): void
