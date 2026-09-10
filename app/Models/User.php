@@ -4,16 +4,29 @@ namespace App\Models;
 
 use App\Models\Concerns\HasProfileCompleteness;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Notifications\BookingRequestNotification;
+use App\Notifications\BookingStatusNotification;
+use App\Notifications\CashPaymentSelectedNotification;
 use App\Notifications\GreenPoolResetPassword;
 use App\Notifications\GreenPoolVerifyEmail;
+use App\Notifications\MessageReceivedNotification;
+use App\Notifications\PaymentCompletedNotification;
+use App\Notifications\PaymentDueNotification;
+use App\Notifications\PaymentReceivedNotification;
+use App\Notifications\RatingReceivedNotification;
+use App\Notifications\RatingReminderNotification;
+use App\Notifications\TripAutoCancelledNotification;
+use App\Notifications\TripReminderNotification;
+use App\Notifications\TripUpdatedNotification;
+use App\Notifications\TripUpdateNotification;
 use Database\Factories\UserFactory;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
-use Illuminate\Notifications\Notification;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Notifications\Notification;
 
 class User extends Authenticatable implements MustVerifyEmail
 {
@@ -103,21 +116,23 @@ class User extends Authenticatable implements MustVerifyEmail
 
     public function allowsInAppNotification(Notification $notification): bool
     {
-        $preferenceField = match ($notification::class) {
-            \App\Notifications\TripUpdatedNotification::class,
-            \App\Notifications\TripUpdateNotification::class,
-            \App\Notifications\TripReminderNotification::class => 'trip_updates',
-            \App\Notifications\BookingRequestNotification::class,
-            \App\Notifications\BookingStatusNotification::class => 'booking_updates',
-            \App\Notifications\PaymentDueNotification::class,
-            \App\Notifications\PaymentCompletedNotification::class,
-            \App\Notifications\PaymentReceivedNotification::class,
-            \App\Notifications\CashPaymentSelectedNotification::class => 'payment_updates',
-            \App\Notifications\MessageReceivedNotification::class => 'message_alerts',
-            \App\Notifications\RatingReminderNotification::class,
-            \App\Notifications\RatingReceivedNotification::class => 'rating_reminders',
-            default => null,
-        };
+        $preferenceField = $notification instanceof BookingStatusNotification
+            ? $notification->preferenceField()
+            : match ($notification::class) {
+                TripUpdatedNotification::class,
+                TripUpdateNotification::class,
+                TripReminderNotification::class,
+                TripAutoCancelledNotification::class => 'trip_updates',
+                BookingRequestNotification::class => 'booking_updates',
+                PaymentDueNotification::class,
+                PaymentCompletedNotification::class,
+                PaymentReceivedNotification::class,
+                CashPaymentSelectedNotification::class => 'payment_updates',
+                MessageReceivedNotification::class => 'message_alerts',
+                RatingReminderNotification::class,
+                RatingReceivedNotification::class => 'rating_reminders',
+                default => null,
+            };
 
         if ($preferenceField === null) {
             return true;
@@ -133,6 +148,22 @@ class User extends Authenticatable implements MustVerifyEmail
         ]);
 
         return (bool) $preferences->{$preferenceField};
+    }
+
+    /** @return array<string, bool> */
+    public function inAppNotificationPreferences(): array
+    {
+        $preferences = $this->notificationPreference()->first();
+
+        return collect([
+            'trip_updates',
+            'booking_updates',
+            'payment_updates',
+            'message_alerts',
+            'rating_reminders',
+        ])->mapWithKeys(fn (string $field) => [
+            $field => $preferences ? (bool) $preferences->{$field} : true,
+        ])->all();
     }
 
     public function driverLicence(): HasOne
@@ -167,7 +198,7 @@ class User extends Authenticatable implements MustVerifyEmail
 
     public function sendEmailVerificationNotification(): void
     {
-        $this->notify(new GreenPoolVerifyEmail());
+        $this->notify(new GreenPoolVerifyEmail);
     }
 
     /**

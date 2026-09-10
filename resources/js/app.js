@@ -142,7 +142,47 @@ const incrementNotificationBadge = () => {
     updateNotificationBadge(currentCount + 1);
 };
 
-const showRealtimeNotification = (notification, iconText = '★') => {
+const notificationPreferenceEnabled = (category) => {
+    if (!category) return true;
+
+    try {
+        const preferences = JSON.parse(document.body.dataset.notificationPreferences || '{}');
+        return preferences[category] !== false;
+    } catch {
+        return true;
+    }
+};
+
+let notificationCenterRefreshTimer;
+const refreshNotificationCenter = () => {
+    const currentCenter = document.querySelector('[data-notification-center]');
+    if (!currentCenter) return;
+
+    window.clearTimeout(notificationCenterRefreshTimer);
+    notificationCenterRefreshTimer = window.setTimeout(async () => {
+        try {
+            const response = await window.fetch(window.location.href, {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            });
+            if (!response.ok) return;
+
+            const page = new DOMParser().parseFromString(await response.text(), 'text/html');
+            const updatedCenter = page.querySelector('[data-notification-center]');
+            if (updatedCenter && currentCenter.isConnected) {
+                currentCenter.replaceWith(updatedCenter);
+            }
+        } catch {
+            // Realtime delivery is optional; the stored notification remains available on refresh.
+        }
+    }, 500);
+};
+
+const showRealtimeNotification = (notification, iconText = '★', category = null) => {
+    if (!notificationPreferenceEnabled(category)) return;
+
+    incrementNotificationBadge();
+    refreshNotificationCenter();
+
     let container = document.querySelector('[data-realtime-notification-container]');
 
     if (!container) {
@@ -187,7 +227,7 @@ const showRealtimeNotification = (notification, iconText = '★') => {
     };
     const scheduleDismiss = () => {
         window.clearTimeout(dismissTimer);
-        dismissTimer = window.setTimeout(dismiss, 10000);
+        dismissTimer = window.setTimeout(dismiss, 15000);
     };
 
     // Keep important notifications visible while the user is reading them.
@@ -227,8 +267,7 @@ const subscribeToRatingNotifications = () => {
 
     window.Echo.private(`${userRole}.${userId}`)
         .listen('RatingReceived', (notification) => {
-            incrementNotificationBadge();
-            showRealtimeNotification(notification);
+            showRealtimeNotification(notification, '★', 'rating_reminders');
 
             if (userRole === 'passenger'
                 && (window.location.pathname.startsWith('/passenger/booking')
@@ -250,8 +289,7 @@ const subscribeToPaymentNotifications = () => {
     if (userRole === 'driver') {
         window.Echo.private(`driver.${userId}`)
             .listen('PaymentReceived', (notification) => {
-                incrementNotificationBadge();
-                showRealtimeNotification(notification, 'RM');
+                showRealtimeNotification(notification, 'RM', 'payment_updates');
 
                 const earnings = document.querySelector('[data-driver-total-earnings]');
                 const total = Number.parseFloat(notification.total_earnings);
@@ -293,7 +331,6 @@ const subscribeToInAppNotifications = () => {
 
     window.Echo.private(`${userRole}.${userId}`)
         .listen('InAppNotificationCreated', (notification) => {
-            incrementNotificationBadge();
             showRealtimeNotification(notification, notificationIcon(notification));
 
             const paymentDetail = document.querySelector('[data-payment-detail]');
@@ -378,12 +415,11 @@ const subscribeToBookingUpdates = () => {
     if (userRole === 'driver') {
         window.Echo.private(`driver.${userId}`)
             .listen('BookingCreated', (event) => {
-                incrementNotificationBadge();
                 showRealtimeNotification({
                     title: 'New Booking Request',
                     message: `${event.passenger_name} requested a seat on your trip from ${event.trip_route || 'your trip'}.`,
                     url: event.url,
-                }, '★');
+                }, '★', 'booking_updates');
             })
             .listen('BookingStatusUpdated', (event) => {
                 if (event.picked_up_booking_id) {
@@ -395,9 +431,8 @@ const subscribeToBookingUpdates = () => {
                     return;
                 }
                 if (event.driver_notification_type === 'booking_request_cancelled') {
-                    incrementNotificationBadge();
                     const notification = bookingUpdateNotification(event, 'driver');
-                    if (notification) showRealtimeNotification(notification, notification.icon);
+                    if (notification) showRealtimeNotification(notification, notification.icon, 'booking_updates');
                 }
 
                 if (path.startsWith('/driver/trips')) {
@@ -415,10 +450,12 @@ const subscribeToBookingUpdates = () => {
                 }
 
                 if (event.passenger_notification_type) {
-                    incrementNotificationBadge();
                     const notification = bookingUpdateNotification(event, 'passenger');
                     if (notification) {
-                        showRealtimeNotification(notification, notification.icon);
+                        const category = event.passenger_notification_type.startsWith('trip_')
+                            ? 'trip_updates'
+                            : 'booking_updates';
+                        showRealtimeNotification(notification, notification.icon, category);
                     }
                 }
 
@@ -476,8 +513,7 @@ const subscribeToTripReminders = () => {
 
     window.Echo.private(`${userRole}.${userId}`)
         .listen('TripReminderSent', (notification) => {
-            incrementNotificationBadge();
-            showRealtimeNotification(notification, '◷');
+            showRealtimeNotification(notification, '◷', 'trip_updates');
         });
 };
 

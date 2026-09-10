@@ -21,6 +21,13 @@ class BookingStatusNotification extends Notification
         return ['database'];
     }
 
+    public function preferenceField(): string
+    {
+        return in_array($this->status, ['Started', 'Completed', 'Cancelled', 'Expired'], true)
+            ? 'trip_updates'
+            : 'booking_updates';
+    }
+
     public function toArray(object $notifiable): array
     {
         $this->booking->loadMissing(['trip.user']);
