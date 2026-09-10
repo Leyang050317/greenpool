@@ -12,6 +12,12 @@
             ->take(2)
             ->map(fn ($part) => mb_strtoupper(mb_substr($part, 0, 1)))
             ->implode('');
+
+        $bookingActionMessage = match (request('result')) {
+            'accepted' => $booking->booking_status === 'Accepted' ? 'Booking request accepted successfully.' : null,
+            'rejected' => $booking->booking_status === 'Rejected' ? 'Booking request rejected successfully.' : null,
+            default => null,
+        };
     @endphp
 
     <div class="min-h-screen bg-[#F8FAFC] px-4 py-8 sm:px-6 lg:px-8" x-data="{ acceptOpen: false, rejectOpen: false }">
@@ -41,6 +47,10 @@
 
             @if(session('success'))
                 <div class="mb-6 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-medium text-green-800">{{ session('success') }}</div>
+            @endif
+
+            @if($bookingActionMessage)
+                <div class="mb-6 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-medium text-green-800">{{ $bookingActionMessage }}</div>
             @endif
 
             @if($errors->any())

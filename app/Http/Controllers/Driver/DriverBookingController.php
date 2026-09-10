@@ -88,7 +88,10 @@ class DriverBookingController extends Controller
             }
 
             $booking->update(['booking_status' => 'Accepted']);
-            $trip->decrement('available_seats', $booking->number_of_seats);
+            $trip->update([
+                'available_seats' => $trip->available_seats - $booking->number_of_seats,
+                'version' => $trip->version + 1,
+            ]);
 
             return $booking;
         });
@@ -96,7 +99,10 @@ class DriverBookingController extends Controller
         $booking->passenger->notify(new BookingStatusNotification($booking, 'Accepted'));
         BookingStatusUpdated::dispatch($booking, null, 'booking_request_accepted');
 
-        return redirect()->route('driver.booking-requests.index')->with('success', 'Booking request accepted successfully.');
+        return redirect()->route('driver.booking-requests.show', [
+            'booking' => $booking,
+            'result' => 'accepted',
+        ]);
     }
 
     public function reject(Request $request, Booking $booking): RedirectResponse
@@ -123,7 +129,10 @@ class DriverBookingController extends Controller
         $booking->passenger->notify(new BookingStatusNotification($booking, 'Rejected'));
         BookingStatusUpdated::dispatch($booking, null, 'booking_request_rejected');
 
-        return redirect()->route('driver.booking-requests.index')->with('success', 'Booking request rejected successfully.');
+        return redirect()->route('driver.booking-requests.show', [
+            'booking' => $booking,
+            'result' => 'rejected',
+        ]);
     }
 
     private function ensureDriverOwnsTrip(Request $request, Trip $trip): void

@@ -132,10 +132,11 @@ class TripGoogleMapsTest extends TestCase
         $vehicle = $this->vehicle($driver);
         $trip = $this->trip($driver, $vehicle);
         $this->fakeGooglePlacesAndRoute();
-        $this->actingAs($driver)->patch(route('driver.trips.update', $trip), $this->tripData($vehicle, ['departure_place_id' => null, 'destination_place_id' => null]))->assertRedirect(route('driver.trips.index'));
+        $this->actingAs($driver)->patch(route('driver.trips.update', $trip), $this->tripData($vehicle, ['departure_place_id' => null, 'destination_place_id' => null, 'version' => $trip->version]))->assertRedirect(route('driver.trips.index'));
         Http::assertNothingSent();
 
-        $this->actingAs($driver)->patch(route('driver.trips.update', $trip), $this->tripData($vehicle, ['departure_place_id' => 'departure', 'destination_place_id' => null]))->assertRedirect(route('driver.trips.index'));
+        $trip->refresh();
+        $this->actingAs($driver)->patch(route('driver.trips.update', $trip), $this->tripData($vehicle, ['departure_place_id' => 'departure', 'destination_place_id' => null, 'version' => $trip->version]))->assertRedirect(route('driver.trips.index'));
         $this->assertSame(988, $trip->refresh()->estimated_duration_seconds);
         Http::assertSentCount(2);
     }

@@ -630,8 +630,8 @@ class BookingModuleTest extends TestCase
 
         $this->actingAs($driver)
             ->patch(route('driver.booking-requests.accept', $booking))
-            ->assertRedirect(route('driver.booking-requests.index'))
-            ->assertSessionHas('success');
+            ->assertRedirect(route('driver.booking-requests.show', ['booking' => $booking, 'result' => 'accepted']))
+            ->assertSessionMissing('success');
 
         $this->assertDatabaseHas('bookings', [
             'id' => $booking->id,
@@ -640,6 +640,7 @@ class BookingModuleTest extends TestCase
         $this->assertDatabaseHas('trips', [
             'trip_id' => $trip->trip_id,
             'available_seats' => 1,
+            'version' => 2,
         ]);
     }
 
@@ -658,7 +659,7 @@ class BookingModuleTest extends TestCase
 
         $this->actingAs($driver)
             ->patch(route('driver.booking-requests.accept', $booking))
-            ->assertRedirect(route('driver.booking-requests.index'));
+            ->assertRedirect(route('driver.booking-requests.show', ['booking' => $booking, 'result' => 'accepted']));
 
         $notification = $passenger->unreadNotifications()->where('type', BookingStatusNotification::class)->firstOrFail();
 
@@ -669,6 +670,24 @@ class BookingModuleTest extends TestCase
             BookingStatusUpdated::class,
             fn (BookingStatusUpdated $event) => $event->passengerNotificationType === 'booking_request_accepted'
         );
+    }
+
+    public function test_booking_action_result_message_only_appears_for_the_matching_final_status(): void
+    {
+        $driver = User::factory()->create(['role' => 'driver']);
+        $trip = $this->createTrip(['user_id' => $driver->id]);
+        $acceptedBooking = $this->createBooking(User::factory()->create(['role' => 'passenger']), $trip, bookingStatus: 'Accepted');
+        $pendingBooking = $this->createBooking(User::factory()->create(['role' => 'passenger']), $trip);
+
+        $this->actingAs($driver)
+            ->get(route('driver.booking-requests.show', ['booking' => $acceptedBooking, 'result' => 'accepted']))
+            ->assertOk()
+            ->assertSee('Booking request accepted successfully.');
+
+        $this->actingAs($driver)
+            ->get(route('driver.booking-requests.show', ['booking' => $pendingBooking, 'result' => 'accepted']))
+            ->assertOk()
+            ->assertDontSee('Booking request accepted successfully.');
     }
 
     public function test_driver_can_view_booking_request_details_for_their_trip(): void
@@ -756,8 +775,8 @@ class BookingModuleTest extends TestCase
 
         $this->actingAs($driver)
             ->patch(route('driver.booking-requests.reject', $booking))
-            ->assertRedirect(route('driver.booking-requests.index'))
-            ->assertSessionHas('success');
+            ->assertRedirect(route('driver.booking-requests.show', ['booking' => $booking, 'result' => 'rejected']))
+            ->assertSessionMissing('success');
 
         $this->assertDatabaseHas('bookings', [
             'id' => $booking->id,
@@ -784,7 +803,7 @@ class BookingModuleTest extends TestCase
 
         $this->actingAs($driver)
             ->patch(route('driver.booking-requests.reject', $booking))
-            ->assertRedirect(route('driver.booking-requests.index'));
+            ->assertRedirect(route('driver.booking-requests.show', ['booking' => $booking, 'result' => 'rejected']));
 
         $notification = $passenger->unreadNotifications()->where('type', BookingStatusNotification::class)->firstOrFail();
 
