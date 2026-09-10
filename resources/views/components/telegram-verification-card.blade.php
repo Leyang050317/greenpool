@@ -34,13 +34,7 @@
                 <x-telegram-link-button />
             </div>
         @else
-            <form method="POST" action="{{ route('telegram.unlink') }}" class="mt-1 shrink-0" onsubmit="return confirm('Unlink this Telegram account? You will not be able to receive verification codes until you link it again.')">
-                @csrf
-                @method('DELETE')
-                <button type="submit" class="inline-flex items-center justify-center rounded-lg border border-red-200 px-4 py-2.5 text-sm font-semibold text-red-700 hover:bg-red-50">
-                    Unlink
-                </button>
-            </form>
+            <x-trip-confirmation name="unlink-telegram" title="Unlink Telegram account?" message="You will not be able to receive verification codes until you link Telegram again." confirm-label="Unlink" :action="route('telegram.unlink')" method="DELETE" variant="danger" class="mt-1 shrink-0 rounded-lg px-4 py-2.5 text-sm font-semibold">Unlink</x-trip-confirmation>
         @endif
     </div>
 </section>

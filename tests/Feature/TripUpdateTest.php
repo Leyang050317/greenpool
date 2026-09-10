@@ -26,7 +26,7 @@ class TripUpdateTest extends TestCase
         $this->booking($trip, $pending, 'Pending');
 
         $this->actingAs($driver)->post(route('trips.updates.store', $trip), ['update_type' => 'traffic_delay'])
-            ->assertRedirect()->assertSessionHas('success', 'Trip update sent.');
+            ->assertRedirect()->assertSessionHas('success', 'Update sent.');
 
         $notification = $accepted->notifications()->where('type', TripUpdateNotification::class)->firstOrFail();
         $this->assertSame('Trip Update', $notification->data['title']);

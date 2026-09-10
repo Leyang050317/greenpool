@@ -122,15 +122,11 @@
 
                             <div class="mt-5 border-t border-gray-50 pt-4">
                                 <p class="text-xs font-medium text-gray-500">Driver Preferences</p>
-                                @if ($trip->user->driverPreference)
-                                    <div class="mt-2 grid gap-2 text-xs font-semibold sm:flex sm:flex-wrap">
-                                        <span class="w-fit max-w-full break-words rounded-full bg-gray-100 px-2.5 py-1 text-gray-700 [overflow-wrap:anywhere]">Smoking: {{ $trip->user->driverPreference->smoking_allowed ? 'Allowed' : 'Not allowed' }}</span>
-                                        <span class="w-fit max-w-full break-words rounded-full bg-gray-100 px-2.5 py-1 text-gray-700 [overflow-wrap:anywhere]">Pets: {{ $trip->user->driverPreference->pets_allowed ? 'Allowed' : 'Not allowed' }}</span>
-                                        <span class="w-fit max-w-full break-words rounded-full bg-green-50 px-2.5 py-1 text-[#2E7D32] [overflow-wrap:anywhere]">{{ $trip->user->driverPreference->conversation_preference }}</span>
-                                    </div>
-                                @else
-                                    <p class="mt-1 text-xs text-gray-400">Not provided</p>
-                                @endif
+                                <div class="mt-2 grid gap-2 text-xs font-semibold sm:flex sm:flex-wrap">
+                                    <span class="w-fit max-w-full break-words rounded-full bg-gray-100 px-2.5 py-1 text-gray-700 [overflow-wrap:anywhere]">Smoking: {{ $trip->smoking_allowed ? 'Allowed' : 'Not allowed' }}</span>
+                                    <span class="w-fit max-w-full break-words rounded-full bg-gray-100 px-2.5 py-1 text-gray-700 [overflow-wrap:anywhere]">Pets: {{ $trip->pets_allowed ? 'Allowed' : 'Not allowed' }}</span>
+                                    <span class="w-fit max-w-full break-words rounded-full bg-green-50 px-2.5 py-1 text-[#2E7D32] [overflow-wrap:anywhere]">{{ $trip->conversation_preference }}</span>
+                                </div>
                             </div>
 
                             <div class="mt-5 flex flex-col gap-3 border-t border-gray-50 pt-4 sm:flex-row sm:items-center sm:justify-between">

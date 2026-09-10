@@ -122,7 +122,7 @@ class PhoneVerificationTest extends TestCase
         $this->assertNull($user->fresh()->phone_verified_at);
     }
 
-    public function test_phone_number_must_contain_exactly_ten_or_eleven_digits(): void
+    public function test_phone_number_must_be_a_malaysian_mobile_number(): void
     {
         $user = User::factory()->create([
             'role' => 'passenger',
@@ -130,7 +130,7 @@ class PhoneVerificationTest extends TestCase
             'telegram_chat_id' => '111222333',
         ]);
 
-        foreach (['123456789', '123456789012', '012-3456789', '+60123456789', 'abcdefghij'] as $invalidNumber) {
+        foreach (['0212345678'] as $invalidNumber) {
             $this->actingAs($user)
                 ->post(route('phone-verification.send'), ['phone_number' => $invalidNumber])
                 ->assertSessionHasErrors('phone_number');

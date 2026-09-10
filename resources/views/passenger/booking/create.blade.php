@@ -94,33 +94,29 @@
 
                         <div class="mt-5 border-t border-gray-50 pt-4">
                             <p class="text-xs font-medium text-gray-500">Driver Preferences</p>
-                            @if($trip->user->driverPreference)
-                                <div class="mt-3 grid gap-3 sm:grid-cols-3">
+                            <div class="mt-3 grid gap-3 sm:grid-cols-3">
                                     <div class="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2">
                                         <p class="text-xs text-gray-500">Smoking</p>
-                                        <p class="mt-1 flex items-center gap-1.5 text-sm font-semibold {{ $trip->user->driverPreference->smoking_allowed ? 'text-green-700' : 'text-gray-700' }}">
-                                            <x-icons.lucide :name="$trip->user->driverPreference->smoking_allowed ? 'circle-check' : 'circle-x'" class="h-3.5 w-3.5" />
-                                            {{ $trip->user->driverPreference->smoking_allowed ? 'Allowed' : 'Not allowed' }}
+                                        <p class="mt-1 flex items-center gap-1.5 text-sm font-semibold {{ $trip->smoking_allowed ? 'text-green-700' : 'text-gray-700' }}">
+                                            <x-icons.lucide :name="$trip->smoking_allowed ? 'circle-check' : 'circle-x'" class="h-3.5 w-3.5" />
+                                            {{ $trip->smoking_allowed ? 'Allowed' : 'Not allowed' }}
                                         </p>
                                     </div>
                                     <div class="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2">
                                         <p class="text-xs text-gray-500">Pets</p>
-                                        <p class="mt-1 flex items-center gap-1.5 text-sm font-semibold {{ $trip->user->driverPreference->pets_allowed ? 'text-green-700' : 'text-gray-700' }}">
-                                            <x-icons.lucide :name="$trip->user->driverPreference->pets_allowed ? 'circle-check' : 'circle-x'" class="h-3.5 w-3.5" />
-                                            {{ $trip->user->driverPreference->pets_allowed ? 'Allowed' : 'Not allowed' }}
+                                        <p class="mt-1 flex items-center gap-1.5 text-sm font-semibold {{ $trip->pets_allowed ? 'text-green-700' : 'text-gray-700' }}">
+                                            <x-icons.lucide :name="$trip->pets_allowed ? 'circle-check' : 'circle-x'" class="h-3.5 w-3.5" />
+                                            {{ $trip->pets_allowed ? 'Allowed' : 'Not allowed' }}
                                         </p>
                                     </div>
                                     <div class="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2">
                                         <p class="text-xs text-gray-500">Conversation</p>
                                         <p class="mt-1 flex items-center gap-1.5 text-sm font-semibold text-gray-700">
                                             <x-icons.lucide name="message-square" class="h-3.5 w-3.5" />
-                                            {{ $trip->user->driverPreference->conversation_preference }}
+                                            {{ $trip->conversation_preference }}
                                         </p>
                                     </div>
-                                </div>
-                            @else
-                                <p class="mt-1 text-sm leading-6 text-gray-500">This driver has not shared driving preferences yet.</p>
-                            @endif
+                            </div>
                         </div>
                     </section>
 
@@ -159,7 +155,7 @@
                             </div>
 
                             <div>
-                                <label for="number_of_luggage" class="mb-1.5 block text-xs font-semibold text-gray-500">Number of Luggage</label>
+                                <label for="number_of_luggage" class="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-gray-500"><x-icons.lucide name="briefcase" class="h-3.5 w-3.5" />Number of Luggage</label>
                                 <input id="number_of_luggage" type="number" name="number_of_luggage" value="{{ old('number_of_luggage', 0) }}" required min="0" class="block w-full rounded-xl border-gray-200 text-sm focus:border-[#16A34A] focus:ring-[#16A34A]" />
                             </div>
                         </div>

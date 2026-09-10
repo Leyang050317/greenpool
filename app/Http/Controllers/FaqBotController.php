@@ -48,7 +48,7 @@ class FaqBotController extends Controller
         // Direct questions have approved, deterministic answers. Return those
         // before Gemini so model wording or a deployment setting cannot hide a
         // core GreenPool guide such as how to create a trip.
-        if ($match && ($match['keyword_score'] >= 8 || $match['exact_question'])) {
+        if ($match && ($match['direct_phrase_score'] >= 8 || $match['exact_question'])) {
             return $this->matchedFaqResponse($match['faq']);
         }
 
@@ -80,16 +80,16 @@ class FaqBotController extends Controller
         return $this->matchedFaqResponse($match['faq']);
     }
 
-    /** @return array{faq: Faq, score: int, keyword_score: int, exact_question: bool}|null */
+    /** @return array{faq: Faq, score: int, keyword_score: int, direct_phrase_score: int, exact_question: bool}|null */
     private function findFaqMatch($faqs, string $question, array $terms): ?array
     {
         return $faqs
             ->map(function (Faq $faq) use ($question, $terms): array {
                 $faqKeywords = collect($faq->keywords ?? [])->map(fn ($keyword) => $this->normalise($keyword));
                 $haystack = $faqKeywords->concat([$this->normalise($faq->question), $this->normalise($faq->answer)])->implode(' ');
-                $keywordScore = $faqKeywords->sum(function (string $keyword) use ($question, $terms): int {
+                $matchedKeywords = $faqKeywords->filter(function (string $keyword) use ($question, $terms): bool {
                     if ($keyword === '') {
-                        return 0;
+                        return false;
                     }
 
                     // Allow natural wording such as "create a trip" to match
@@ -99,8 +99,12 @@ class FaqBotController extends Controller
                     $allKeywordTermsPresent = $keywordTerms !== []
                         && collect($keywordTerms)->every(fn (string $term) => in_array($term, $terms, true));
 
-                    return str_contains($question, $keyword) || $allKeywordTermsPresent ? 8 : 0;
+                    return str_contains($question, $keyword) || $allKeywordTermsPresent;
                 });
+                $keywordScore = $matchedKeywords->count() * 8;
+                $directPhraseScore = $matchedKeywords
+                    ->filter(fn (string $keyword) => count(array_filter(explode(' ', $keyword))) >= 2)
+                    ->count() * 8;
                 $keywordTermMatches = collect($terms)->filter(fn (string $term) => $faqKeywords->contains($term))->count();
                 $exactTermMatches = collect($terms)->filter(fn (string $term) => str_contains($haystack, $term))->count();
                 $score = $keywordScore + ($exactTermMatches * 2);
@@ -119,6 +123,7 @@ class FaqBotController extends Controller
                     'faq' => $faq,
                     'score' => $score,
                     'keyword_score' => $keywordScore,
+                    'direct_phrase_score' => $directPhraseScore,
                     'exact_question' => $question === $this->normalise($faq->question),
                     'has_direct_match' => $keywordScore > 0 || $keywordTermMatches > 0,
                 ];

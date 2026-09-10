@@ -51,6 +51,18 @@
             <circle cx="12" cy="12" r="2" />
             <path d="M6 10h.01M18 14h.01" />
             @break
+        @case('briefcase')
+            <rect width="20" height="13" x="2" y="7" rx="2" />
+            <path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M2 12h20M10 12v2h4v-2" />
+            @break
+        @case('archive')
+            <path d="M21 8v13H3V8M1 3h22v5H1z" />
+            <path d="M10 12h4" />
+            @break
+        @case('images')
+            <rect width="18" height="14" x="3" y="5" rx="2" />
+            <path d="m3 16 5-5 4 4 3-3 6 6M8.5 9.5h.01" />
+            @break
         @case('user-circle')
             <circle cx="12" cy="12" r="10" />
             <circle cx="12" cy="10" r="3" />
@@ -184,6 +196,12 @@
         @case('mail')
             <rect width="18" height="14" x="3" y="5" rx="2" />
             <path d="m3 7 9 6 9-6" />
+            @break
+        @case('phone')
+            <path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 2 .7 2.9a2 2 0 0 1-.5 2.1L8 10a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.5c.9.3 1.9.6 2.9.7A2 2 0 0 1 22 16.9Z" />
+            @break
+        @case('loader-circle')
+            <path d="M21 12a9 9 0 1 1-2.64-6.36" />
             @break
         @case('send')
             <path d="m22 2-7 20-4-9-9-4Z" />

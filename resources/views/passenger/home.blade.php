@@ -139,7 +139,7 @@
                                         <dd class="mt-1 text-lg font-bold text-slate-900">{{ $upcomingRide->number_of_seats }}</dd>
                                     </div>
                                     <div>
-                                        <dt class="text-xs font-semibold uppercase text-slate-400">Luggage</dt>
+                                        <dt class="flex items-center gap-1.5 text-xs font-semibold uppercase text-slate-400"><x-icons.lucide name="briefcase" class="h-3.5 w-3.5" />Luggage</dt>
                                         <dd class="mt-1 text-lg font-bold text-slate-900">{{ $upcomingRide->number_of_luggage }}</dd>
                                     </div>
                                     <div>
@@ -235,7 +235,7 @@
                                         <dd class="mt-1 font-semibold text-slate-900">{{ $requestItem->number_of_seats }}</dd>
                                     </div>
                                     <div>
-                                        <dt class="text-xs font-semibold uppercase text-slate-400">Luggage</dt>
+                                        <dt class="flex items-center gap-1.5 text-xs font-semibold uppercase text-slate-400"><x-icons.lucide name="briefcase" class="h-3.5 w-3.5" />Luggage</dt>
                                         <dd class="mt-1 font-semibold text-slate-900">{{ $requestItem->number_of_luggage }}</dd>
                                     </div>
                                 </div>

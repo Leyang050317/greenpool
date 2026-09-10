@@ -24,6 +24,7 @@ class Trip extends Model
         'vehicle_id', 'departure_location', 'destination', 'departure_at',
         'available_seats', 'price_per_passenger', 'description', 'estimated_distance_km', 'estimated_duration_seconds', 'estimated_arrival_at', 'status', 'version',
         'departure_latitude', 'departure_longitude', 'destination_latitude', 'destination_longitude',
+        'smoking_allowed', 'pets_allowed', 'conversation_preference',
         'started_at', 'completed_at', 'cancelled_at',
     ];
 
@@ -44,11 +45,21 @@ class Trip extends Model
             'departure_longitude' => 'decimal:7',
             'destination_latitude' => 'decimal:7',
             'destination_longitude' => 'decimal:7',
+            'smoking_allowed' => 'boolean',
+            'pets_allowed' => 'boolean',
         ];
     }
 
     protected static function booted(): void
     {
+        static::creating(function (Trip $trip): void {
+            $preference = $trip->user?->driverPreference;
+
+            $trip->smoking_allowed ??= $preference?->smoking_allowed ?? false;
+            $trip->pets_allowed ??= $preference?->pets_allowed ?? false;
+            $trip->conversation_preference ??= $preference?->conversation_preference ?? 'Moderate';
+        });
+
         static::updating(function (Trip $trip): void {
             if (! $trip->isDirty('version')) {
                 $trip->version = ((int) $trip->version) + 1;
