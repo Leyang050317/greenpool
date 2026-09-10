@@ -43,6 +43,8 @@ class PaymentModuleTest extends TestCase
             ->assertSee('How would you like to pay?')
             ->assertSee('Pay by Card')
             ->assertSee('Pay Cash')
+            ->assertSee('min-h-[100dvh]', false)
+            ->assertSee('[overflow-wrap:anywhere]', false)
             ->assertDontSee('GrabPay')
             ->assertDontSee('Alipay');
 

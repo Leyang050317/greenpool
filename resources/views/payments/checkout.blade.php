@@ -1,5 +1,5 @@
 <x-payments.shell>
-    <div class="min-h-screen bg-slate-50 px-4 py-8 sm:px-6 lg:px-8">
+    <div class="min-h-[100dvh] bg-slate-50 px-4 py-8 pb-10 sm:px-6 lg:px-8">
         <div class="mx-auto max-w-5xl">
             <a href="{{ route('payments.show', $payment) }}" class="inline-flex items-center gap-2 text-sm font-semibold text-slate-500 transition hover:text-green-700">
                 <x-icons.lucide name="arrow-left" class="h-4 w-4" />
@@ -35,11 +35,11 @@
                                 <div class="min-w-0 flex-1 space-y-5">
                                     <div>
                                         <p class="text-xs font-semibold uppercase tracking-wide text-green-200">Pickup</p>
-                                        <p class="mt-1 truncate font-semibold text-white">{{ $payment->booking->trip->departure_location }}</p>
+                                        <p class="mt-1 break-words font-semibold text-white [overflow-wrap:anywhere]">{{ $payment->booking->trip->departure_location }}</p>
                                     </div>
                                     <div>
                                         <p class="text-xs font-semibold uppercase tracking-wide text-green-200">Destination</p>
-                                        <p class="mt-1 truncate font-semibold text-white">{{ $payment->booking->trip->destination }}</p>
+                                        <p class="mt-1 break-words font-semibold text-white [overflow-wrap:anywhere]">{{ $payment->booking->trip->destination }}</p>
                                     </div>
                                 </div>
                             </div>
@@ -48,7 +48,7 @@
                         <dl class="grid grid-cols-2 gap-3 lg:col-span-2 lg:grid-cols-3 lg:-mt-1">
                             <div class="rounded-2xl bg-white/10 p-4 ring-1 ring-white/10">
                                 <dt class="text-xs font-medium text-green-200">Driver</dt>
-                                <dd class="mt-1 truncate text-sm font-bold">{{ $payment->payee->name }}</dd>
+                                <dd class="mt-1 break-words text-sm font-bold [overflow-wrap:anywhere]">{{ $payment->payee->name }}</dd>
                             </div>
                             <div class="rounded-2xl bg-white/10 p-4 ring-1 ring-white/10">
                                 <dt class="text-xs font-medium text-green-200">Seats</dt>
