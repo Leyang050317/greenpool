@@ -3,16 +3,16 @@
 namespace Tests\Feature\Driver;
 
 use App\Models\User;
-use Tests\Concerns\CreatesVehicleValidationTokens;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Tests\Concerns\CreatesVehicleValidationTokens;
 use Tests\TestCase;
 
 class VehicleDocumentVerificationTest extends TestCase
 {
-    use RefreshDatabase;
     use CreatesVehicleValidationTokens;
+    use RefreshDatabase;
 
     public function test_matching_normalized_geran_owner_name_can_be_saved(): void
     {
@@ -83,6 +83,18 @@ class VehicleDocumentVerificationTest extends TestCase
         ]))->assertSessionHasErrors('geran_plate_number');
 
         $this->assertDatabaseCount('vehicles', 0);
+    }
+
+    public function test_document_scan_problem_uses_error_styling_even_after_a_successful_scan(): void
+    {
+        $driver = User::factory()->create(['role' => 'driver', 'name' => 'ER KIM WEN']);
+        $this->addValidDrivingLicence($driver);
+
+        $this->actingAs($driver)
+            ->get(route('driver.vehicles.create'))
+            ->assertOk()
+            ->assertSee(":class=\"ocrProblem.vehicle_geran?'border-red-200 bg-red-50 text-red-700'", false)
+            ->assertSee('role="alert"', false);
     }
 
     private function payload(array $overrides = []): array

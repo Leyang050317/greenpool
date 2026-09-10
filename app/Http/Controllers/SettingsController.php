@@ -17,7 +17,7 @@ class SettingsController extends Controller
 
     public function updateNotifications(Request $request): RedirectResponse
     {
-        $fields = ['trip_updates', 'booking_updates', 'payment_updates', 'message_alerts', 'rating_reminders', 'attraction_updates'];
+        $fields = ['trip_updates', 'booking_updates', 'payment_updates', 'message_alerts', 'rating_reminders'];
         $preferences = $request->user()->notificationPreference()->firstOrCreate([]);
         $preferences->update(collect($fields)->mapWithKeys(fn (string $field) => [$field => $request->boolean($field)])->all());
 
