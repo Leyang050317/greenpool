@@ -95,7 +95,7 @@
                                         @else
                                             <p class="mt-0.5 text-xs text-gray-400">No ratings yet</p>
                                         @endif
-                                        <p class="truncate text-xs text-gray-500">{{ $trip->vehicle?->brand }} {{ $trip->vehicle?->model }} {{ $trip->vehicle?->plate_number ? '('.$trip->vehicle->plate_number.')' : '' }}</p>
+                                        <p class="break-words text-xs text-gray-500 [overflow-wrap:anywhere]">{{ $trip->vehicle?->brand }} {{ $trip->vehicle?->model }} {{ $trip->vehicle?->plate_number ? '('.$trip->vehicle->plate_number.')' : '' }}</p>
                                     </div>
                                 </div>
                                 <span class="shrink-0 rounded-full bg-green-50 px-2.5 py-1 text-xs font-medium text-[#2E7D32]">{{ $trip->available_seats }} seats</span>
@@ -123,26 +123,26 @@
                             <div class="mt-5 border-t border-gray-50 pt-4">
                                 <p class="text-xs font-medium text-gray-500">Driver Preferences</p>
                                 @if ($trip->user->driverPreference)
-                                    <div class="mt-2 flex flex-wrap gap-2 text-xs font-semibold">
-                                        <span class="rounded-full bg-gray-100 px-2.5 py-1 text-gray-700">Smoking: {{ $trip->user->driverPreference->smoking_allowed ? 'Allowed' : 'Not allowed' }}</span>
-                                        <span class="rounded-full bg-gray-100 px-2.5 py-1 text-gray-700">Pets: {{ $trip->user->driverPreference->pets_allowed ? 'Allowed' : 'Not allowed' }}</span>
-                                        <span class="rounded-full bg-green-50 px-2.5 py-1 text-[#2E7D32]">{{ $trip->user->driverPreference->conversation_preference }}</span>
+                                    <div class="mt-2 grid gap-2 text-xs font-semibold sm:flex sm:flex-wrap">
+                                        <span class="w-fit max-w-full break-words rounded-full bg-gray-100 px-2.5 py-1 text-gray-700 [overflow-wrap:anywhere]">Smoking: {{ $trip->user->driverPreference->smoking_allowed ? 'Allowed' : 'Not allowed' }}</span>
+                                        <span class="w-fit max-w-full break-words rounded-full bg-gray-100 px-2.5 py-1 text-gray-700 [overflow-wrap:anywhere]">Pets: {{ $trip->user->driverPreference->pets_allowed ? 'Allowed' : 'Not allowed' }}</span>
+                                        <span class="w-fit max-w-full break-words rounded-full bg-green-50 px-2.5 py-1 text-[#2E7D32] [overflow-wrap:anywhere]">{{ $trip->user->driverPreference->conversation_preference }}</span>
                                     </div>
                                 @else
                                     <p class="mt-1 text-xs text-gray-400">Not provided</p>
                                 @endif
                             </div>
 
-                            <div class="mt-5 flex items-center justify-between gap-3 border-t border-gray-50 pt-4">
+                            <div class="mt-5 flex flex-col gap-3 border-t border-gray-50 pt-4 sm:flex-row sm:items-center sm:justify-between">
                                 @if($myBooking)
                                     <span class="rounded-full px-2.5 py-1 text-xs font-semibold {{ $myBooking->booking_status === 'Accepted' ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700' }}">{{ $myBooking->booking_status === 'Accepted' ? 'Booking confirmed' : 'Booking pending' }}</span>
-                                    <a href="{{ route('passenger.bookings.show', $myBooking) }}" class="inline-flex items-center gap-2 rounded-xl bg-[#2E7D32] px-4 py-2 text-sm font-semibold text-white hover:bg-[#256b29]">View booking <x-icons.lucide name="arrow-right" class="h-4 w-4" /></a>
+                                    <a href="{{ route('passenger.bookings.show', $myBooking) }}" class="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#2E7D32] px-4 py-2 text-sm font-semibold text-white hover:bg-[#256b29] sm:w-auto">View booking <x-icons.lucide name="arrow-right" class="h-4 w-4" /></a>
                                 @elseif($bookingRestricted)
                                     <span class="text-xs font-medium text-amber-700">Resolve payment to book a new trip.</span>
-                                    <a href="{{ route('payments.index') }}" class="inline-flex items-center gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-800 hover:bg-amber-100">Payments <x-icons.lucide name="arrow-right" class="h-4 w-4" /></a>
+                                    <a href="{{ route('payments.index') }}" class="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-800 hover:bg-amber-100 sm:w-auto">Payments <x-icons.lucide name="arrow-right" class="h-4 w-4" /></a>
                                 @else
                                     <span></span>
-                                    <a href="{{ route('passenger.bookings.create', ['trip_id' => $trip->trip_id]) }}" class="inline-flex items-center gap-2 rounded-xl bg-[#2E7D32] px-4 py-2 text-sm font-semibold text-white hover:bg-[#256b29]">View Details <x-icons.lucide name="arrow-right" class="h-4 w-4" /></a>
+                                    <a href="{{ route('passenger.bookings.create', ['trip_id' => $trip->trip_id]) }}" class="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#2E7D32] px-4 py-2 text-sm font-semibold text-white hover:bg-[#256b29] sm:w-auto">View Details <x-icons.lucide name="arrow-right" class="h-4 w-4" /></a>
                                 @endif
                             </div>
                         </article>

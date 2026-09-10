@@ -44,7 +44,24 @@
                         <p class="mt-1 text-sm text-gray-500">Your booking requests will appear here.</p>
                     </div>
                 @else
-                    <div class="overflow-x-auto">
+                    <div class="space-y-3 p-3 md:hidden">
+                        @foreach($bookings as $booking)
+                            @php
+                                $displayStatus = $booking->booking_status === 'Accepted' && $booking->trip->status === 'Scheduled'
+                                    ? ($booking->trip->hasExpiredDeparture() ? 'Expired' : 'Accepted')
+                                    : ($booking->booking_status === 'Accepted' ? $booking->trip->status : $booking->booking_status);
+                            @endphp
+                            <a href="{{ route('passenger.bookings.show', $booking) }}" class="block rounded-xl border border-gray-100 p-4 transition hover:border-green-200 hover:bg-green-50/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2E7D32]">
+                                <div class="flex items-start justify-between gap-3">
+                                    <div class="min-w-0"><p class="break-words font-semibold text-gray-900 [overflow-wrap:anywhere]">{{ $booking->trip->departure_location }} to {{ $booking->trip->destination }}</p><p class="mt-1 text-xs text-gray-500">{{ $booking->trip->user->name }}</p></div>
+                                    <span class="shrink-0 rounded-full px-2.5 py-1 text-xs font-medium {{ $badge[$displayStatus] }}">{{ $displayStatus }}</span>
+                                </div>
+                                <dl class="mt-4 grid grid-cols-2 gap-3 border-t border-gray-50 pt-3 text-sm"><div><dt class="text-xs text-gray-500">Date</dt><dd class="mt-1 font-semibold text-gray-800">{{ $booking->trip->departure_at->format('d M Y, g:i A') }}</dd></div><div><dt class="text-xs text-gray-500">Seats</dt><dd class="mt-1 font-semibold text-gray-800">{{ $booking->number_of_seats }}</dd></div><div class="col-span-2"><dt class="text-xs text-gray-500">Pickup point</dt><dd class="mt-1 break-words font-semibold text-gray-800 [overflow-wrap:anywhere]">{{ $booking->pickup_point }}</dd></div></dl>
+                                <span class="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-[#2E7D32]">View booking <x-icons.lucide name="arrow-right" class="h-4 w-4" /></span>
+                            </a>
+                        @endforeach
+                    </div>
+                    <div class="hidden overflow-x-auto md:block">
                         <table class="min-w-full">
                             <thead>
                                 <tr class="border-b border-gray-100">
