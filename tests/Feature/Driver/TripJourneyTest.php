@@ -237,9 +237,9 @@ class TripJourneyTest extends TestCase
             ->assertSee('Expired')
             ->assertSee('data-journey-expiry-card', false)
             ->assertSee('data-journey-expiry-actions', false)
-            ->assertSee('The scheduled departure time has passed. Edit this trip to choose a future time, or cancel it.')
+            ->assertSee('The scheduled departure time has passed. Edit this trip to choose a future time.')
             ->assertSee('Edit Trip')
-            ->assertSee('Cancel Trip');
+            ->assertDontSee('Cancel Trip');
 
         $this->actingAs($driver)
             ->patch(route('driver.trips.start', $trip))
