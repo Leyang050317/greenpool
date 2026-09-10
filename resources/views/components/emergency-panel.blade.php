@@ -27,6 +27,7 @@
     @keydown.escape.window="if (open && !submitting) open = false"
     data-emergency-panel
     data-trip-id="{{ $trip->trip_id }}"
+    data-panel-url="{{ route('trips.emergencies.panel', $trip) }}"
     class="rounded-2xl border border-red-200 bg-red-50 p-5"
     aria-label="Report emergency"
 >

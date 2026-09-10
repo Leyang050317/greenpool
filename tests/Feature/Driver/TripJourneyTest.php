@@ -51,6 +51,10 @@ class TripJourneyTest extends TestCase
             ->assertSee('Safety assistance')
             ->assertSee('tel:999', false)
             ->assertSee('Call emergency contact')
+            ->assertSee('Confirm passenger pickup?')
+            ->assertSee('This action cannot be undone.')
+            ->assertSee('Confirm Pickup')
+            ->assertSee('Destination')
             ->assertSee(route('trips.emergencies.store', $trip), false)
             ->assertSee('<option value="safety_risk">', false);
     }

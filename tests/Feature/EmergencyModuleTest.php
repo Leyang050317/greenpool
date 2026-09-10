@@ -356,6 +356,67 @@ class EmergencyModuleTest extends TestCase
         $this->assertSame(1, $passenger->notifications()->where('type', EmergencyAlertNotification::class)->count());
     }
 
+    public function test_json_report_returns_the_panel_url_needed_for_realtime_refresh(): void
+    {
+        [$driver, $trip] = $this->trip(['status' => 'In Progress', 'started_at' => now()]);
+
+        $response = $this->actingAs($driver)
+            ->postJson(route('trips.emergencies.store', $trip), ['issue_type' => 'safety_risk'])
+            ->assertOk()
+            ->assertJsonPath('trip_id', $trip->trip_id)
+            ->assertJsonPath('panel_url', route('trips.emergencies.panel', $trip));
+
+        $this->assertSame(Emergency::firstOrFail()->id, $response->json('emergency_id'));
+    }
+
+    public function test_emergency_event_includes_the_panel_url_for_the_recipient(): void
+    {
+        [$driver, $trip] = $this->trip(['status' => 'In Progress', 'started_at' => now()]);
+        $passenger = User::factory()->create(['role' => 'passenger']);
+        $booking = $this->booking($trip, $passenger);
+        $emergency = Emergency::create([
+            'trip_id' => $trip->trip_id,
+            'user_id' => $driver->id,
+            'role' => 'driver',
+            'issue_type' => 'safety_risk',
+            'status' => 'Active',
+            'triggered_at' => now(),
+        ]);
+
+        $payload = (new EmergencyTriggered($emergency, $passenger->id, 'passenger', $booking))->broadcastWith();
+
+        $this->assertSame(route('trips.emergencies.panel', $trip), $payload['panel_url']);
+    }
+
+    public function test_trip_participants_can_refresh_the_emergency_panel_but_outsiders_cannot(): void
+    {
+        [$driver, $trip] = $this->trip(['status' => 'In Progress', 'started_at' => now()]);
+        $passenger = User::factory()->create(['role' => 'passenger']);
+        $this->booking($trip, $passenger);
+        $outsider = User::factory()->create(['role' => 'passenger']);
+        $emergency = Emergency::create([
+            'trip_id' => $trip->trip_id,
+            'user_id' => $passenger->id,
+            'role' => 'passenger',
+            'issue_type' => 'medical_emergency',
+            'status' => 'Active',
+            'triggered_at' => now(),
+        ]);
+
+        foreach ([$driver, $passenger] as $participant) {
+            $this->actingAs($participant)
+                ->get(route('trips.emergencies.panel', $trip))
+                ->assertOk()
+                ->assertSee('data-emergency-panel', false)
+                ->assertSee('emergency-'.$emergency->id, false)
+                ->assertSee('Medical Emergency');
+        }
+
+        $this->actingAs($outsider)
+            ->get(route('trips.emergencies.panel', $trip))
+            ->assertForbidden();
+    }
+
     private function trip(array $overrides = []): array
     {
         $driver = User::factory()->create(['role' => 'driver']);

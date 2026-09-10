@@ -53,10 +53,13 @@
                     id="phone_number"
                     name="phone_number"
                     type="tel"
-                    inputmode="tel"
+                    inputmode="numeric"
                     autocomplete="tel"
+                    minlength="10"
+                    maxlength="11"
+                    pattern="[0-9]{10,11}"
                     value="{{ old('phone_number', $user->phone_number) }}"
-                    placeholder="+60 12-345 6789"
+                    placeholder="0123456789"
                     :readonly="{{ $user->phone_verified_at ? '!editingPhone' : 'false' }}"
                     :class="editingPhone ? 'border-gray-300 focus:border-[#2E7D32] focus:ring-[#2E7D32]' : 'cursor-not-allowed border-gray-200 bg-gray-50 text-gray-600'"
                     class="block w-full rounded-lg pr-28 text-sm shadow-sm"
@@ -77,7 +80,7 @@
                 <button type="submit" class="inline-flex min-h-10 items-center justify-center rounded-lg bg-[#2E7D32] px-4 py-2 text-sm font-semibold text-white hover:bg-[#256b29]">Verify Number</button>
             @endif
         </div>
-        <p class="mt-2 text-xs text-gray-500">{{ $user->phone_verified_at ? 'Your verified number is locked until you confirm a change.' : 'Verification is required before the number can be used for trip communication.' }}</p>
+        <p class="mt-2 text-xs text-gray-500">{{ $user->phone_verified_at ? 'Your verified number is locked until you confirm a change.' : 'Enter 10 or 11 digits without spaces or symbols. Verification is required before the number can be used for trip communication.' }}</p>
         @if (!$user->telegram_chat_id)
             <p class="mt-2 text-xs font-medium text-amber-700">Link Telegram first so GreenPool can deliver your verification code.</p>
         @endif

@@ -51,14 +51,21 @@
                                     ? ($booking->trip->hasExpiredDeparture() ? 'Expired' : 'Accepted')
                                     : ($booking->booking_status === 'Accepted' ? $booking->trip->status : $booking->booking_status);
                             @endphp
-                            <a href="{{ route('passenger.bookings.show', $booking) }}" class="block rounded-xl border border-gray-100 p-4 transition hover:border-green-200 hover:bg-green-50/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2E7D32]">
-                                <div class="flex items-start justify-between gap-3">
-                                    <div class="min-w-0"><p class="break-words font-semibold text-gray-900 [overflow-wrap:anywhere]">{{ $booking->trip->departure_location }} to {{ $booking->trip->destination }}</p><p class="mt-1 text-xs text-gray-500">{{ $booking->trip->user->name }}</p></div>
-                                    <span class="shrink-0 rounded-full px-2.5 py-1 text-xs font-medium {{ $badge[$displayStatus] }}">{{ $displayStatus }}</span>
-                                </div>
-                                <dl class="mt-4 grid grid-cols-2 gap-3 border-t border-gray-50 pt-3 text-sm"><div><dt class="text-xs text-gray-500">Date</dt><dd class="mt-1 font-semibold text-gray-800">{{ $booking->trip->departure_at->format('d M Y, g:i A') }}</dd></div><div><dt class="text-xs text-gray-500">Seats</dt><dd class="mt-1 font-semibold text-gray-800">{{ $booking->number_of_seats }}</dd></div><div class="col-span-2"><dt class="text-xs text-gray-500">Pickup point</dt><dd class="mt-1 break-words font-semibold text-gray-800 [overflow-wrap:anywhere]">{{ $booking->pickup_point }}</dd></div></dl>
-                                <span class="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-[#2E7D32]">View booking <x-icons.lucide name="arrow-right" class="h-4 w-4" /></span>
-                            </a>
+                            <div class="rounded-xl border border-gray-100 p-4">
+                                <a href="{{ route('passenger.bookings.show', $booking) }}" class="block rounded-lg transition hover:bg-green-50/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2E7D32]">
+                                    <div class="flex items-start justify-between gap-3">
+                                        <div class="min-w-0"><p class="break-words font-semibold text-gray-900 [overflow-wrap:anywhere]">{{ $booking->trip->departure_location }} to {{ $booking->trip->destination }}</p><p class="mt-1 text-xs text-gray-500">{{ $booking->trip->user->name }}</p></div>
+                                        <span class="shrink-0 rounded-full px-2.5 py-1 text-xs font-medium {{ $badge[$displayStatus] }}">{{ $displayStatus }}</span>
+                                    </div>
+                                    <dl class="mt-4 grid grid-cols-2 gap-3 border-t border-gray-50 pt-3 text-sm"><div><dt class="text-xs text-gray-500">Date</dt><dd class="mt-1 font-semibold text-gray-800">{{ $booking->trip->departure_at->format('d M Y, g:i A') }}</dd></div><div><dt class="text-xs text-gray-500">Seats</dt><dd class="mt-1 font-semibold text-gray-800">{{ $booking->number_of_seats }}</dd></div><div class="col-span-2"><dt class="text-xs text-gray-500">Pickup point</dt><dd class="mt-1 break-words font-semibold text-gray-800 [overflow-wrap:anywhere]">{{ $booking->pickup_point }}</dd></div></dl>
+                                    <span class="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-[#2E7D32]">View booking <x-icons.lucide name="arrow-right" class="h-4 w-4" /></span>
+                                </a>
+                                @if($booking->booking_status === 'Pending')
+                                    <div class="mt-4 border-t border-gray-100 pt-4">
+                                        <x-trip-confirmation name="cancel-booking-mobile-{{ $booking->id }}" title="Cancel Booking Request?" message="Are you sure you want to cancel this booking request?" confirm-label="Confirm Cancel" :action="route('passenger.bookings.cancel', $booking)" variant="danger" class="min-h-11 w-full justify-center rounded-lg px-3 text-sm font-medium">Cancel booking</x-trip-confirmation>
+                                    </div>
+                                @endif
+                            </div>
                         @endforeach
                     </div>
                     <div class="hidden overflow-x-auto md:block">
@@ -111,10 +118,6 @@
                                                 >
                                                     Cancel
                                                 </x-trip-confirmation>
-                                            @elseif($booking->booking_status === 'Accepted' && $booking->trip->status === 'Scheduled')
-                                                <x-trip-confirmation name="cancel-confirmed-booking-{{ $booking->id }}" title="Cancel confirmed booking?" message="Your driver will be notified and your seats will become available again." confirm-label="Cancel booking" :action="route('passenger.bookings.cancel', $booking)" variant="danger" class="h-9 rounded-lg px-3 text-xs font-medium">Cancel booking</x-trip-confirmation>
-                                            @elseif($booking->booking_status === 'Accepted' && $booking->trip->status === 'In Progress' && $booking->picked_up_at === null)
-                                                <x-trip-confirmation name="not-boarding-{{ $booking->id }}" title="Tell your driver you will not board?" message="Your driver will be told to skip your pickup point. Use Emergency instead if you need urgent help." confirm-label="I will not board" :action="route('passenger.bookings.cancel', $booking)" variant="danger" class="h-9 rounded-lg px-3 text-xs font-medium">I will not board</x-trip-confirmation>
                                             @elseif($booking->booking_status === 'Accepted' && $booking->trip->status === 'Completed' && ! $booking->payment?->isPaid())
                                                 <a href="{{ route('payments.checkout', $booking) }}" class="rounded-lg bg-green-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-green-700">Pay RM {{ number_format((float) $booking->trip->price_per_passenger * $booking->number_of_seats, 2) }}</a>
                                             @elseif($booking->booking_status === 'Accepted' && $booking->trip->status === 'Completed' && ! $booking->ratings->contains('reviewer_id', Auth::id()))

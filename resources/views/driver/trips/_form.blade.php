@@ -50,7 +50,7 @@
                     <p class="mt-1 text-xs text-gray-400">Select a suggestion in Malaysia to use it.</p><x-input-error :messages="$errors->get('departure_place_id')" class="mt-1.5" />
                 </div>
                 <div class="relative">
-                    <label for="destination" class="mb-1.5 flex items-center gap-1.5 text-sm font-medium text-gray-700"><x-icons.lucide name="map-pin" class="h-4 w-4 text-gray-400" />Destination</label>
+                    <label for="destination" class="mb-1.5 flex items-center gap-1.5 text-sm font-medium text-gray-700"><x-icons.lucide name="map-pinned" class="h-4 w-4 text-gray-400" />Destination</label>
                     <input id="destination" name="destination" x-model="destination.text" @input="search('destination')" @focus="destination.open = true" autocomplete="off" maxlength="255" required class="block w-full rounded-xl border-gray-200 text-sm focus:border-[#16A34A] focus:ring-[#16A34A]" placeholder="Search a Malaysian address or place" />
                     <input type="hidden" name="destination_place_id" :value="destination.placeId" />
                     <div x-cloak x-show="destination.open && destination.suggestions.length" class="absolute z-20 mt-1 w-full overflow-hidden rounded-xl border border-gray-200 bg-white py-1 shadow-lg"><template x-for="suggestion in destination.suggestions" :key="suggestion.place_id"><button type="button" @click="select('destination', suggestion)" class="block w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50" x-text="suggestion.text"></button></template></div>

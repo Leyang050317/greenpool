@@ -149,6 +149,7 @@ Route::middleware(['auth', 'active-account', 'verified'])->group(function () {
     Route::patch('/passenger/booking/{booking}/cancel', [PassengerBookingController::class, 'cancel'])
         ->name('passenger.bookings.cancel');
     Route::post('/trips/{trip}/emergencies', [EmergencyController::class, 'store'])->name('trips.emergencies.store');
+    Route::get('/trips/{trip}/emergency-panel', [EmergencyController::class, 'panel'])->name('trips.emergencies.panel');
     Route::post('/trips/{trip}/updates', [TripUpdateController::class, 'store'])->name('trips.updates.store');
     Route::patch('/emergencies/{emergency}/acknowledge', [EmergencyController::class, 'acknowledge'])->name('emergencies.acknowledge');
     Route::patch('/emergencies/{emergency}/resolve', [EmergencyController::class, 'resolve'])->name('emergencies.resolve');

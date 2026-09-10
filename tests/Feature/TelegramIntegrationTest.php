@@ -123,7 +123,7 @@ class TelegramIntegrationTest extends TestCase
         ]);
 
         $this->actingAs($user)
-            ->post(route('phone-verification.send'), ['phone_number' => '+60 12-345 6789'])
+            ->post(route('phone-verification.send'), ['phone_number' => '0123456789'])
             ->assertSessionHasErrors('telegram');
 
         $this->assertNull($user->fresh()->phone_number);
@@ -136,18 +136,18 @@ class TelegramIntegrationTest extends TestCase
         Http::fake(['api.telegram.org/*' => Http::response(['ok' => false], 500)]);
         $verifiedAt = now()->subDay()->startOfSecond();
         $user = User::factory()->create([
-            'phone_number' => '+60 12-345 6789',
+            'phone_number' => '0123456789',
             'phone_verified_at' => $verifiedAt,
             'telegram_chat_id' => '555',
         ]);
 
         $this->actingAs($user)->post(route('phone-verification.send'), [
-            'phone_number' => '+60 19-876 5432',
+            'phone_number' => '01123456789',
             'confirm_phone_change' => '1',
         ])->assertSessionHasErrors('telegram');
 
         $freshUser = $user->fresh();
-        $this->assertSame('+60 12-345 6789', $freshUser->phone_number);
+        $this->assertSame('0123456789', $freshUser->phone_number);
         $this->assertTrue($verifiedAt->equalTo($freshUser->phone_verified_at));
         $this->assertNull(Cache::get('phone-verification:'.$user->id));
     }

@@ -20,8 +20,7 @@ class PhoneVerificationController extends Controller
             'phone_number' => [
                 'required',
                 'string',
-                'max:30',
-                'regex:/^\+?[0-9\s\-()]{7,30}$/',
+                'regex:/^[0-9]{10,11}$/',
                 Rule::unique('users', 'phone_number')->ignore($user->id),
             ],
         ]);

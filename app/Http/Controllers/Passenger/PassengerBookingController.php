@@ -297,45 +297,29 @@ class PassengerBookingController extends Controller
         abort_unless($booking->passenger_id === $request->user()->id, 403);
 
         $booking->loadMissing('trip.user');
-        $trip = $booking->trip;
+        $cancelledBooking = DB::transaction(function () use ($booking) {
+            $lockedBooking = Booking::query()
+                ->whereKey($booking->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
 
-        if ($booking->booking_status === 'Pending') {
-            $booking->update(['booking_status' => 'Cancelled']);
-            $booking->trip->user->notify(new BookingRequestNotification($booking, 'cancelled'));
-            BookingStatusUpdated::dispatch($booking, 'booking_request_cancelled');
+            if ($lockedBooking->booking_status !== 'Pending') {
+                return null;
+            }
 
-            return redirect()->route('passenger.bookings.history')->with('success', 'Booking request cancelled successfully.');
+            $lockedBooking->update(['booking_status' => 'Cancelled']);
+
+            return $lockedBooking->load('trip.user');
+        });
+
+        if (! $cancelledBooking) {
+            return back()->with('error', 'Only pending booking requests can be cancelled.');
         }
 
-        if ($booking->booking_status === 'Accepted' && $trip->status === 'Scheduled') {
-            $booking = DB::transaction(function () use ($booking, $trip) {
-                $lockedBooking = Booking::query()->whereKey($booking->getKey())->lockForUpdate()->firstOrFail();
-                $lockedTrip = Trip::query()->whereKey($trip->getKey())->lockForUpdate()->firstOrFail();
+        $cancelledBooking->trip->user->notify(new BookingRequestNotification($cancelledBooking, 'cancelled'));
+        BookingStatusUpdated::dispatch($cancelledBooking, 'booking_request_cancelled');
 
-                abort_unless($lockedBooking->booking_status === 'Accepted' && $lockedTrip->status === 'Scheduled', 422);
-
-                $lockedBooking->update(['booking_status' => 'Cancelled']);
-                $lockedTrip->increment('available_seats', $lockedBooking->number_of_seats);
-
-                return $lockedBooking->load('trip.user');
-            });
-
-            $booking->trip->user->notify(new BookingRequestNotification($booking, 'cancelled_confirmed'));
-            BookingStatusUpdated::dispatch($booking, 'booking_confirmed_cancelled');
-
-            return redirect()->route('passenger.bookings.history')->with('success', 'Confirmed booking cancelled. The seats are available again.');
-        }
-
-        if ($booking->booking_status === 'Accepted' && $trip->status === 'In Progress' && $booking->picked_up_at === null) {
-            $booking->update(['booking_status' => 'Cancelled']);
-            $booking->load('trip.user');
-            $booking->trip->user->notify(new BookingRequestNotification($booking, 'not_boarding'));
-            BookingStatusUpdated::dispatch($booking, 'passenger_not_boarding');
-
-            return redirect()->route('passenger.bookings.history')->with('success', 'Your driver has been notified that you will not board.');
-        }
-
-        return back()->with('error', 'This booking can no longer be cancelled. Use Emergency if you need urgent help during the trip.');
+        return redirect()->route('passenger.bookings.history')->with('success', 'Booking request cancelled successfully.');
     }
 
     private function ensurePassenger(Request $request): void

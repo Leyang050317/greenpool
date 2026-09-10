@@ -15,6 +15,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
+use Illuminate\View\View;
 use Throwable;
 
 class EmergencyController extends Controller
@@ -44,7 +45,7 @@ class EmergencyController extends Controller
 
         if ($recent) {
             if ($request->expectsJson()) {
-                return response()->json(['message' => 'Emergency reported successfully.', 'emergency_id' => $recent->id]);
+                return response()->json($this->reportedPayload($recent, $trip));
             }
 
             return back()->with('success', 'Emergency reported successfully.');
@@ -70,13 +71,17 @@ class EmergencyController extends Controller
         $this->notifyParticipants($emergency, $trip);
 
         if ($request->expectsJson()) {
-            return response()->json([
-                'message' => 'Emergency reported successfully.',
-                'emergency_id' => $emergency->id,
-            ]);
+            return response()->json($this->reportedPayload($emergency, $trip));
         }
 
         return back()->with('success', 'Emergency reported successfully.');
+    }
+
+    public function panel(Request $request, Trip $trip): View
+    {
+        $this->participantBooking($request, $trip);
+
+        return view('emergencies.panel', compact('trip'));
     }
 
     public function acknowledge(Request $request, Emergency $emergency): RedirectResponse
@@ -191,5 +196,15 @@ class EmergencyController extends Controller
         } catch (Throwable $exception) {
             Log::warning('Emergency participant notification could not be sent.', ['emergency_id' => $emergency->id, 'user_id' => $recipient->id, 'exception' => $exception->getMessage()]);
         }
+    }
+
+    private function reportedPayload(Emergency $emergency, Trip $trip): array
+    {
+        return [
+            'message' => 'Emergency reported successfully.',
+            'emergency_id' => $emergency->id,
+            'trip_id' => $trip->trip_id,
+            'panel_url' => route('trips.emergencies.panel', $trip),
+        ];
     }
 }

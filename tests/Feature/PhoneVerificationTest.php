@@ -25,21 +25,21 @@ class PhoneVerificationTest extends TestCase
 
         $this->actingAs($user)
             ->post(route('phone-verification.send'), [
-                'phone_number' => '+60 12-345 6789',
+                'phone_number' => '0123456789',
             ])
             ->assertRedirect(route('profile.edit'))
             ->assertSessionHas('status', 'phone-otp-sent');
 
-        $this->assertSame('+60 12-345 6789', $user->fresh()->phone_number);
+        $this->assertSame('0123456789', $user->fresh()->phone_number);
         $this->assertNull($user->fresh()->phone_verified_at);
-        $this->assertSame('+60 12-345 6789', Cache::get('phone-verification:'.$user->id)['phone_number']);
+        $this->assertSame('0123456789', Cache::get('phone-verification:'.$user->id)['phone_number']);
     }
 
     public function test_user_can_verify_a_phone_number_with_a_valid_code(): void
     {
         $user = User::factory()->create([
             'role' => 'passenger',
-            'phone_number' => '+60 12-345 6789',
+            'phone_number' => '0123456789',
             'phone_verified_at' => null,
         ]);
         Cache::put('phone-verification:'.$user->id, [
@@ -62,7 +62,7 @@ class PhoneVerificationTest extends TestCase
     {
         $user = User::factory()->create([
             'role' => 'passenger',
-            'phone_number' => '+60 12-345 6789',
+            'phone_number' => '0123456789',
             'phone_verified_at' => null,
         ]);
         Cache::put('phone-verification:'.$user->id, [
@@ -84,18 +84,18 @@ class PhoneVerificationTest extends TestCase
     {
         $user = User::factory()->create([
             'role' => 'passenger',
-            'phone_number' => '+60 12-345 6789',
+            'phone_number' => '0123456789',
             'phone_verified_at' => now(),
         ]);
 
         $this->actingAs($user)
             ->post(route('phone-verification.send'), [
-                'phone_number' => '+60 19-876 5432',
+                'phone_number' => '01123456789',
             ])
             ->assertRedirect(route('profile.edit'))
             ->assertSessionHasErrors('phone_number');
 
-        $this->assertSame('+60 12-345 6789', $user->fresh()->phone_number);
+        $this->assertSame('0123456789', $user->fresh()->phone_number);
         $this->assertNotNull($user->fresh()->phone_verified_at);
     }
 
@@ -103,7 +103,7 @@ class PhoneVerificationTest extends TestCase
     {
         $user = User::factory()->create([
             'role' => 'passenger',
-            'phone_number' => '+60 12-345 6789',
+            'phone_number' => '0123456789',
             'phone_verified_at' => now(),
             'telegram_chat_id' => '111222333',
         ]);
@@ -112,13 +112,30 @@ class PhoneVerificationTest extends TestCase
 
         $this->actingAs($user)
             ->post(route('phone-verification.send'), [
-                'phone_number' => '+60 19-876 5432',
+                'phone_number' => '01123456789',
                 'confirm_phone_change' => '1',
             ])
             ->assertRedirect(route('profile.edit'))
             ->assertSessionHas('status', 'phone-otp-sent');
 
-        $this->assertSame('+60 19-876 5432', $user->fresh()->phone_number);
+        $this->assertSame('01123456789', $user->fresh()->phone_number);
         $this->assertNull($user->fresh()->phone_verified_at);
+    }
+
+    public function test_phone_number_must_contain_exactly_ten_or_eleven_digits(): void
+    {
+        $user = User::factory()->create([
+            'role' => 'passenger',
+            'phone_number' => null,
+            'telegram_chat_id' => '111222333',
+        ]);
+
+        foreach (['123456789', '123456789012', '012-3456789', '+60123456789', 'abcdefghij'] as $invalidNumber) {
+            $this->actingAs($user)
+                ->post(route('phone-verification.send'), ['phone_number' => $invalidNumber])
+                ->assertSessionHasErrors('phone_number');
+        }
+
+        $this->assertNull($user->fresh()->phone_number);
     }
 }
