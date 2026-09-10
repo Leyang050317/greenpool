@@ -87,9 +87,26 @@ class UpdateVehicleRequest extends StoreVehicleRequest
                     if ($context === null) {
                         $validator->errors()->add($field, "Validate the {$view} vehicle photo again before saving.");
                     } else {
-                        $photoContexts[] = $context;
+                        $photoContexts[$field] = $context;
                     }
                 }
+
+                if ($this->fieldChanged($vehicle, 'plate_number')) {
+                    foreach ($photoContexts as $field => $context) {
+                        if (blank($context['plate_number'] ?? null)) {
+                            $validator->errors()->add($field, 'Inappropriate image. Please upload a clear vehicle photo with a readable plate number.');
+                        }
+                    }
+                }
+
+                if ($this->fieldChanged($vehicle, 'colour')) {
+                    foreach ($photoContexts as $field => $context) {
+                        if (blank($context['detected_colour'] ?? null)) {
+                            $validator->errors()->add($field, 'Inappropriate image. Please upload a clear vehicle photo with the vehicle colour visible.');
+                        }
+                    }
+                }
+
                 if (collect($photoContexts)->pluck('colour')->filter()->unique()->count() > 1) {
                     $validator->errors()->add('colour', 'The vehicle colour does not match across the uploaded photos.');
                 }
@@ -125,6 +142,21 @@ class UpdateVehicleRequest extends StoreVehicleRequest
                 if (! is_array($scan) || ! $geranHash || ! hash_equals((string) ($scan['hash'] ?? ''), $geranHash)) {
                     $validator->errors()->add('vehicle_geran', 'Scan the newly selected Vehicle Geran/VOC before saving.');
                 } else {
+                    $requiredScanFields = ['registered_owner_name', 'owner_identity_no', 'manufacturer'];
+                    if ($this->fieldChanged($vehicle, 'model')) {
+                        $requiredScanFields[] = 'model_name';
+                    }
+                    if ($this->fieldChanged($vehicle, 'plate_number')) {
+                        $requiredScanFields[] = 'registration_no';
+                    }
+                    foreach ($requiredScanFields as $field) {
+                        if (blank($scan['fields'][$field] ?? null)) {
+                            $validator->errors()->add('vehicle_geran', 'Inappropriate image. Please upload a clear Vehicle Geran / VOC image with the required details visible.');
+
+                            return;
+                        }
+                    }
+
                     foreach (['registered_owner_name', 'owner_identity_no', 'manufacturer', 'model_name'] as $field) {
                         if (DocumentIdentity::normalizeName($this->input($field)) !== DocumentIdentity::normalizeName($scan['fields'][$field] ?? null)) {
                             $validator->errors()->add($field, 'Vehicle Geran details must use the values extracted by the document scan.');

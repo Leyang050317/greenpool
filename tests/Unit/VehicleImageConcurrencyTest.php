@@ -61,7 +61,30 @@ class VehicleImageConcurrencyTest extends TestCase
         $this->assertSame('Inappropriate image. Please upload a clear front car image with a readable plate number.', $response->getData(true)['message']);
     }
 
-    public function test_non_front_photo_without_a_detectable_plate_can_still_pass(): void
+    public function test_rear_photo_without_a_detectable_plate_is_rejected(): void
+    {
+        $lock = Mockery::mock(Lock::class);
+        $lock->shouldReceive('get')->once()->andReturnTrue();
+        $lock->shouldReceive('release')->once();
+        Cache::shouldReceive('store->lock')->once()->andReturn($lock);
+
+        $validator = Mockery::mock(VehicleImageValidationService::class);
+        $validator->shouldReceive('validate')->once()->andReturn([
+            'accepted' => true,
+            'token' => 'token-value',
+        ]);
+        $validator->shouldNotReceive('attachPlateNumber');
+
+        $plateExtractor = Mockery::mock(PlateNumberExtractionService::class);
+        $plateExtractor->shouldReceive('extract')->once()->andReturnNull();
+
+        $response = $this->controller($validator, $plateExtractor)->validateImage($this->request('REAR'));
+
+        $this->assertSame(422, $response->status());
+        $this->assertSame('Inappropriate image. Please upload a clear rear car image with a readable plate number.', $response->getData(true)['message']);
+    }
+
+    public function test_side_photo_without_a_detectable_plate_can_still_pass(): void
     {
         $lock = Mockery::mock(Lock::class);
         $lock->shouldReceive('get')->once()->andReturnTrue();
